@@ -1,0 +1,36 @@
+{
+  "users": [],
+  "comments": [],
+  "articles": [
+    {
+      "id": "507f1f77bcf86cd799439011",
+      "authorId": "507f1f77bcf86cd799439011",
+      "title": "first article",
+      "body": "first article body",
+      "cover": "https://s.aws.com/myfirstblog/123.jpg",
+      "status": "draft",
+      "createdAt": "2026-01-14T09:45:14.528Z",
+      "updatedAt": "2026-01-14T09:45:14.528Z"
+    },
+    {
+      "id": "507f1f77bcf86cd799439012",
+      "authorId": "507f1f77bcf86cd799439011",
+      "title": "Second article",
+      "body": "second article body",
+      "cover": "https://s.aws.com/myfirstblog/123.jpg",
+      "status": "draft",
+      "createdAt": "2026-01-14T09:45:14.528Z",
+      "updatedAt": "2026-01-14T10:35:53.014Z"
+    },
+    {
+      "id": "507f1f77bcf86cd799439013",
+      "authorId": "507f1f77bcf86cd799439011",
+      "title": "third article",
+      "body": "third article body",
+      "cover": "https://s.aws.com/myfirstblog/123.jpg",
+      "status": "draft",
+      "createdAt": "2026-01-14T09:45:14.528Z",
+      "updatedAt": "2026-01-14T10:26:31.647Z"
+    }
+  ]
+}
