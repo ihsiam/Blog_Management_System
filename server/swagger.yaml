@@ -648,6 +648,7 @@ components:
       in: query
       name: page
       description: current page number
+      required: true
       schema:
         type: integer
         format: int32
@@ -657,6 +658,7 @@ components:
       in: query
       name: limit
       description: number of  should return
+      required: true
       schema:
         type: integer
         format: int32
