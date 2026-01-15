@@ -1,15 +1,8 @@
+/* eslint-disable no-param-reassign */
 /* eslint-disable class-methods-use-this */
-const connection = require('../db');
-
 class Article {
-    constructor() {
-        this.articles = [];
-        // this.init();
-    }
-
-    async init() {
-        const db = await connection.getDB();
-        this.articles = db.articles;
+    constructor(articles) {
+        this.articles = articles;
     }
 
     async find() {
@@ -55,6 +48,17 @@ class Article {
             hasNext,
             hasPrev,
         };
+    }
+
+    async create(article, dbConnection) {
+        article.id = '507f1f77bcf86cd799439009';
+        article.createdAt = new Date().toISOString();
+        article.updatedAt = new Date().toISOString();
+        this.articles.push(article);
+        dbConnection.db.articles = this.articles;
+        await dbConnection.write();
+
+        return article;
     }
 
     async sortAsc(articles, sortBy) {

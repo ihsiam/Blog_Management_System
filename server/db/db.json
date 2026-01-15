@@ -13,7 +13,7 @@
       "updatedAt": "2026-01-14T09:45:14.528Z"
     },
     {
-      "id": "507f1f77bcf86cd799439012",
+      "id": "507f1f77bcf86cd799439010",
       "authorId": "507f1f77bcf86cd799439011",
       "title": "Second article",
       "body": "second article body",
@@ -31,6 +31,26 @@
       "status": "draft",
       "createdAt": "2026-01-14T09:45:14.528Z",
       "updatedAt": "2026-01-14T10:26:31.647Z"
+    },
+    {
+      "title": "fourth article",
+      "body": "fourth article body",
+      "cover": "https://s.aws.com/myfirstblog/123.jpg",
+      "status": "draft",
+      "authorId": "507f1f77bcf86cd799439011",
+      "id": "507f1f77bcf86cd799439009",
+      "createdAt": "2026-01-15T12:38:36.086Z",
+      "updatedAt": "2026-01-15T12:38:36.086Z"
+    },
+    {
+      "title": "fifth article",
+      "body": "fifth article body",
+      "cover": "https://s.aws.com/myfirstblog/123.jpg",
+      "status": "draft",
+      "authorId": "507f1f77bcf86cd799439011",
+      "id": "507f1f77bcf86cd799439009",
+      "createdAt": "2026-01-15T12:42:09.946Z",
+      "updatedAt": "2026-01-15T12:42:09.947Z"
     }
   ]
 }

@@ -217,7 +217,6 @@ paths:
                   example: first article
                 body:
                   type: string
-                  format: text
                   example: first article body
                 cover:
                   type: string
@@ -225,7 +224,7 @@ paths:
                   example: https://s.aws.com/myfirstblog/123.jpg
                 status:
                   type: string
-                  enum: [drafft, published]
+                  enum: [draft, published]
                   example: draft
               required: [title, body]
       responses:
@@ -321,7 +320,6 @@ paths:
                   example: updated title
                 body:
                   type: string
-                  format: text
                   example: updated body
                 cover:
                   type: string
@@ -362,7 +360,6 @@ paths:
                   example: updated title
                 body:
                   type: string
-                  format: text
                   example: updated body
                 cover:
                   type: string
@@ -422,7 +419,6 @@ components:
               example: first article
             body:
               type: string
-              format: text
               example: first article body
             cover:
               type: string
@@ -430,7 +426,7 @@ components:
               example: https://s.aws.com/myfirstblog/123.jpg
             status:
               type: string
-              enum: [drafft, published]
+              enum: [draft, published]
               example: draft
           required: [id, authorId, title, body, status]
         - $ref: "#/components/schemas/Timestamp"
@@ -450,7 +446,7 @@ components:
               example: 507f1f77bcf86cd799439011
             body:
               type: string
-              format: text
+
               example: first comment
             status:
               type: string

@@ -6,6 +6,7 @@ const swaggerUI = require('swagger-ui-express');
 const YAML = require('yamljs');
 const OpenApiValidator = require('express-openapi-validator');
 const articleService = require('./services/Articles');
+const dbConnection = require('./db');
 
 const swaggerDocs = YAML.load('./swagger.yaml');
 
@@ -19,6 +20,11 @@ app.use(
         apiSpec: './swagger.yaml',
     })
 );
+
+app.use((req, res, next) => {
+    req.authorId = '507f1f77bcf86cd799439011';
+    next();
+});
 
 app.get('/health', (_req, res) => {
     res.status(200).json({
@@ -52,22 +58,47 @@ app.get('/api/v1/articles', async (req, res) => {
             totalItems,
         },
         links: {
-            self: `/articles?page=${page}&limit=${limit}`,
+            self: `/api/v1/articles?page=${page}&limit=${limit}`,
         },
     };
 
     // pagination link
     if (hasPrev) {
         response.Pagination.prev = page - 1;
-        response.links.prev = `/articles?page=${page - 1}&limit=${limit}`;
+        response.links.prev = `/api/v1/articles?page=${page - 1}&limit=${limit}`;
     }
 
     if (hasNext) {
         response.Pagination.next = page + 1;
-        response.links.next = `/articles?page=${page + 1}&limit=${limit}`;
+        response.links.next = `/api/v1/articles?page=${page + 1}&limit=${limit}`;
     }
 
     res.status(200).json(response);
+});
+
+app.post('/api/v1/articles', async (req, res) => {
+    // extract article data
+    const { title, body, cover, status } = req.body;
+
+    // call service
+    const article = await articleService.createArticle({
+        title,
+        body,
+        cover,
+        status,
+        authorId: req.authorId,
+    });
+
+    // generate response
+    const response = {
+        code: 201,
+        message: 'article created',
+        data: article,
+        links: {
+            self: `/api/v1/articles/${article.id}`,
+        },
+    };
+    res.status(201).json(response);
 });
 
 app.use((err, req, res, _next) => {
@@ -78,7 +109,11 @@ app.use((err, req, res, _next) => {
     });
 });
 
-app.listen(process.env.PORT, () => {
-    console.log('server is running');
-    console.log('http://localhost:4000/docs');
-});
+(async () => {
+    await dbConnection.connect();
+    console.log('Database connected');
+    app.listen(process.env.PORT, () => {
+        console.log('server is running');
+        console.log('API documentation: http://localhost:4000/docs');
+    });
+})();

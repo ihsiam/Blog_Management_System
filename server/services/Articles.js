@@ -1,8 +1,10 @@
+/* eslint-disable max-len */
 /* eslint-disable prettier/prettier */
 /* eslint-disable camelcase */
 /* eslint-disable object-curly-newline */
 /* eslint-disable comma-dangle */
 const Article = require('../models/Articles');
+const dbConnection = require('../db');
 
 const findArticles = async ({
     page = 1,
@@ -11,8 +13,8 @@ const findArticles = async ({
     sort_by = 'updatedAt',
     search = '',
 }) => {
-    const articleInstance = new Article();
-    await articleInstance.init();
+    // article instance
+    const articleInstance = new Article(dbConnection.db.articles);
 
     let articles;
 
@@ -24,6 +26,7 @@ const findArticles = async ({
     }
 
     // sorting
+    articles = [...articles];
     articles = await articleInstance.sort(articles, sort_type, sort_by);
 
     // pagination
@@ -42,13 +45,21 @@ const transformarticles = ({ articles = [] }) => articles.map((article) => {
             id: transform.authorId,
             // todo
         };
-        transform.link = `/articles/${transform.id}`;
+        transform.link = `/api/v1/articles/${transform.id}`;
         delete transform.body;
         delete transform.authorId;
         return transform;
     });
 
+const createArticle = async ({ title, body, cover = '', status = 'draft', authorId }) => {
+    const articleInstance = new Article(dbConnection.db.articles);
+    const article = await articleInstance.create({ title, body, cover, status, authorId }, dbConnection);
+
+    return article;
+};
+
 module.exports = {
     findArticles,
-    transformarticles
+    transformarticles,
+    createArticle
 };
