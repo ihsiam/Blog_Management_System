@@ -11,12 +11,12 @@ const ArticleSchema = new Schema(
             enum: ['draft', 'published'],
             default: 'draft',
         },
-        authorId: {
+        author: {
             type: Schema.ObjectId,
             ref: 'User',
         },
     },
-    { timestamps: true, id: true }
+    { timestamps: true }
 );
 
 const Article = model('Article', ArticleSchema);

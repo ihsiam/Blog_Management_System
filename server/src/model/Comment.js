@@ -9,16 +9,16 @@ const CommentSchema = new Schema(
             enum: ['public', 'hidden'],
             default: 'public',
         },
-        articleId: {
+        article: {
             type: Schema.ObjectId,
             ref: 'Article',
         },
-        authorId: {
+        author: {
             type: Schema.ObjectId,
             ref: 'User',
         },
     },
-    { timestamps: true, id: true }
+    { timestamps: true }
 );
 
 const Comment = model('Comment', CommentSchema);

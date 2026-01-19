@@ -17,7 +17,7 @@ const UserSchema = new Schema(
             default: 'pending',
         },
     },
-    { timestamps: true, id: true }
+    { timestamps: true }
 );
 
 const User = model('User', UserSchema);

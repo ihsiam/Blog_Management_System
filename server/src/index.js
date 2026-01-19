@@ -1,47 +1,22 @@
-/* eslint-disable prettier/prettier */
 require('dotenv').config();
-const express = require('express');
-const swaggerUI = require('swagger-ui-express');
-const YAML = require('yamljs');
-const OpenApiValidator = require('express-openapi-validator');
-const mongoose = require('mongoose');
+const http = require('http');
+const { connectDB } = require('./db');
+const app = require('./app');
 
-const swaggerDocs = YAML.load('./swagger.yaml');
+const server = http.createServer(app);
 
-// express app
-const app = express();
+// run server
+const main = async () => {
+    try {
+        await connectDB();
+        server.listen(process.env.PORT || 4000, () => {
+            console.log('server is running');
+            console.log('API documentation: http://localhost:4000/docs');
+        });
+    } catch (e) {
+        console.log('DB Connection failed');
+        console.log(e.message);
+    }
+};
 
-// Global middlewares
-app.use(express.json());
-app.use('/docs', swaggerUI.serve, swaggerUI.setup(swaggerDocs));
-
-app.use(
-    OpenApiValidator.middleware({
-        apiSpec: './swagger.yaml',
-    }),
-);
-
-app.get('/health', (_req, res) => {
-    res.status(200).json({
-        health: 'ok',
-    });
-});
-
-app.use((err, req, res, _next) => {
-    // format error
-    res.status(err.status || 500).json({
-        message: err.message,
-        errors: err.errors,
-    });
-});
-
-mongoose.connect(process.env.DB_URL, {}).then(() => {
-    console.log('Database connected successfully');
-    app.listen(process.env.PORT, () => {
-        console.log('server is running');
-        console.log('API documentation: http://localhost:4000/docs');
-    });
-}).catch((e) => {
-    console.log('DB Connection failed');
-    console.log(e.message);
-});
+main();
