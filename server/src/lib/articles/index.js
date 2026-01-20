@@ -1,6 +1,9 @@
-/* eslint-disable prettier/prettier */
+/* eslint-disable comma-dangle */
+/* eslint-disable object-curly-newline */
+/* eslint-disable no-underscore-dangle */
 const Article = require('../../model/Article');
 const defaults = require('../../config/defaults');
+const { notFound } = require('../../utils/error');
 
 // find all articles
 const findAll = async ({
@@ -13,11 +16,14 @@ const findAll = async ({
     const sortKey = `${sortType === 'dsc' ? '-' : ''}${sortBy}`;
     const filter = { title: { $regex: searchTerm, $options: 'i' } };
     const articles = await Article.find(filter)
-       // .populate({ path: 'author', select: 'name' })
+        // .populate({ path: 'author', select: 'name' })
         .sort(sortKey)
         .skip(page * limit - limit)
         .limit(limit);
-    return articles;
+
+    return articles.map((article) => ({
+        ...article._doc,
+    }));
 };
 
 // count articles
@@ -29,7 +35,11 @@ const count = async ({ searchTerm = '' }) => {
 
 // create an article
 const create = async ({
- title, body = defaults.body, cover = defaults.cover, status = defaults.articleStatus, author,
+    title,
+    body = defaults.body,
+    cover = defaults.cover,
+    status = defaults.articleStatus,
+    author,
 }) => {
     if (!title || !author) {
         const error = new Error('Invalid parameters');
@@ -45,8 +55,101 @@ const create = async ({
         author,
     });
 
-    const result = await article.save();
-    return result;
+    await article.save();
+    return article._doc;
 };
 
-module.exports = { findAll, count, create };
+// find single item
+const findSingleItem = async ({ id, expand = '' }) => {
+    if (!id) {
+        throw new Error('Id required');
+    }
+
+    const TrimedExpand = expand.split(',').map((item) => item.trim());
+
+    const article = await Article.findById(id);
+
+    if (!article) {
+        throw notFound();
+    }
+
+    if (TrimedExpand.includes('author')) {
+        await article.populate({ path: 'author', select: 'name' });
+    }
+
+    if (TrimedExpand.includes('comments')) {
+        await article.populate({ path: 'comments' });
+    }
+
+    return article._doc;
+};
+
+// create or update an item
+const updateOrCreate = async (
+    id,
+    { title, body, cover = defaults.cover, status = defaults.articleStatus, author }
+) => {
+    const article = await Article.findById(id);
+
+    if (!article) {
+        const newArticle = await create({
+            title,
+            body,
+            cover,
+            status,
+            author,
+        });
+
+        return { article: newArticle, statusCode: 201 };
+    }
+
+    const payload = {
+        title,
+        body,
+        cover,
+        status,
+        author,
+    };
+
+    article.overwrite(payload);
+    await article.save();
+    return { article: article._doc, statusCode: 200 };
+};
+
+// update item using patch
+const updateItemPatch = async (id, { title, body, cover, status }) => {
+    const article = await Article.findById(id);
+
+    if (!article) {
+        throw notFound();
+    }
+    const payload = { title, body, cover, status };
+
+    Object.keys(payload).forEach((key) => {
+        article[key] = payload[key] ?? article[key];
+    });
+
+    await article.save();
+    return article._doc;
+};
+
+const deleteItem = async (id) => {
+    const article = await Article.findById(id);
+
+    if (!article) {
+        throw notFound();
+    }
+
+    // todo: need to delete all associated articles
+    return Article.findByIdAndDelete(id);
+};
+
+module.exports = {
+    findAll,
+    count,
+    create,
+    findSingleItem,
+    updateOrCreate,
+    updateItemPatch,
+    deleteItem,
+};

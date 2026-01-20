@@ -247,8 +247,7 @@ paths:
           name: expand
           schema:
             type: string
-            enum: [author, comments]
-            example: author
+            example: author, comments
       responses:
         "200":
           description: Retrived an article
@@ -411,7 +410,7 @@ components:
             id:
               type: string
               example: 507f1f77bcf86cd799439011
-            authorId:
+            author:
               type: string
               example: 507f1f77bcf86cd799439011
             title:
@@ -428,7 +427,7 @@ components:
               type: string
               enum: [draft, published]
               example: draft
-          required: [id, authorId, title, body, status]
+          required: [id, author, title, body, status]
         - $ref: "#/components/schemas/Timestamp"
 
     Comments:
@@ -438,10 +437,10 @@ components:
             id:
               type: string
               example: 507f1f77bcf86cd799439011
-            authorId:
+            author:
               type: string
               example: 507f1f77bcf86cd799439011
-            articleId:
+            article:
               type: string
               example: 507f1f77bcf86cd799439011
             body:
@@ -452,7 +451,7 @@ components:
               type: string
               enum: [hidden, public]
               example: public
-          required: [id, authorId, articleId, body, status]
+          required: [id, author, article, body, status]
         - $ref: "#/components/schemas/Timestamp"
 
     Timestamp:

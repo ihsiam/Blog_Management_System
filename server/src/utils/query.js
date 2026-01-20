@@ -1,3 +1,4 @@
+/* eslint-disable no-underscore-dangle */
 /* eslint-disable comma-dangle */
 const defaults = require('../config/defaults');
 const generateQueryString = require('./queryString');
@@ -27,7 +28,31 @@ const getPagination = (
     return pagination;
 };
 
-const getLinks = ({
+const transformData = ({ items = [], selection = [], path = '/' }) => {
+    if (!Array.isArray(items) || !Array.isArray(selection)) {
+        throw new Error('Invalid arguments');
+    }
+
+    if (selection.length === 0) {
+        return items.map((item) => ({
+            ...item,
+            link: `${path}/${item._id}`,
+        }));
+    }
+
+    return items.map((item) => {
+        const result = {};
+
+        selection.forEach((key) => {
+            result[key] = item[key];
+        });
+        result.link = `${path}/${item._id}`;
+
+        return result;
+    });
+};
+
+const hateOAS = ({
     url = '/',
     path = '',
     query = {},
@@ -52,4 +77,4 @@ const getLinks = ({
     return links;
 };
 
-module.exports = { getPagination, getLinks };
+module.exports = { getPagination, transformData, hateOAS };

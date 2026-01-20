@@ -5,9 +5,9 @@ router.route('/api/v1/articles').get(articleController.findAll).post(articleCont
 
 router
     .route('/api/v1/articles/:id')
-    .get(() => {})
-    .put(() => {})
-    .patch(() => {})
-    .delete(() => {});
+    .get(articleController.findSingleItem)
+    .put(articleController.updateItem)
+    .patch(articleController.updateItemPatch)
+    .delete(articleController.deleteItem);
 
 module.exports = router;

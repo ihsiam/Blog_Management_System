@@ -1,4 +1,3 @@
-/* eslint-disable no-underscore-dangle */
 const services = require('../../../../lib/articles');
 const { query } = require('../../../../utils');
 const defaults = require('../../../../config/defaults');
@@ -22,15 +21,16 @@ const findAll = async (req, res, next) => {
 
         const totalItems = await services.count({ searchTerm });
 
-        // generate response
-        const data = articles.map((article) => ({
-            ...article._doc,
-            link: `/articles/${article.id}`,
-        }));
+        // process response data
+        const data = query.transformData({
+            items: articles,
+            selection: ['_id', 'title', 'cover', 'author', 'createdAt', 'updatedAt'],
+            path: '/articles',
+        });
 
         const pagination = query.getPagination(page, limit, totalItems);
 
-        const links = query.getLinks({
+        const links = query.hateOAS({
             url: req.url,
             path: req.path,
             query: req.query,

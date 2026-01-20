@@ -2,15 +2,16 @@
 const defaults = require('../../../../config/defaults');
 const services = require('../../../../lib/articles');
 
-const create = async (req, res, next) => {
+const updateItem = async (req, res, next) => {
+    const { id } = req.params;
     const { title } = req.body;
-    const body = req.body.body || defaults.body;
+    const { body } = req.body;
+    const author = req.user.id;
     const cover = req.body.cover || defaults.cover;
     const status = req.body.status || defaults.articleStatus;
-    const author = req.user.id;
 
     try {
-        const article = await services.create({
+        const { article, statusCode } = await services.updateOrCreate(id, {
             title,
             body,
             cover,
@@ -18,9 +19,9 @@ const create = async (req, res, next) => {
             author,
         });
 
-        res.status(201).json({
-            code: 201,
-            message: 'Article created',
+        res.status(statusCode).json({
+            code: statusCode,
+            message: statusCode === 200 ? 'successfully updated article data' : 'Article created',
             data: article,
             links: {
                 self: `/articles/${article._id}`,
@@ -31,4 +32,4 @@ const create = async (req, res, next) => {
     }
 };
 
-module.exports = create;
+module.exports = updateItem;
