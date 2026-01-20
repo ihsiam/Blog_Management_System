@@ -41,7 +41,7 @@ const findAll = async (req, res, next) => {
 
         res.json({
             code: 200,
-            message: 'Data retrived',
+            message: 'Data retrieved',
             data,
             pagination,
             links,

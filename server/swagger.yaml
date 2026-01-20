@@ -2,7 +2,7 @@ openapi: 3.0.0
 info:
   version: "1.0.0"
   title: "Blog Management System"
-  description: "This is my first professional industry standard API project. This is a Blog Management System where we can create or login into our account. We can post article here which will be visiable for everyone. And we can also comment on articles."
+  description: "This is my first professional industry standard API project. This is a Blog Management System where we can create or login into our account. We can post article here which will be visible for everyone. And we can also comment on articles."
   contact:
     name: Md Ismile Hosen Siam
     email: siam679ihs@gmail.com
@@ -19,7 +19,7 @@ tags:
   - name: User
     description: User endpoints
 paths:
-  "/auth/singup":
+  "/auth/signUp":
     post:
       description: Create an user account
       tags: [Auth]
@@ -43,7 +43,7 @@ paths:
               required: [name, email, password]
       responses:
         "201":
-          description: Singup successful
+          description: SignUp successful
           content:
             "application/json":
               schema:
@@ -68,17 +68,17 @@ paths:
                       self:
                         type: string
                         format: url
-                        example: "/auth/singup"
-                      singin:
+                        example: "/auth/signUp"
+                      signin:
                         type: string
                         format: url
-                        example: "/auth/singin"
+                        example: "/auth/signin"
         "400":
           $ref: "#/components/responses/BadRequest"
         "500":
           $ref: "#/components/responses/ServerError"
 
-  "/auth/singin":
+  "/auth/signin":
     post:
       description: Login into user account
       tags: [Auth]
@@ -124,7 +124,7 @@ paths:
                       self:
                         type: string
                         format: url
-                        example: "/auth/singin"
+                        example: "/auth/signin"
         "400":
           $ref: "#/components/responses/BadRequest"
         "500":
@@ -132,7 +132,7 @@ paths:
 
   "/articles":
     get:
-      description: Retrive all published articles.
+      description: Retrieved all published articles.
       tags: [Article]
       parameters:
         - $ref: "#/components/parameters/pageParam"
@@ -154,7 +154,7 @@ paths:
                     example: 200
                   message:
                     type: string
-                    example: Data retrived
+                    example: Data retrieved
                   data:
                     type: array
                     items:
@@ -240,7 +240,7 @@ paths:
   "/articles/{id}":
     get:
       tags: [Article]
-      description: Retrive a single article
+      description: Retrieved a single article
       parameters:
         - $ref: "#/components/parameters/idPathParam"
         - in: query
@@ -250,7 +250,7 @@ paths:
             example: author, comments
       responses:
         "200":
-          description: Retrived an article
+          description: Retrieved an article
           content:
             "application/json":
               schema:
@@ -262,7 +262,7 @@ paths:
                     example: 200
                   message:
                     type: string
-                    example: Data retrived
+                    example: Data retrieved
                   data:
                     allOf:
                       - $ref: "#/components/schemas/Article"
@@ -556,7 +556,7 @@ components:
                 example: Internal server error
               message:
                 type: string
-                example: We are sorry for the inconvience. Please try again later.
+                example: We are sorry for the inconvenience. Please try again later.
 
     Unauthorized:
       description: Unauthorized

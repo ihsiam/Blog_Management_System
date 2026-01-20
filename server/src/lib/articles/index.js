@@ -65,7 +65,7 @@ const findSingleItem = async ({ id, expand = '' }) => {
         throw new Error('Id required');
     }
 
-    const TrimedExpand = expand.split(',').map((item) => item.trim());
+    const TrimmedExpand = expand.split(',').map((item) => item.trim());
 
     const article = await Article.findById(id);
 
@@ -73,11 +73,11 @@ const findSingleItem = async ({ id, expand = '' }) => {
         throw notFound();
     }
 
-    if (TrimedExpand.includes('author')) {
+    if (TrimmedExpand.includes('author')) {
         await article.populate({ path: 'author', select: 'name' });
     }
 
-    if (TrimedExpand.includes('comments')) {
+    if (TrimmedExpand.includes('comments')) {
         await article.populate({ path: 'comments' });
     }
 

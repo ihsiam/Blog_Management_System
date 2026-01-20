@@ -9,7 +9,7 @@ const findSingleItem = async (req, res, next) => {
         const article = await services.findSingleItem({ id, expand });
         res.status(200).json({
             code: 200,
-            message: 'Data retrived',
+            message: 'Data retrieved',
             data: article,
             links: {
                 self: `/articles/${article._id}`,
