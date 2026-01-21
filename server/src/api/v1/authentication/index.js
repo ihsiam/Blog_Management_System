@@ -1,3 +1,3 @@
-const controller = require('./controllers');
+const controller = require("./controllers");
 
 module.exports = { controller };

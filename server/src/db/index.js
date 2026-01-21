@@ -1,3 +1,3 @@
-const connectDB = require('./connection');
+const connectDB = require("./connection");
 
 module.exports = { connectDB };
