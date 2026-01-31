@@ -2,13 +2,14 @@ openapi: 3.0.0
 info:
   version: "1.0.0"
   title: "Blog Management System"
-  description: "This is my first professional industry standard API project. This is a Blog Management System where we can create or login into our account. We can post article here which will be visible for everyone. And we can also comment on articles."
+  description: "This is a Blog Management System where we can create or login into our account. Registered users can post article, which will be visible for everyone. And registered users can also comment on articles."
   contact:
     name: Md Ismile Hosen Siam
     email: siam679ihs@gmail.com
 servers:
   - description: dev
     url: http://localhost:4000/api/v1
+
 tags:
   - name: Auth
     description: Auth endpoints
@@ -18,6 +19,7 @@ tags:
     description: Comment endpoints
   - name: User
     description: User endpoints
+
 paths:
   "/auth/signUp":
     post:
@@ -27,20 +29,7 @@ paths:
         content:
           "application/json":
             schema:
-              type: object
-              properties:
-                name:
-                  type: string
-                  example: MD Ismile Hosen Siam
-                email:
-                  type: string
-                  format: email
-                  example: example@gmail.com
-                password:
-                  type: string
-                  format: password
-                  example: password1234
-              required: [name, email, password]
+              $ref: "#/components/schemas/createUser"
       responses:
         "201":
           description: SignUp successful
@@ -379,6 +368,7 @@ paths:
           $ref: "#/components/responses/NotFound"
         "500":
           $ref: "#/components/responses/ServerError"
+
     delete:
       security:
         - bearerAuth: []
@@ -422,14 +412,11 @@ paths:
                     type: array
                     items:
                       allOf:
+                        - $ref: "#/components/schemas/commentBody"
                         - type: object
                           properties:
-                            "body":
-                              type: string
-                              example: this is a comment
                             "author":
                               $ref: "#/components/schemas/AuthorDetails"
-                        - $ref: "#/components/schemas/Timestamp"
                   pagination:
                     $ref: "#/components/schemas/Pagination"
                   links:
@@ -457,16 +444,112 @@ paths:
           $ref: "#/components/responses/NotFound"
         "500":
           $ref: "#/components/responses/ServerError"
+
     post:
       security:
         - bearerAuth: []
-      description: create a comment for the post
+      description: create a comment for the article
       tags: [Article]
+      requestBody:
+        content:
+          "application/json":
+            schema:
+              type: object
+              properties:
+                body:
+                  type: string
+                  example: this is a comment
+                status:
+                  type: string
+                  enum: [public, hidden]
+                  example: public
+              required: [body]
+      responses:
+        "201":
+          description: comment posted
+          content:
+            "application/json":
+              schema:
+                type: object
+                properties:
+                  code:
+                    type: integer
+                    format: int32
+                    example: 201
+                  message:
+                    type: string
+                    example: comment posted
+                  data:
+                    $ref: "#/components/schemas/commentBody"
+                  links:
+                    type: object
+                    properties:
+                      self:
+                        type: "string"
+                        format: "url"
+                        example: "/articles/507f1f77bcf86cd799439011/comments"
+                      article:
+                        type: "string"
+                        format: "url"
+                        example: "/articles/507f1f77bcf86cd799439011"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/ServerError"
 
   "/articles/{id}/author":
     get:
       description: get the author of an article
       tags: [Article]
+      responses:
+        "200":
+          description: "get author details of an article"
+          content:
+            "application/json":
+              schema:
+                type: object
+                properties:
+                  code:
+                    type: integer
+                    format: int32
+                    example: 200
+                  message:
+                    type: string
+                    example: Data retrieved
+                  data:
+                    type: object
+                    properties:
+                      id:
+                        type: string
+                        example: 507f1f77bcf86cd799439011
+                      email:
+                        type: string
+                        format: email
+                        example: test@gmail.com
+                      name:
+                        type: string
+                        example: MD Ismile Hosen Siam
+                  links:
+                    type: object
+                    properties:
+                      self:
+                        type: "string"
+                        format: "url"
+                        example: "/articles/507f1f77bcf86cd799439011/author"
+                      article:
+                        type: "string"
+                        format: "url"
+                        example: "/articles/507f1f77bcf86cd799439011"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/ServerError"
 
   "/comments":
     get:
@@ -474,12 +557,108 @@ paths:
         - bearerAuth: []
       description: get all comments
       tags: [Comment]
+      parameters:
+        - $ref: "#/components/parameters/pageParam"
+        - $ref: "#/components/parameters/limitParam"
+        - $ref: "#/components/parameters/sortTypeParam"
+        - $ref: "#/components/parameters/sortByParam"
+        - in: query
+          name: postId
+          schema:
+            type: string
+            example: 507f1f77bcf86cd799439011
+      responses:
+        "200":
+          description: get all comment data
+          content:
+            "application/json":
+              schema:
+                type: object
+                properties:
+                  code:
+                    type: integer
+                    format: int32
+                    example: 200
+                  message:
+                    type: string
+                    example: Data retrieved
+                  data:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/Comments"
+                  pagination:
+                    $ref: "#/components/schemas/Pagination"
+                  links:
+                    type: object
+                    properties:
+                      self:
+                        type: string
+                        format: url
+                        example: "/comments?page=2&limit=10"
+                      next:
+                        type: string
+                        format: url
+                        example: "/comments?page=3&limit=10"
+                      prev:
+                        type: string
+                        format: url
+                        example: "/comments?page=1&limit=10"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "500":
+          $ref: "#/components/responses/ServerError"
 
     post:
       security:
         - bearerAuth: []
       description: create a comment
       tags: [Comment]
+      requestBody:
+        content:
+          "application/json":
+            schema:
+              type: object
+              properties:
+                body:
+                  type: string
+                  example: this is a comment
+                status:
+                  type: string
+                  enum: [public, hidden]
+                  example: public
+              required: [body]
+      responses:
+        "201":
+          description: comment posted
+          content:
+            "application/json":
+              schema:
+                type: object
+                properties:
+                  code:
+                    type: integer
+                    format: int32
+                    example: 201
+                  message:
+                    type: string
+                    example: comment posted
+                  data:
+                    $ref: "#/components/schemas/commentBody"
+                  links:
+                    type: object
+                    properties:
+                      self:
+                        type: "string"
+                        format: "url"
+                        example: "/comments/507f1f77bcf86cd799439011"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "500":
+          $ref: "#/components/responses/ServerError"
 
   "/comments/{id}":
     patch:
@@ -487,11 +666,70 @@ paths:
         - bearerAuth: []
       description: update a comment body
       tags: [Comment]
+      requestBody:
+        content:
+          "application/json":
+            schema:
+              type: object
+              properties:
+                body:
+                  type: string
+                  example: this is a comment
+                status:
+                  type: string
+                  enum: [public, hidden]
+                  example: public
+      responses:
+        "200":
+          description: comment updated
+          content:
+            "application/json":
+              schema:
+                type: object
+                properties:
+                  code:
+                    type: integer
+                    format: int32
+                    example: 201
+                  message:
+                    type: string
+                    example: comment updated
+                  data:
+                    $ref: "#/components/schemas/commentBody"
+                  links:
+                    type: object
+                    properties:
+                      self:
+                        type: "string"
+                        format: "url"
+                        example: "/comments/507f1f77bcf86cd799439011"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/ServerError"
+
     delete:
       security:
         - bearerAuth: []
       description: delete a comment
       tags: [Comment]
+      parameters:
+        - $ref: "#/components/parameters/idPathParam"
+      responses:
+        "204":
+          description: Comment deleted successfully
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/ServerError"
 
   "/users":
     get:
@@ -499,11 +737,98 @@ paths:
         - bearerAuth: []
       description: Get all users
       tags: [User]
+      parameters:
+        - $ref: "#/components/parameters/pageParam"
+        - $ref: "#/components/parameters/limitParam"
+        - $ref: "#/components/parameters/sortTypeParam"
+        - $ref: "#/components/parameters/sortByParam"
+        - in: query
+          name: name
+          schema:
+            type: string
+            example: Siam
+        - in: query
+          name: email
+          schema:
+            type: string
+            format: email
+            example: test@gmail.com
+      responses:
+        "200":
+          description: get all user data
+          content:
+            "application/json":
+              schema:
+                type: object
+                properties:
+                  code:
+                    type: integer
+                    format: int32
+                    example: 200
+                  message:
+                    type: string
+                    example: Data retrieved
+                  data:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/user"
+                  pagination:
+                    $ref: "#/components/schemas/Pagination"
+                  links:
+                    type: object
+                    properties:
+                      self:
+                        type: string
+                        format: url
+                        example: "/users?page=2&limit=10"
+                      next:
+                        type: string
+                        format: url
+                        example: "/users?page=3&limit=10"
+                      prev:
+                        type: string
+                        format: url
+                        example: "/users?page=1&limit=10"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "500":
+          $ref: "#/components/responses/ServerError"
+
     post:
       security:
         - bearerAuth: []
       description: Create an user
       tags: [User]
+      requestBody:
+        content:
+          "application/json":
+            schema:
+              $ref: "#/components/schemas/createUser"
+      responses:
+        "201":
+          description: account created
+          content:
+            "application/json":
+              schema:
+                type: object
+                properties:
+                  code:
+                    type: integer
+                    format: int32
+                    example: 201
+                  message:
+                    type: string
+                    example: Account created
+                  data:
+                    $ref: "#/components/schemas/UserCreateUpdateResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "500":
+          $ref: "#/components/responses/ServerError"
 
   "/users/{id}":
     get:
@@ -511,16 +836,175 @@ paths:
         - bearerAuth: []
       description: get a single user data
       tags: [User]
+      parameters:
+        - in: query
+          name: expand
+          schema:
+            type: string
+            example: articles, comments
+      responses:
+        "200":
+          description: Retrieved an user
+          content:
+            "application/json":
+              schema:
+                type: object
+                properties:
+                  code:
+                    type: integer
+                    format: int32
+                    example: 200
+                  message:
+                    type: string
+                    example: Data retrieved
+                  data:
+                    allOf:
+                      - $ref: "#/components/schemas/user"
+                      - type: object
+                        properties:
+                          articles:
+                            type: array
+                            items:
+                              type: object
+                              properties:
+                                id:
+                                  type: string
+                                  example: 507f1f77bcf86cd799439011
+                                title:
+                                  type: string
+                                  example: first article
+                                status:
+                                  type: string
+                                  enum: [draft, published]
+                                  example: published
+                      - type: object
+                        properties:
+                          comments:
+                            type: array
+                            items:
+                              type: object
+                              properties:
+                                id:
+                                  type: string
+                                  example: 507f1f77bcf86cd799439011
+                                body:
+                                  type: string
+                                  example: this is a comment
+                                status:
+                                  type: string
+                                  enum: [public, hidden]
+                                  example: public
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/ServerError"
+
     patch:
       security:
         - bearerAuth: []
       description: update an user data
       tags: [User]
+      requestBody:
+        content:
+          "application/json":
+            schema:
+              type: object
+              properties:
+                name:
+                  type: string
+                  example: MD Ismile Hosen Siam
+                email:
+                  type: string
+                  format: email
+                  example: example@gmail.com
+      responses:
+        "200":
+          description: account updated
+          content:
+            "application/json":
+              schema:
+                type: object
+                properties:
+                  code:
+                    type: integer
+                    format: int32
+                    example: 200
+                  message:
+                    type: string
+                    example: Account updated
+                  data:
+                    $ref: "#/components/schemas/UserCreateUpdateResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/ServerError"
+
     delete:
       security:
         - bearerAuth: []
       description: delete an user data
       tags: [User]
+      parameters:
+        - $ref: "#/components/parameters/idPathParam"
+      responses:
+        "204":
+          description: Account deleted successfully
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/ServerError"
+
+  "/users/{id}/changePassword":
+    patch:
+      security:
+        - bearerAuth: []
+      description: change password
+      tags: [User]
+      requestBody:
+        content:
+          "application/json":
+            schema:
+              type: object
+              properties:
+                password:
+                  type: string
+                  format: password
+                  example: password1234
+      responses:
+        "200":
+          description: password updated
+          content:
+            "application/json":
+              schema:
+                type: object
+                properties:
+                  code:
+                    type: integer
+                    format: int32
+                    example: 200
+                  message:
+                    type: string
+                    example: password updated
+                  data:
+                    $ref: "#/components/schemas/UserCreateUpdateResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/ServerError"
 
 components:
   securitySchemes:
@@ -535,9 +1019,6 @@ components:
         - type: object
           properties:
             id:
-              type: string
-              example: 507f1f77bcf86cd799439011
-            author:
               type: string
               example: 507f1f77bcf86cd799439011
             title:
@@ -557,6 +1038,62 @@ components:
           required: [id, author, title, body, status]
         - $ref: "#/components/schemas/Timestamp"
 
+    user:
+      allOf:
+        - type: object
+          properties:
+            id:
+              type: string
+              example: 507f1f77bcf86cd799439011
+            name:
+              type: string
+              example: MD Ismile Hosen Siam
+            email:
+              type: string
+              format: email
+              example: example@gmail.com
+            role:
+              type: string
+              enum: [admin, user]
+              example: user
+            status:
+              type: string
+              enum: [pending, approved, block, decline]
+              example: pending
+        - $ref: "#/components/schemas/Timestamp"
+
+    createUser:
+      type: object
+      properties:
+        name:
+          type: string
+          example: MD Ismile Hosen Siam
+        email:
+          type: string
+          format: email
+          example: example@gmail.com
+        password:
+          type: string
+          format: password
+          example: password1234
+      required: [name, email, password]
+
+    UserCreateUpdateResponse:
+      allOf:
+        - type: object
+          properties:
+            id:
+              type: string
+              example: 507f1f77bcf86cd799439011
+            name:
+              type: string
+              example: MD Ismile Hosen Siam
+            email:
+              type: string
+              format: email
+              example: example@gmail.com
+        - $ref: "#/components/schemas/Timestamp"
+
     Comments:
       allOf:
         - type: object
@@ -572,13 +1109,29 @@ components:
               example: 507f1f77bcf86cd799439011
             body:
               type: string
-
               example: first comment
             status:
               type: string
               enum: [hidden, public]
               example: public
           required: [id, author, article, body, status]
+        - $ref: "#/components/schemas/Timestamp"
+
+    commentBody:
+      allOf:
+        - type: object
+          properties:
+            id:
+              type: string
+              example: 507f1f77bcf86cd799439011
+            body:
+              type: string
+              example: this is a comment
+            status:
+              type: string
+              enum: [public, hidden]
+              example: public
+          required: [id, body, status]
         - $ref: "#/components/schemas/Timestamp"
 
     Timestamp:
@@ -702,6 +1255,7 @@ components:
               message:
                 type: string
                 example: You don't have the right permission.
+
     NotFound:
       description: Resource not found.
       content:
@@ -719,7 +1273,8 @@ components:
               message:
                 type: string
                 example: Requested resource not Not Found
-    "ArticleCreated":
+
+    ArticleCreated:
       description: Article created
       content:
         "application/json":
@@ -734,7 +1289,13 @@ components:
                 type: string
                 example: article created
               data:
-                $ref: "#/components/schemas/Article"
+                allOf:
+                  - $ref: "#/components/schemas/Article"
+                  - type: object
+                    properties:
+                      author:
+                        type: string
+                        example: 507f1f77bcf86cd799439011
               links:
                 type: object
                 properties:
@@ -742,6 +1303,7 @@ components:
                     type: string
                     format: url
                     example: "/article/507f1f77bcf86cd799439011"
+
     ArticleUpdated:
       description: Article updated
       content:
@@ -757,7 +1319,13 @@ components:
                 type: string
                 example: successfully updated article data
               data:
-                $ref: "#/components/schemas/Article"
+                allOf:
+                  - $ref: "#/components/schemas/Article"
+                  - type: object
+                    properties:
+                      author:
+                        type: string
+                        example: 507f1f77bcf86cd799439011
               links:
                 type: object
                 properties:
@@ -765,6 +1333,7 @@ components:
                     type: string
                     format: url
                     example: "/article/507f1f77bcf86cd799439011"
+
   parameters:
     pageParam:
       in: query

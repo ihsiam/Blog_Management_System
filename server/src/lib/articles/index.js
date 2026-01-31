@@ -71,7 +71,17 @@ const findSingleItem = async ({ id, expand = "" }) => {
   }
 
   if (TrimmedExpand.includes("author")) {
-    await article.populate({ path: "author", select: "name" });
+    await article.populate({
+      path: "comments",
+      match: { status: "public" },
+      populate: {
+        path: "author",
+        select: "name",
+      },
+    });
+
+    // empty array if no comment exists
+    article.comments = article.comments ?? [];
   }
 
   if (TrimmedExpand.includes("comments")) {
