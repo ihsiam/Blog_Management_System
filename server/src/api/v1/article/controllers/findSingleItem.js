@@ -1,11 +1,11 @@
-const services = require("../../../../lib/articles");
+const articleServices = require("../../../../lib/articles");
 
 const findSingleItem = async (req, res, next) => {
   const { id } = req.params;
   const expand = req.query.expand || "";
 
   try {
-    const article = await services.findSingleItem({ id, expand });
+    const article = await articleServices.findSingleItem({ id, expand });
     res.status(200).json({
       code: 200,
       message: "Data retrieved",

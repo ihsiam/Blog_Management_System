@@ -1,7 +1,7 @@
 const findAll = require("./findAll");
 const create = require("./create");
 const findSingleItem = require("./findSingleItem");
-const updateItem = require("./updateItem");
+const updateOrCreateItem = require("./updateOrCreateItem");
 const updateItemPatch = require("./updateItemPatch");
 const deleteItem = require("./deleteItem");
 
@@ -9,7 +9,7 @@ module.exports = {
   findAll,
   create,
   findSingleItem,
-  updateItem,
+  updateOrCreateItem,
   updateItemPatch,
   deleteItem,
 };

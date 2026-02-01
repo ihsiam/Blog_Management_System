@@ -1,4 +1,4 @@
-const services = require("../../../../lib/articles");
+const articleServices = require("../../../../lib/articles");
 const { query } = require("../../../../utils");
 const defaults = require("../../../../config/defaults");
 
@@ -11,7 +11,7 @@ const findAll = async (req, res, next) => {
 
   try {
     // get data from service
-    const articles = await services.findAll({
+    const articles = await articleServices.findAll({
       page,
       limit,
       sortBy,
@@ -19,7 +19,7 @@ const findAll = async (req, res, next) => {
       searchTerm,
     });
 
-    const totalItems = await services.count({ searchTerm });
+    const totalItems = await articleServices.count({ searchTerm });
 
     // process response data
     const data = query.transformData({

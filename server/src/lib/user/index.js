@@ -16,4 +16,4 @@ const createUser = async ({ name, email, password }) => {
   return user._doc;
 };
 
-module.exports = { userExist, createUser };
+module.exports = { userExist, createUser, findUserByEmail };

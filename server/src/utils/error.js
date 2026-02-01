@@ -10,4 +10,28 @@ const badRequest = (msg = "bad request") => {
   return error;
 };
 
-module.exports = { notFound, badRequest };
+const serverError = (msg = "Internal server error") => {
+  const error = new Error(msg);
+  error.status = 500;
+  return error;
+};
+
+const authenticationError = (msg = "Authentication failed") => {
+  const error = new Error(msg);
+  error.status = 401;
+  return error;
+};
+
+const authorizationError = (msg = "Permission denied") => {
+  const error = new Error(msg);
+  error.status = 403;
+  return error;
+};
+
+module.exports = {
+  notFound,
+  badRequest,
+  serverError,
+  authenticationError,
+  authorizationError,
+};

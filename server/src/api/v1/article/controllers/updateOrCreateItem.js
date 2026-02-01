@@ -1,16 +1,16 @@
 const defaults = require("../../../../config/defaults");
-const services = require("../../../../lib/articles");
+const articleServices = require("../../../../lib/articles");
 
-const updateItem = async (req, res, next) => {
+const updateOrCreateItem = async (req, res, next) => {
   const { id } = req.params;
   const { title } = req.body;
   const { body } = req.body;
-  const author = req.user.id;
+  const author = req.user._id;
   const cover = req.body.cover || defaults.cover;
   const status = req.body.status || defaults.articleStatus;
 
   try {
-    const { article, statusCode } = await services.updateOrCreate(id, {
+    const { article, statusCode } = await articleServices.updateOrCreate(id, {
       title,
       body,
       cover,
@@ -34,4 +34,4 @@ const updateItem = async (req, res, next) => {
   }
 };
 
-module.exports = updateItem;
+module.exports = updateOrCreateItem;

@@ -13,7 +13,7 @@ const findAll = async ({
   const sortKey = `${sortType === "dsc" ? "-" : ""}${sortBy}`;
   const filter = { title: { $regex: searchTerm, $options: "i" } };
   const articles = await Article.find(filter)
-    // .populate({ path: 'author', select: 'name' })
+    .populate({ path: "author", select: "name" })
     .sort(sortKey)
     .skip(page * limit - limit)
     .limit(limit);
@@ -71,21 +71,14 @@ const findSingleItem = async ({ id, expand = "" }) => {
   }
 
   if (TrimmedExpand.includes("author")) {
-    await article.populate({
-      path: "comments",
-      match: { status: "public" },
-      populate: {
-        path: "author",
-        select: "name",
-      },
-    });
-
-    // empty array if no comment exists
-    article.comments = article.comments ?? [];
+    await article.populate({ path: "author", select: "name" });
   }
 
   if (TrimmedExpand.includes("comments")) {
-    await article.populate({ path: "comments" });
+    await article.populate({ path: "comments", match: { status: "public" } });
+
+    // empty array if no comment exists
+    article.comments = article.comments ?? [];
   }
 
   return article._doc;
@@ -157,6 +150,20 @@ const deleteItem = async (id) => {
   return Article.findByIdAndDelete(id);
 };
 
+const CheckOwner = async ({ resourceId, userId }) => {
+  const article = await Article.findById(resourceId);
+
+  if (!article) {
+    throw notFound();
+  }
+
+  if (article.author.toString() === userId.toString()) {
+    return true;
+  }
+
+  return false;
+};
+
 module.exports = {
   findAll,
   count,
@@ -165,4 +172,5 @@ module.exports = {
   updateOrCreate,
   updateItemPatch,
   deleteItem,
+  CheckOwner,
 };
