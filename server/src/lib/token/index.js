@@ -1,9 +1,10 @@
 const jwt = require("jsonwebtoken");
-const { serverError } = require("../../utils/error");
+const { badRequest, unauthorized } = require("../../utils/error");
 
 const { JWT_SECRET } = process.env;
 const JWT_EXPIRES_IN = "7d";
 
+// auth token generate
 const generateToken = (payload) => {
   try {
     return jwt.sign(payload, JWT_SECRET, {
@@ -11,27 +12,60 @@ const generateToken = (payload) => {
       expiresIn: JWT_EXPIRES_IN,
     });
   } catch (e) {
-    console.log("[JWT]: ", e);
-    throw serverError();
+    console.log("[JWT GENERATE]:", e);
+    throw badRequest(null, "Failed to generate token");
   }
 };
 
+// verify auth token
 const verifyToken = (token) => {
   try {
-    return jwt.verify(token, JWT_SECRET, { algorithms: ["HS256"] });
+    if (!token) {
+      throw unauthorized("Authorization token missing");
+    }
+
+    return jwt.verify(token, JWT_SECRET, {
+      algorithms: ["HS256"],
+    });
   } catch (e) {
-    console.log("[JWT]: ", e);
-    throw serverError();
+    console.log("[JWT VERIFY]:", e);
+
+    // Token expired
+    if (e.name === "TokenExpiredError") {
+      throw unauthorized("JWT token expired");
+    }
+
+    // Invalid / malformed token
+    if (e.name === "JsonWebTokenError") {
+      throw unauthorized("Invalid JWT token");
+    }
+
+    // Token not active yet
+    if (e.name === "NotBeforeError") {
+      throw unauthorized("JWT token not active yet");
+    }
+
+    // Fallback
+    throw unauthorized("Authentication failed");
   }
 };
 
+// decode the token
 const decodeToken = (token) => {
   try {
-    return jwt.decode(token);
+    const decoded = jwt.decode(token);
+    if (!decoded) {
+      throw badRequest(null, "Invalid JWT token format");
+    }
+    return decoded;
   } catch (e) {
-    console.log("[JWT]: ", e);
-    throw serverError();
+    console.log("[JWT DECODE]:", e);
+    throw badRequest(null, "Invalid JWT token");
   }
 };
 
-module.exports = { generateToken, verifyToken, decodeToken };
+module.exports = {
+  generateToken,
+  verifyToken,
+  decodeToken,
+};

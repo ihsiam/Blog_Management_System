@@ -1,21 +1,44 @@
 const articleService = require("../lib/articles");
-const { authorizationError } = require("../utils/error");
+const { forbidden, unauthorized, badRequest } = require("../utils/error");
 
 const ownership =
   (model = "") =>
   async (req, _res, next) => {
-    if (model === "article") {
-      const owner = await articleService.CheckOwner({
-        resourceId: req.params.id,
-        userId: req.user._id,
-      });
+    try {
+      // Check if user exists
+      if (!req.user || !req.user.id) {
+        return next(unauthorized("Authentication required"));
+      }
 
-      if (owner) {
+      // check params id
+      if (!req.params.id) {
+        return next(
+          badRequest(
+            [{ field: "id", message: "Resource ID is required", in: "params" }],
+            "Validation error",
+          ),
+        );
+      }
+
+      // ownership for article model
+      if (model === "article") {
+        const isOwner = await articleService.CheckOwner({
+          resourceId: req.params.id,
+          userId: req.user.id,
+        });
+
+        if (!isOwner) {
+          return next(
+            forbidden("You do not have permission to access this article"),
+          );
+        }
+
         return next();
       }
-      return next(authorizationError());
+      return next(forbidden("You are not allowed to access this resource"));
+    } catch (e) {
+      return next(forbidden("You are not allowed to access this resource"));
     }
-    return next(authorizationError());
   };
 
 module.exports = ownership;

@@ -1,24 +1,38 @@
 const { verifyToken } = require("../lib/token");
 const { findUserByEmail } = require("../lib/user");
-const { authenticationError } = require("../utils/error");
+const { unauthorized } = require("../utils/error");
 
 const authenticate = async (req, res, next) => {
   try {
-    const token = req.headers.authorization.split(" ")[1];
-    const decode = verifyToken(token);
-    const user = await findUserByEmail(decode.email);
+    const authHeader = req.headers.authorization;
+
+    // Token missing
+    if (!authHeader || !authHeader.startsWith("Bearer ")) {
+      return next(unauthorized("Authorization token missing"));
+    }
+
+    const token = authHeader.split(" ")[1];
+
+    // Verify JWT
+    const decoded = verifyToken(token);
+
+    const user = await findUserByEmail(decoded.email);
     if (!user) {
-      next(authenticationError());
+      return next(unauthorized("Invalid authentication token"));
     }
 
+    // Account status check
     if (user.status !== "approved") {
-      next(authenticationError(`Your account status is ${user.status}`));
+      return next(unauthorized("Your account is not active"));
     }
 
-    req.user = user._doc;
-    next();
+    // Attach user to request
+    req.user = decoded;
+    console.log(req.user);
+
+    return next();
   } catch (e) {
-    next(authenticationError());
+    return next(unauthorized("Authentication failed"));
   }
 };
 

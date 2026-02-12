@@ -1,8 +1,27 @@
 const authServices = require("../../../../lib/authentication");
+const { badRequest } = require("../../../../utils/error");
 
 const login = async (req, res, next) => {
-  const { email, password } = req.body;
   try {
+    const { email, password } = req.body;
+
+    const errors = [];
+
+    // email validation
+    if (!email || typeof email !== "string") {
+      errors.push({ field: "email", message: "invalid input", in: "body" });
+    }
+
+    // password validation
+    if (!password || typeof password !== "string") {
+      errors.push({ field: "password", message: "invalid input", in: "body" });
+    }
+
+    // throw error
+    if (errors.length) {
+      throw badRequest(errors, "invalid input");
+    }
+
     const token = await authServices.login({ email, password });
     const response = {
       code: 201,

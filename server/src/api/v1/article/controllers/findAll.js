@@ -3,13 +3,13 @@ const { query } = require("../../../../utils");
 const defaults = require("../../../../config/defaults");
 
 const findAll = async (req, res, next) => {
-  const page = +req.query.page || defaults.page;
-  const limit = +req.query.limit || defaults.limit;
-  const sortType = req.query.sort_type || defaults.sortType;
-  const sortBy = req.query.sort_by || defaults.sortBy;
-  const searchTerm = req.query.search || defaults.searchTerm;
-
   try {
+    const page = +req.query.page || defaults.page;
+    const limit = +req.query.limit || defaults.limit;
+    const sortType = req.query.sort_type || defaults.sortType;
+    const sortBy = req.query.sort_by || defaults.sortBy;
+    const searchTerm = req.query.search || defaults.searchTerm;
+
     // get data from service
     const articles = await articleServices.findAll({
       page,
@@ -28,8 +28,10 @@ const findAll = async (req, res, next) => {
       path: "/articles",
     });
 
+    // process pagination
     const pagination = query.getPagination(page, limit, totalItems);
 
+    // process hateOAS links
     const links = query.hateOAS({
       url: req.url,
       path: req.path,

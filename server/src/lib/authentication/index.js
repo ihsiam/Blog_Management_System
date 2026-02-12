@@ -1,48 +1,94 @@
 const { userExist, createUser, findUserByEmail } = require("../user");
-const { badRequest, authenticationError } = require("../../utils/error");
+const { badRequest, unauthorized } = require("../../utils/error");
 const { hashing } = require("../../utils");
 const { generateToken } = require("../token");
 
+// user register
 const register = async ({ name, email, password }) => {
-  const hasUser = await userExist(email);
+  const errors = [];
 
-  if (hasUser) {
-    throw badRequest("User exist");
+  if (!name) {
+    errors.push({ field: "name", message: "Name is required", in: "body" });
+  }
+  if (!email) {
+    errors.push({ field: "email", message: "Email is required", in: "body" });
+  }
+  if (!password) {
+    errors.push({
+      field: "password",
+      message: "Password is required",
+      in: "body",
+    });
   }
 
+  if (errors.length) {
+    throw badRequest(errors, "Validation error");
+  }
+
+  // existing user check
+  const hasUser = await userExist(email);
+  if (hasUser) {
+    throw badRequest(null, "Invalid credentials");
+  }
+
+  // password hash
   const hashPassword = await hashing.generateHash(password);
 
-  const user = await createUser({ name, email, password: hashPassword });
+  const user = await createUser({
+    name,
+    email,
+    password: hashPassword,
+  });
 
   return user;
 };
 
 const login = async ({ email, password }) => {
+  const errors = [];
+
+  if (!email) {
+    errors.push({ field: "email", message: "Email is required", in: "body" });
+  }
+  if (!password) {
+    errors.push({
+      field: "password",
+      message: "Password is required",
+      in: "body",
+    });
+  }
+
+  if (errors.length) {
+    throw badRequest(errors, "Validation error");
+  }
+
+  // find user with email
   const user = await findUserByEmail(email);
-
   if (!user) {
-    throw badRequest("Invalid credentials");
+    throw unauthorized("Invalid credentials");
   }
 
+  // match password
   const isMatched = await hashing.compareHash(password, user.password);
-
   if (!isMatched) {
-    throw badRequest("Invalid credentials");
+    throw unauthorized("Invalid credentials");
   }
 
+  // check account status
   if (user.status !== "approved") {
-    throw authenticationError(`Your account status is ${user.status}`);
+    throw unauthorized("Your account is not active");
   }
 
-  const payload = {
+  // generate token
+  const token = generateToken({
     id: user._id,
     role: user.role,
     email: user.email,
-  };
-
-  const token = generateToken(payload);
+  });
 
   return token;
 };
 
-module.exports = { login, register };
+module.exports = {
+  register,
+  login,
+};

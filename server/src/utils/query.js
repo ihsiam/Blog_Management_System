@@ -1,6 +1,7 @@
 const defaults = require("../config/defaults");
 const generateQueryString = require("./queryString");
 
+// pagination
 const getPagination = (
   page = defaults.page,
   limit = defaults.limit,
@@ -26,6 +27,7 @@ const getPagination = (
   return pagination;
 };
 
+// transform data based on selection items
 const transformData = ({ items = [], selection = [], path = "/" }) => {
   if (!Array.isArray(items) || !Array.isArray(selection)) {
     throw new Error("Invalid arguments");
@@ -50,6 +52,7 @@ const transformData = ({ items = [], selection = [], path = "/" }) => {
   });
 };
 
+// hateOAS for next prev page
 const hateOAS = ({
   url = "/",
   path = "",

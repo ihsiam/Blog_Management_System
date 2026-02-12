@@ -1,10 +1,23 @@
 const articleServices = require("../../../../lib/articles");
+const { badRequest } = require("../../../../utils/error");
 
 const findSingleItem = async (req, res, next) => {
-  const { id } = req.params;
-  const expand = req.query.expand || "";
-
   try {
+    const { id } = req.params;
+    const expand = req.query.expand || "";
+
+    const errors = [];
+
+    // validate id
+    if (!id || typeof id !== "string") {
+      errors.push({ field: "id", message: "invalid input", in: "params" });
+    }
+
+    // throw error
+    if (errors.length) {
+      throw badRequest(errors, "invalid input");
+    }
+
     const article = await articleServices.findSingleItem({ id, expand });
     res.status(200).json({
       code: 200,

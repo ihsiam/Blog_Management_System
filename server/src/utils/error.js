@@ -1,37 +1,52 @@
-const notFound = (msg = "Resource not found") => {
-  const error = new Error(msg);
-  error.status = 404;
-  return error;
+const createError = ({
+  statusCode = 500,
+  error = "Internal server error",
+  message,
+  data,
+} = {}) => {
+  const err = new Error(message || "Internal server error");
+  err.statusCode = statusCode;
+  err.error = error;
+  if (data !== undefined) err.data = data;
+  return err;
 };
 
-const badRequest = (msg = "bad request") => {
-  const error = new Error(msg);
-  error.status = 400;
-  return error;
-};
+// 400 error
+const badRequest = (data, message = "invalid input") =>
+  createError({
+    statusCode: 400,
+    error: "Bad request",
+    message,
+    data,
+  });
 
-const serverError = (msg = "Internal server error") => {
-  const error = new Error(msg);
-  error.status = 500;
-  return error;
-};
+// 401 error
+const unauthorized = (message = "You don't have the right permission.") =>
+  createError({
+    statusCode: 401,
+    error: "Unauthorized",
+    message,
+  });
 
-const authenticationError = (msg = "Authentication failed") => {
-  const error = new Error(msg);
-  error.status = 401;
-  return error;
-};
+// 403 error
+const forbidden = (message = "Permission denied") =>
+  createError({
+    statusCode: 403,
+    error: "Forbidden",
+    message,
+  });
 
-const authorizationError = (msg = "Permission denied") => {
-  const error = new Error(msg);
-  error.status = 403;
-  return error;
-};
+// 404 error
+const notFound = (message = "Requested resource not found") =>
+  createError({
+    statusCode: 404,
+    error: "Not found",
+    message,
+  });
 
 module.exports = {
-  notFound,
   badRequest,
-  serverError,
-  authenticationError,
-  authorizationError,
+  unauthorized,
+  forbidden,
+  notFound,
 };
