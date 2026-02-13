@@ -2,21 +2,26 @@ const { verifyToken } = require("../lib/token");
 const { findUserByEmail } = require("../lib/user");
 const { unauthorized } = require("../utils/error");
 
+// Authentication Middleware
 const authenticate = async (req, res, next) => {
   try {
     const authHeader = req.headers.authorization;
 
-    // Token missing
+    //  checking Authorization header's existence
     if (!authHeader || !authHeader.startsWith("Bearer ")) {
       return next(unauthorized("Authorization token missing"));
     }
 
+    // Extract token
     const token = authHeader.split(" ")[1];
 
-    // Verify JWT
+    // Verify token
     const decoded = verifyToken(token);
 
+    // find user from db
     const user = await findUserByEmail(decoded.email);
+
+    // if not found
     if (!user) {
       return next(unauthorized("Invalid authentication token"));
     }
@@ -27,8 +32,12 @@ const authenticate = async (req, res, next) => {
     }
 
     // Attach user to request
-    req.user = decoded;
-    console.log(req.user);
+    req.user = {
+      id: user._id,
+      email: user.email,
+      role: user.role,
+      status: user.status,
+    };
 
     return next();
   } catch (e) {

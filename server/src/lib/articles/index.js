@@ -1,6 +1,6 @@
 const Article = require("../../model/Article");
 const defaults = require("../../config/defaults");
-const { notFound, badRequest } = require("../../utils/error");
+const { notFound } = require("../../utils/error");
 
 // find all articles
 const findAll = async ({
@@ -10,9 +10,10 @@ const findAll = async ({
   sortType = defaults.sortType,
   searchTerm = defaults.searchTerm,
 }) => {
-  const sortKey = `${sortType === "dsc" ? "-" : ""}${sortBy}`;
+  const sortKey = `${sortType === "desc" ? "-" : ""}${sortBy}`;
   const filter = { title: { $regex: searchTerm, $options: "i" } };
 
+  // find articles
   const articles = await Article.find(filter)
     .populate({ path: "author", select: "name" })
     .sort(sortKey)
@@ -25,6 +26,7 @@ const findAll = async ({
 // count articles
 const count = async ({ searchTerm = "" }) => {
   const filter = { title: { $regex: searchTerm, $options: "i" } };
+  // count article
   const totalArticle = await Article.countDocuments(filter);
   return totalArticle;
 };
@@ -37,17 +39,9 @@ const create = async ({
   status = defaults.articleStatus,
   author,
 }) => {
-  const errors = [];
-
-  if (typeof title !== "string" || !title.trim()) {
-    errors.push({ field: "title", message: "invalid input", in: "body" });
-  }
-
-  if (errors.length) {
-    throw badRequest(errors, "invalid input");
-  }
-
+  // create article
   const article = new Article({ title, body, cover, status, author });
+
   await article.save();
 
   return article._doc;
@@ -55,24 +49,22 @@ const create = async ({
 
 // find single item
 const findSingleItem = async ({ id, expand = "" }) => {
-  if (!id) {
-    throw badRequest(
-      [{ field: "id", message: "required", in: "params" }],
-      "invalid input",
-    );
-  }
-
   const TrimmedExpand = expand.split(",").map((item) => item.trim());
+
+  // find article
   const article = await Article.findById(id);
 
+  // if not found
   if (!article) {
     throw notFound();
   }
 
+  // expand author
   if (TrimmedExpand.includes("author")) {
     await article.populate({ path: "author", select: "name" });
   }
 
+  // expand comments
   if (TrimmedExpand.includes("comments")) {
     await article.populate({ path: "comments", match: { status: "public" } });
     article.comments = article.comments ?? [];
@@ -92,40 +84,50 @@ const updateOrCreate = async (
     author,
   },
 ) => {
+  // find article
   const article = await Article.findById(id);
 
+  // if not found, create new
   if (!article) {
     const newArticle = await create({ title, body, cover, status, author });
     return { article: newArticle, statusCode: 201 };
   }
 
+  // if found, update
   const payload = { title, body, cover, status, author };
   article.overwrite(payload);
   await article.save();
+
   return { article: article._doc, statusCode: 200 };
 };
 
 // update item using patch
 const updateItemPatch = async (id, { title, body, cover, status }) => {
+  // find article
   const article = await Article.findById(id);
 
+  // if not found
   if (!article) {
     throw notFound();
   }
 
+  // update article
   const payload = { title, body, cover, status };
   Object.keys(payload).forEach((key) => {
     article[key] = payload[key] ?? article[key];
   });
 
   await article.save();
+
   return article._doc;
 };
 
 // delete item
 const deleteItem = async (id) => {
+  // find article
   const article = await Article.findById(id);
 
+  // if not found
   if (!article) {
     throw notFound();
   }
@@ -135,10 +137,16 @@ const deleteItem = async (id) => {
 };
 
 // check ownership
-const CheckOwner = async ({ resourceId, userId }) => {
+const CheckOwner = async ({ resourceId, userId, allowMissing = false }) => {
+  // find article
   const article = await Article.findById(resourceId);
 
+  // if not found
   if (!article) {
+    // for put method
+    if (allowMissing) {
+      return null;
+    }
     throw notFound();
   }
 

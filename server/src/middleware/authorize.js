@@ -1,19 +1,24 @@
 const { forbidden, unauthorized } = require("../utils/error");
 
+// Authorization Middleware
 const authorize =
   (roles = ["admin"]) =>
   (req, _res, next) => {
-    // req header check
-    if (!req.user || !req.user.role) {
-      return next(unauthorized("Authentication required"));
-    }
+    try {
+      // req header check
+      if (!req.user || !req.user.role) {
+        return next(unauthorized("Authentication required"));
+      }
 
-    // role check
-    if (!roles.includes(req.user.role)) {
+      // role base permission check
+      if (!roles.includes(req.user.role)) {
+        return next(forbidden("You are not allowed to access this resource"));
+      }
+
+      return next();
+    } catch (e) {
       return next(forbidden("You are not allowed to access this resource"));
     }
-
-    return next();
   };
 
 module.exports = authorize;

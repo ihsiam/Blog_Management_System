@@ -13,7 +13,10 @@ const deleteItem = async (req, res, next) => {
       );
     }
 
+    // delete article
     await articleServices.deleteItem(id);
+
+    // response
     res.status(204).end();
   } catch (e) {
     next(e);

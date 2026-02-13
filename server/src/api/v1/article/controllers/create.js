@@ -6,23 +6,20 @@ const create = async (req, res, next) => {
   try {
     const { title } = req.body;
 
-    const errors = [];
-
     // validate title
-    if (typeof title !== "string" || !title.trim()) {
-      errors.push({ field: "title", message: "invalid input", in: "body" });
-    }
-
-    // throw error
-    if (errors.length) {
-      throw badRequest(errors, "invalid input");
+    if (!title || typeof title !== "string" || !title.trim()) {
+      throw badRequest(
+        [{ field: "title", message: "invalid input", in: "body" }],
+        "invalid input",
+      );
     }
 
     const body = req.body.body || defaults.body;
     const cover = req.body.cover || defaults.cover;
     const status = req.body.status || defaults.articleStatus;
-    const author = req.user.id;
+    const author = req.user?.id;
 
+    // create article
     const article = await articleServices.create({
       title,
       body,
@@ -31,6 +28,7 @@ const create = async (req, res, next) => {
       author,
     });
 
+    // response
     res.status(201).json({
       code: 201,
       message: "Article created",

@@ -13,12 +13,20 @@ const findSingleItem = async (req, res, next) => {
       errors.push({ field: "id", message: "invalid input", in: "params" });
     }
 
+    // expand validation
+    if (typeof expand !== "string") {
+      errors.push({ field: "expand", message: "invalid input", in: "query" });
+    }
+
     // throw error
     if (errors.length) {
       throw badRequest(errors, "invalid input");
     }
 
+    // find single item
     const article = await articleServices.findSingleItem({ id, expand });
+
+    // response
     res.status(200).json({
       code: 200,
       message: "Data retrieved",

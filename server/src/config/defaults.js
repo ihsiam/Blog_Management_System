@@ -2,7 +2,7 @@ const config = {
   page: 1,
   limit: 10,
   totalItems: 0,
-  sortType: "dsc",
+  sortType: "desc",
   sortBy: "updatedAt",
   searchTerm: "",
   body: "",

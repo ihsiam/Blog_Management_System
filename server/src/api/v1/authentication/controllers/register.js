@@ -16,10 +16,16 @@ const register = async (req, res, next) => {
     // email validate
     if (!email) {
       errors.push({ field: "email", message: "invalid input", in: "body" });
+    } else {
+      // email format validation
+      const emailOk = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim());
+      if (!emailOk) {
+        errors.push({ field: "email", message: "invalid input", in: "body" });
+      }
     }
 
     // password validate
-    if (!password || typeof password !== "string" || password.length < 6) {
+    if (!password || typeof password !== "string") {
       errors.push({ field: "password", message: "invalid input", in: "body" });
     }
 
@@ -28,16 +34,20 @@ const register = async (req, res, next) => {
       throw badRequest(errors, "invalid input");
     }
 
+    // create user
     const user = await authServices.register({ name, email, password });
 
+    // token payload
     const payload = {
       id: user._id,
       role: user.role,
       email: user.email,
     };
 
+    // generate token
     const token = generateToken(payload);
 
+    // response
     const response = {
       code: 201,
       message: "Account created",

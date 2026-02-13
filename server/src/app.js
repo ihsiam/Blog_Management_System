@@ -6,11 +6,8 @@ const { notFound } = require("./utils/error");
 // express app
 const app = express();
 
-// middlewares
+// apply global middlewares
 applyMiddleware(app);
-
-// routing
-app.use(routes);
 
 // API health
 app.get("/health", (req, res) => {
@@ -20,11 +17,14 @@ app.get("/health", (req, res) => {
   });
 });
 
-// error response for irrelevant page
-app.use((req, _res, next) => next(notFound("Requested resource not found")));
+// routing
+app.use(routes);
+
+// not found routes
+app.use((_req, _res, next) => next(notFound("Requested resource not found")));
 
 // error handling
-app.use((err, req, res, _next) => {
+app.use((err, _req, res, _next) => {
   const statusCode = err.statusCode || 500;
 
   console.log(err);

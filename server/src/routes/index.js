@@ -5,11 +5,13 @@ const authenticate = require("../middleware/authenticate");
 const authorize = require("../middleware/authorize");
 const ownership = require("../middleware/ownership");
 
-// auth route
+// api routes for version 1
+
+// auth routes
 router.post("/api/v1/auth/signUp", authController.register);
 router.post("/api/v1/auth/signin", authController.login);
 
-// article route
+// article routes
 router
   .route("/api/v1/articles")
   .get(articleController.findAll)
@@ -21,7 +23,7 @@ router
   .put(
     authenticate,
     authorize(["user", "admin"]),
-    ownership("article"),
+    ownership("article", { allowMissing: true }),
     articleController.updateOrCreateItem,
   )
   .patch(

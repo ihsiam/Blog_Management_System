@@ -13,7 +13,7 @@ const generateToken = (payload) => {
     });
   } catch (e) {
     console.log("[JWT GENERATE]:", e);
-    throw badRequest(null, "Failed to generate token");
+    throw new Error(null, "Failed to generate token");
   }
 };
 
@@ -35,7 +35,7 @@ const verifyToken = (token) => {
       throw unauthorized("JWT token expired");
     }
 
-    // Invalid / malformed token
+    // Invalid token
     if (e.name === "JsonWebTokenError") {
       throw unauthorized("Invalid JWT token");
     }
@@ -54,9 +54,12 @@ const verifyToken = (token) => {
 const decodeToken = (token) => {
   try {
     const decoded = jwt.decode(token);
+
+    // if not decoded
     if (!decoded) {
       throw badRequest(null, "Invalid JWT token format");
     }
+
     return decoded;
   } catch (e) {
     console.log("[JWT DECODE]:", e);

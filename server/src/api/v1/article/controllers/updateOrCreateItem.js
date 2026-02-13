@@ -18,11 +18,17 @@ const updateOrCreateItem = async (req, res, next) => {
       errors.push({ field: "id", message: "invalid input", in: "params" });
     }
 
+    // title validation
+    if (title !== undefined && (typeof title !== "string" || !title.trim())) {
+      errors.push({ field: "title", message: "invalid input", in: "body" });
+    }
+
     // throw error
     if (errors.length) {
       throw badRequest(errors, "invalid input");
     }
 
+    // update or create article
     const { article, statusCode } = await articleServices.updateOrCreate(id, {
       title,
       body,
@@ -31,6 +37,7 @@ const updateOrCreateItem = async (req, res, next) => {
       author,
     });
 
+    // response
     res.status(statusCode).json({
       code: statusCode,
       message:

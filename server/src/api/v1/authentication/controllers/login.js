@@ -10,6 +10,11 @@ const login = async (req, res, next) => {
     // email validation
     if (!email || typeof email !== "string") {
       errors.push({ field: "email", message: "invalid input", in: "body" });
+    } else {
+      // email format validation
+      const emailOk = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim());
+      if (!emailOk)
+        errors.push({ field: "email", message: "invalid input", in: "body" });
     }
 
     // password validation
@@ -22,7 +27,10 @@ const login = async (req, res, next) => {
       throw badRequest(errors, "invalid input");
     }
 
+    // generate token
     const token = await authServices.login({ email, password });
+
+    // response
     const response = {
       code: 201,
       message: "Login successful",
