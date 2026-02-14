@@ -42,7 +42,7 @@ const ownership =
       }
       return next(forbidden("You are not allowed to access this resource"));
     } catch (e) {
-      return next(forbidden("You are not allowed to access this resource"));
+      return next(e);
     }
   };
 

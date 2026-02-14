@@ -1,6 +1,6 @@
 const Article = require("../../model/Article");
 const defaults = require("../../config/defaults");
-const { notFound } = require("../../utils/error");
+const { notFound, badRequest } = require("../../utils/error");
 
 // find all articles
 const findAll = async ({
@@ -89,6 +89,15 @@ const updateOrCreate = async (
 
   // if not found, create new
   if (!article) {
+    // if title not found for creation phase
+    if (!title || typeof title !== "string" || !title.trim()) {
+      throw badRequest(
+        [{ field: "title", message: "invalid input", in: "body" }],
+        "invalid input",
+      );
+    }
+
+    // create article
     const newArticle = await create({ title, body, cover, status, author });
     return { article: newArticle, statusCode: 201 };
   }

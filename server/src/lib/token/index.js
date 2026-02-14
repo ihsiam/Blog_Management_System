@@ -13,7 +13,9 @@ const generateToken = (payload) => {
     });
   } catch (e) {
     console.log("[JWT GENERATE]:", e);
-    throw new Error(null, "Failed to generate token");
+    throw new Error(
+      "We are sorry for the inconvenience. Please try again later.",
+    );
   }
 };
 

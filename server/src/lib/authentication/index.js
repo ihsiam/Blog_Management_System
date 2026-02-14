@@ -11,7 +11,7 @@ const register = async ({ name, email, password }) => {
   // if user exist with email
   if (hasUser) {
     throw badRequest(
-      [{ field: "email", message: "Email already exists", in: "body" }],
+      [{ field: "email", message: "User already exists", in: "body" }],
       "Validation error",
     );
   }
