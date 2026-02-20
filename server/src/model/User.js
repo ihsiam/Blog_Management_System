@@ -1,4 +1,5 @@
 const { Schema, model } = require("mongoose");
+const schemaOptions = require("./schemaOptions");
 
 const UserSchema = new Schema(
   {
@@ -6,6 +7,7 @@ const UserSchema = new Schema(
     email: {
       type: String,
       unique: true,
+      required: true,
     },
     password: String,
     role: {
@@ -19,7 +21,7 @@ const UserSchema = new Schema(
       default: "pending",
     },
   },
-  { timestamps: true },
+  schemaOptions,
 );
 
 const User = model("User", UserSchema);

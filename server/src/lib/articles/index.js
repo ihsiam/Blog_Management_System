@@ -1,6 +1,7 @@
 const Article = require("../../model/Article");
 const defaults = require("../../config/defaults");
 const { notFound, badRequest } = require("../../utils/error");
+const UserServices = require("../user");
 
 // find all articles
 const findAll = async ({
@@ -20,7 +21,7 @@ const findAll = async ({
     .skip(page * limit - limit)
     .limit(limit);
 
-  return articles.map((article) => ({ ...article._doc }));
+  return articles.map((article) => article.toObject());
 };
 
 // count articles
@@ -28,6 +29,7 @@ const count = async ({ searchTerm = "" }) => {
   const filter = { title: { $regex: searchTerm, $options: "i" } };
   // count article
   const totalArticle = await Article.countDocuments(filter);
+
   return totalArticle;
 };
 
@@ -44,12 +46,15 @@ const create = async ({
 
   await article.save();
 
-  return article._doc;
+  return article.toObject();
 };
 
 // find single item
 const findSingleItem = async ({ id, expand = "" }) => {
-  const TrimmedExpand = expand.split(",").map((item) => item.trim());
+  const TrimmedExpand = expand
+    .split(",")
+    .map((item) => item.trim())
+    .filter(Boolean);
 
   // find article
   const article = await Article.findById(id);
@@ -67,10 +72,9 @@ const findSingleItem = async ({ id, expand = "" }) => {
   // expand comments
   if (TrimmedExpand.includes("comments")) {
     await article.populate({ path: "comments", match: { status: "public" } });
-    article.comments = article.comments ?? [];
   }
 
-  return article._doc;
+  return article.toObject();
 };
 
 // create or update an item
@@ -104,10 +108,13 @@ const updateOrCreate = async (
 
   // if found, update
   const payload = { title, body, cover, status, author };
-  article.overwrite(payload);
+  Object.keys(payload).forEach((key) => {
+    article[key] = payload[key] ?? article[key];
+  });
+
   await article.save();
 
-  return { article: article._doc, statusCode: 200 };
+  return { article: article.toObject(), statusCode: 200 };
 };
 
 // update item using patch
@@ -128,7 +135,7 @@ const updateItemPatch = async (id, { title, body, cover, status }) => {
 
   await article.save();
 
-  return article._doc;
+  return article.toObject();
 };
 
 // delete item
@@ -145,10 +152,17 @@ const deleteItem = async (id) => {
   return Article.findByIdAndDelete(id);
 };
 
+// find article by id
+const findArticleById = async (id) => {
+  const article = await Article.findById(id);
+
+  return article;
+};
+
 // check ownership
 const CheckOwner = async ({ resourceId, userId, allowMissing = false }) => {
   // find article
-  const article = await Article.findById(resourceId);
+  const article = await findArticleById(resourceId);
 
   // if not found
   if (!article) {
@@ -162,6 +176,21 @@ const CheckOwner = async ({ resourceId, userId, allowMissing = false }) => {
   return article.author.toString() === userId.toString();
 };
 
+const getArticleAuthor = async (articleID) => {
+  // find article
+  const article = await findSingleItem({ id: articleID });
+
+  // if article not found
+  if (!article) {
+    throw notFound();
+  }
+
+  // find user
+  const user = await UserServices.findUserById(article.author);
+
+  return user;
+};
+
 module.exports = {
   findAll,
   count,
@@ -171,4 +200,6 @@ module.exports = {
   updateItemPatch,
   deleteItem,
   CheckOwner,
+  findArticleById,
+  getArticleAuthor,
 };

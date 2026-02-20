@@ -33,8 +33,9 @@ app.use((err, _req, res, _next) => {
     code: statusCode,
     error: err.error || "Internal server error",
     message:
-      err.message ||
-      "We are sorry for the inconvenience. Please try again later.",
+      statusCode === 500
+        ? "We are sorry for the inconvenience. Please try again later."
+        : err.message,
     ...(err.data && { data: err.data }),
   });
 });

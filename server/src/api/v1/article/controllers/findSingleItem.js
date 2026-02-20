@@ -32,9 +32,9 @@ const findSingleItem = async (req, res, next) => {
       message: "Data retrieved",
       data: article,
       links: {
-        self: `/articles/${article._id}`,
-        author: `/articles/${article._id}/author`,
-        comments: `/articles/${article._id}/comments`,
+        self: `/api/v1/articles/${article.id}`,
+        author: `/api/v1/articles/${article.id}/author`,
+        comments: `/api/v1/articles/${article.id}/comments`,
       },
     });
   } catch (e) {

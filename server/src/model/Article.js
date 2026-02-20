@@ -1,4 +1,5 @@
 const { Schema, model } = require("mongoose");
+const schemaOptions = require("./schemaOptions");
 
 const ArticleSchema = new Schema(
   {
@@ -11,17 +12,14 @@ const ArticleSchema = new Schema(
       default: "draft",
     },
     author: {
-      type: Schema.ObjectId,
+      type: Schema.Types.ObjectId,
       ref: "User",
     },
   },
-  {
-    timestamps: true,
-    toJSON: { virtuals: true },
-    toObject: { virtuals: true },
-  },
+  schemaOptions,
 );
 
+// Virtual populate
 ArticleSchema.virtual("comments", {
   ref: "Comment",
   localField: "_id",

@@ -32,7 +32,7 @@ const getPagination = (
 };
 
 // transform data based on selection items
-const transformData = ({ items = [], selection = [], path = "/" }) => {
+const transformData = ({ items = [], selection = [], path = "" }) => {
   if (!Array.isArray(items) || !Array.isArray(selection)) {
     throw new Error("Invalid arguments");
   }
@@ -41,7 +41,7 @@ const transformData = ({ items = [], selection = [], path = "/" }) => {
   if (selection.length === 0) {
     return items.map((item) => ({
       ...item,
-      link: `${path}/${item._id}`,
+      link: `${path}/${item.id}`,
     }));
   }
 
@@ -52,7 +52,9 @@ const transformData = ({ items = [], selection = [], path = "/" }) => {
     selection.forEach((key) => {
       result[key] = item[key];
     });
-    result.link = `${path}/${item._id}`;
+    if (path) {
+      result.link = `${path}/${item.id}`;
+    }
 
     return result;
   });

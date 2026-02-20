@@ -39,7 +39,7 @@ const register = async (req, res, next) => {
 
     // token payload
     const payload = {
-      id: user._id,
+      id: user.id,
       role: user.role,
       email: user.email,
     };

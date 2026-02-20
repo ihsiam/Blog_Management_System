@@ -4,6 +4,9 @@ const findSingleItem = require("./findSingleItem");
 const updateOrCreateItem = require("./updateOrCreateItem");
 const updateItemPatch = require("./updateItemPatch");
 const deleteItem = require("./deleteItem");
+const postCommentOnArticle = require("./postCommentOnArticle");
+const getArticleComments = require("./getArticleComments");
+const getArticleAuthor = require("./getArticleAuthor");
 
 module.exports = {
   findAll,
@@ -12,4 +15,7 @@ module.exports = {
   updateOrCreateItem,
   updateItemPatch,
   deleteItem,
+  postCommentOnArticle,
+  getArticleComments,
+  getArticleAuthor,
 };

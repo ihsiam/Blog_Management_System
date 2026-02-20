@@ -33,7 +33,7 @@ const authenticate = async (req, res, next) => {
 
     // Attach user to request
     req.user = {
-      id: user._id,
+      id: user.id,
       email: user.email,
       role: user.role,
       status: user.status,

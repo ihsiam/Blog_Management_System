@@ -46,7 +46,7 @@ const updateOrCreateItem = async (req, res, next) => {
           : "Article created",
       data: article,
       links: {
-        self: `/articles/${article._id}`,
+        self: `/api/v1/articles/${article.id}`,
       },
     });
   } catch (e) {

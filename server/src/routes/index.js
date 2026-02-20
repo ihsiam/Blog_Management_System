@@ -39,4 +39,17 @@ router
     articleController.deleteItem,
   );
 
+router
+  .route("/api/v1/articles/:id/comments")
+  .get(articleController.getArticleComments)
+  .post(
+    authenticate,
+    authorize(["user", "admin"]),
+    articleController.postCommentOnArticle,
+  );
+
+router
+  .route("/api/v1/articles/:id/author")
+  .get(articleController.getArticleAuthor);
+
 module.exports = router;

@@ -8,6 +8,7 @@ const config = {
   body: "",
   cover: "",
   articleStatus: "draft",
+  commentStatus: "public",
 };
 
 module.exports = Object.freeze(config);

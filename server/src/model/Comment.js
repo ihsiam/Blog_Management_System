@@ -1,4 +1,5 @@
 const { Schema, model } = require("mongoose");
+const schemaOptions = require("./schemaOptions");
 
 const CommentSchema = new Schema(
   {
@@ -9,15 +10,15 @@ const CommentSchema = new Schema(
       default: "public",
     },
     article: {
-      type: Schema.ObjectId,
+      type: Schema.Types.ObjectId,
       ref: "Article",
     },
     author: {
-      type: Schema.ObjectId,
+      type: Schema.Types.ObjectId,
       ref: "User",
     },
   },
-  { timestamps: true },
+  schemaOptions,
 );
 
 const Comment = model("Comment", CommentSchema);

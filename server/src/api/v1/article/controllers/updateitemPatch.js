@@ -37,7 +37,7 @@ const updateItemPatch = async (req, res, next) => {
       message: "successfully updated article data",
       data: article,
       links: {
-        self: `/articles/${article._id}`,
+        self: `/api/v1/articles/${article.id}`,
       },
     });
   } catch (e) {
