@@ -4,9 +4,12 @@ const commentServices = require("../../../../lib/comments");
 
 const postCommentOnArticle = async (req, res, next) => {
   try {
+    // extract params from request
     const articleID = req.params.id;
-    const { body } = req.body;
     const author = req.user.id;
+
+    // extract comment data
+    const { body } = req.body;
     const status = req.body.status || defaults.commentStatus;
 
     // throw error if comment body not found

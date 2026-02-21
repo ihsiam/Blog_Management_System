@@ -11,21 +11,25 @@ const findAll = async ({
   sortType = defaults.sortType,
   searchTerm = defaults.searchTerm,
 }) => {
+  // sort option
   const sortKey = `${sortType === "desc" ? "-" : ""}${sortBy}`;
+
+  // filter option based on search
   const filter = { title: { $regex: searchTerm, $options: "i" } };
 
   // find articles
-  const articles = await Article.find(filter)
-    .populate({ path: "author", select: "name" })
-    .sort(sortKey)
-    .skip(page * limit - limit)
-    .limit(limit);
+  const articles = await Article.find(filter) // filter data based on search
+    .populate({ path: "author", select: "name" }) // populate author's name and id
+    .sort(sortKey) // sort data
+    .skip(page * limit - limit) // skip based on page
+    .limit(limit); // retrieved based on limit
 
   return articles.map((article) => article.toObject());
 };
 
 // count articles
 const count = async ({ searchTerm = "" }) => {
+  // filter option based on search
   const filter = { title: { $regex: searchTerm, $options: "i" } };
   // count article
   const totalArticle = await Article.countDocuments(filter);
@@ -51,6 +55,7 @@ const create = async ({
 
 // find single item
 const findSingleItem = async ({ id, expand = "" }) => {
+  // extract expand
   const TrimmedExpand = expand
     .split(",")
     .map((item) => item.trim())
@@ -108,6 +113,7 @@ const updateOrCreate = async (
 
   // if found, update
   const payload = { title, body, cover, status, author };
+
   Object.keys(payload).forEach((key) => {
     article[key] = payload[key] ?? article[key];
   });
@@ -129,6 +135,7 @@ const updateItemPatch = async (id, { title, body, cover, status }) => {
 
   // update article
   const payload = { title, body, cover, status };
+
   Object.keys(payload).forEach((key) => {
     article[key] = payload[key] ?? article[key];
   });
@@ -154,6 +161,7 @@ const deleteItem = async (id) => {
 
 // find article by id
 const findArticleById = async (id) => {
+  // find article
   const article = await Article.findById(id);
 
   return article;

@@ -33,6 +33,7 @@ const getPagination = (
 
 // transform data based on selection items
 const transformData = ({ items = [], selection = [], path = "" }) => {
+  // for invalid array
   if (!Array.isArray(items) || !Array.isArray(selection)) {
     throw new Error("Invalid arguments");
   }
@@ -52,6 +53,8 @@ const transformData = ({ items = [], selection = [], path = "" }) => {
     selection.forEach((key) => {
       result[key] = item[key];
     });
+
+    // if path required
     if (path) {
       result.link = `${path}/${item.id}`;
     }

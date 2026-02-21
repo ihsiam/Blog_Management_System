@@ -1,5 +1,5 @@
 const { userExist, createUser, findUserByEmail } = require("../user");
-const { badRequest, unauthorized } = require("../../utils/error");
+const { badRequest, unauthorized, forbidden } = require("../../utils/error");
 const { hashing } = require("../../utils");
 const { generateToken } = require("../token");
 
@@ -33,6 +33,7 @@ const login = async ({ email, password }) => {
   // find user with email
   const user = await findUserByEmail(email);
 
+  // if not found
   if (!user) {
     throw unauthorized("Invalid credentials");
   }
@@ -40,13 +41,14 @@ const login = async ({ email, password }) => {
   // match password
   const isMatched = await hashing.compareHash(password, user.password);
 
+  // if password is not matched
   if (!isMatched) {
     throw unauthorized("Invalid credentials");
   }
 
   // check account status
   if (user.status !== "approved") {
-    throw unauthorized("Your account is not active");
+    throw forbidden("Your account is not active");
   }
 
   // generate token

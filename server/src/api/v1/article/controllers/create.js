@@ -4,6 +4,7 @@ const { badRequest } = require("../../../../utils/error");
 
 const create = async (req, res, next) => {
   try {
+    // extract title from request body
     const { title } = req.body;
 
     // validate title
@@ -14,6 +15,7 @@ const create = async (req, res, next) => {
       );
     }
 
+    // extract article data from request body
     const body = req.body.body || defaults.body;
     const cover = req.body.cover || defaults.cover;
     const status = req.body.status || defaults.articleStatus;

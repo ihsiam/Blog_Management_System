@@ -4,6 +4,7 @@ const { badRequest } = require("../../../../utils/error");
 
 const updateOrCreateItem = async (req, res, next) => {
   try {
+    // extract article data from request
     const { id } = req.params;
     const { title } = req.body;
     const { body } = req.body;
@@ -11,6 +12,7 @@ const updateOrCreateItem = async (req, res, next) => {
     const cover = req.body.cover || defaults.cover;
     const status = req.body.status || defaults.articleStatus;
 
+    // 400 error data
     const errors = [];
 
     // id validation

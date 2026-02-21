@@ -5,13 +5,15 @@ const { badRequest } = require("../../../../utils/error");
 
 const findAll = async (req, res, next) => {
   try {
-    const errors = [];
-
+    // extract params from request query
     const page = Number(req.query.page || defaults.page);
     const limit = Number(req.query.limit || defaults.limit);
     const sortType = req.query.sort_type || defaults.sortType;
     const sortBy = req.query.sort_by || defaults.sortBy;
     const searchTerm = req.query.search || defaults.searchTerm;
+
+    // 400 error data
+    const errors = [];
 
     // page validation
     if (!Number.isFinite(page) || page < 1) {

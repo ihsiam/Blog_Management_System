@@ -1,5 +1,6 @@
 const bcrypt = require("bcrypt");
 
+// salt round for hashing data
 const SALT_ROUNDS = Number(process.env.SALT_ROUNDS) || 10;
 
 // bcrypt hash generation for the given text

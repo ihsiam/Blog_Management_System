@@ -17,7 +17,7 @@ const authorize =
 
       return next();
     } catch (e) {
-      return next(forbidden("You are not allowed to access this resource"));
+      return next(e);
     }
   };
 

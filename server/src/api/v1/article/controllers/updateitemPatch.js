@@ -3,9 +3,13 @@ const { badRequest } = require("../../../../utils/error");
 
 const updateItemPatch = async (req, res, next) => {
   try {
+    // extract article id
     const { id } = req.params;
+
+    // extract update data from request body
     const { title, body, cover, status } = req.body;
 
+    // 400 error data
     const errors = [];
 
     // id validation

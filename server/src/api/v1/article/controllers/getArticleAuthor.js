@@ -3,6 +3,7 @@ const { query } = require("../../../../utils");
 
 const getArticleAuthor = async (req, res, next) => {
   try {
+    // extract article id
     const articleID = req.params.id;
 
     // get user
@@ -28,4 +29,5 @@ const getArticleAuthor = async (req, res, next) => {
     next(e);
   }
 };
+
 module.exports = getArticleAuthor;

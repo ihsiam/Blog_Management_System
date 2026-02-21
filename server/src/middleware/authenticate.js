@@ -1,10 +1,11 @@
 const { verifyToken } = require("../lib/token");
 const { findUserByEmail } = require("../lib/user");
-const { unauthorized } = require("../utils/error");
+const { unauthorized, forbidden } = require("../utils/error");
 
 // Authentication Middleware
 const authenticate = async (req, res, next) => {
   try {
+    // extract token header
     const authHeader = req.headers.authorization;
 
     //  checking Authorization header's existence
@@ -28,7 +29,7 @@ const authenticate = async (req, res, next) => {
 
     // Account status check
     if (user.status !== "approved") {
-      return next(unauthorized("Your account is not active"));
+      return next(forbidden("Your account is not active"));
     }
 
     // Attach user to request
@@ -41,7 +42,7 @@ const authenticate = async (req, res, next) => {
 
     return next();
   } catch (e) {
-    return next(unauthorized("Authentication failed"));
+    return next(e);
   }
 };
 

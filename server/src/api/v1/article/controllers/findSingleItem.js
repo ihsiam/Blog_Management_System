@@ -3,9 +3,11 @@ const { badRequest } = require("../../../../utils/error");
 
 const findSingleItem = async (req, res, next) => {
   try {
+    // extract params from request
     const { id } = req.params;
     const expand = req.query.expand || "";
 
+    // 400 error data
     const errors = [];
 
     // validate id

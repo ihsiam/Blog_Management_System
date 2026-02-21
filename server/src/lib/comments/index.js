@@ -18,10 +18,10 @@ const getCommentByArticle = async ({
   }
 
   // find comments
-  const comments = await Comment.find({ article: articleID })
-    .populate({ path: "author", select: "name" })
-    .skip(page * limit - limit)
-    .limit(limit);
+  const comments = await Comment.find({ article: articleID }) // filter comment by article id
+    .populate({ path: "author", select: "name" }) // populate author
+    .skip(page * limit - limit) // skip based on page
+    .limit(limit); // retrieved data
 
   return comments.map((comment) => comment.toObject());
 };
@@ -54,6 +54,7 @@ const create = async ({
 
   // create comment
   const comment = new Comment({ body, status, article: articleID, author });
+
   await comment.save();
 
   return comment.toObject();

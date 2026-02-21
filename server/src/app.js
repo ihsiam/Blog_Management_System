@@ -25,10 +25,12 @@ app.use((_req, _res, next) => next(notFound("Requested resource not found")));
 
 // error handling
 app.use((err, _req, res, _next) => {
+  // status code
   const statusCode = err.statusCode || 500;
 
   console.log(err);
 
+  // response
   res.status(statusCode).json({
     code: statusCode,
     error: err.error || "Internal server error",

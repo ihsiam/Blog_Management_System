@@ -5,10 +5,12 @@ const { query } = require("../../../../utils");
 
 const getArticleComments = async (req, res, next) => {
   try {
+    // extract params from request
     const articleID = req.params.id;
     const page = Number(req.query.page || defaults.page);
     const limit = Number(req.query.limit || defaults.limit);
 
+    // 400 error data
     const errors = [];
 
     // page validation
@@ -70,4 +72,5 @@ const getArticleComments = async (req, res, next) => {
     next(e);
   }
 };
+
 module.exports = getArticleComments;

@@ -4,8 +4,10 @@ const { badRequest } = require("../../../../utils/error");
 
 const register = async (req, res, next) => {
   try {
+    // extract register data from request body
     const { name, email, password } = req.body;
 
+    // 400 error data
     const errors = [];
 
     // name validate
@@ -19,6 +21,7 @@ const register = async (req, res, next) => {
     } else {
       // email format validation
       const emailOk = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim());
+
       if (!emailOk) {
         errors.push({ field: "email", message: "invalid input", in: "body" });
       }

@@ -3,6 +3,7 @@ const { badRequest } = require("../../../../utils/error");
 
 const deleteItem = async (req, res, next) => {
   try {
+    // extract article id
     const { id } = req.params;
 
     // Validate id
