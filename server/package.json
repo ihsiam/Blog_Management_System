@@ -1,7 +1,7 @@
 {
   "name": "blog-management-system",
   "version": "1.0.0",
-  "packageManager": "yarn@1.22.19",
+  "packageManager": "yarn@4.12.0",
   "description": "",
   "main": "index.js",
   "scripts": {
@@ -20,7 +20,7 @@
     "prettier": "^3.2.5"
   },
   "dependencies": {
-    "bcrypt": "^5.1.1",
+    "bcryptjs": "^3.0.3",
     "cors": "^2.8.5",
     "dotenv": "^16.4.5",
     "express": "^4.19.2",

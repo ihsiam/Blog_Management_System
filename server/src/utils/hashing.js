@@ -1,4 +1,4 @@
-const bcrypt = require("bcrypt");
+const bcrypt = require("bcryptjs");
 
 // salt round for hashing data
 const SALT_ROUNDS = Number(process.env.SALT_ROUNDS) || 10;
