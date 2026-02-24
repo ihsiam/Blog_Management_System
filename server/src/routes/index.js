@@ -1,6 +1,7 @@
 const router = require("express").Router();
 const { articleController } = require("../api/v1/article");
 const { authController } = require("../api/v1/authentication");
+const { commentsController } = require("../api/v1/comments");
 const authenticate = require("../middleware/authenticate");
 const authorize = require("../middleware/authorize");
 const ownership = require("../middleware/ownership");
@@ -51,5 +52,26 @@ router
 router
   .route("/api/v1/articles/:id/author")
   .get(articleController.getArticleAuthor);
+
+// comment routes
+router
+  .route("/api/v1/comments")
+  .get(authenticate, authorize(["admin"]), commentsController.getComments)
+  .post(authenticate, authorize(["admin"]), commentsController.postComment);
+
+router
+  .route("/api/v1/comments/:id")
+  .patch(
+    authenticate,
+    authorize(["user", "admin"]),
+    ownership("comment"),
+    commentsController.updateComment,
+  )
+  .delete(
+    authenticate,
+    authorize(["user", "admin"]),
+    ownership("comment"),
+    commentsController.deleteComment,
+  );
 
 module.exports = router;

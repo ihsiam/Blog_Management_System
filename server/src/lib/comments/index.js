@@ -26,6 +26,45 @@ const getCommentByArticle = async ({
   return comments.map((comment) => comment.toObject());
 };
 
+// get all comments
+const getComments = async ({
+  page = defaults.page,
+  limit = defaults.limit,
+  sortType = defaults.sortType,
+  sortBy = defaults.sortBy,
+  postId,
+}) => {
+  // sort option
+  const sortKey = `${sortType === "desc" ? "-" : ""}${sortBy}`;
+
+  // if post id exists
+  if (postId) {
+    // find article with id
+    const article = await articleServices.findArticleById(postId);
+
+    // if article not found
+    if (!article) {
+      throw notFound();
+    }
+
+    // find comments
+    const comments = await Comment.find({ article: postId }) // filter comment by article id
+      .sort(sortKey) // sort data
+      .skip(page * limit - limit) // skip based on page
+      .limit(limit); // retrieved data
+
+    return comments;
+  }
+
+  // get all comments of the page
+  const comments = await Comment.find() // filter comment by article id
+    .sort(sortKey) // sort data
+    .skip(page * limit - limit) // skip based on page
+    .limit(limit); // retrieved data
+
+  return comments;
+};
+
 // count comments
 const count = async (filter) => {
   // count article
@@ -60,4 +99,4 @@ const create = async ({
   return comment.toObject();
 };
 
-module.exports = { getCommentByArticle, create, count };
+module.exports = { getCommentByArticle, getComments, create, count };
