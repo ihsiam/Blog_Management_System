@@ -30,6 +30,12 @@ const register = async (req, res, next) => {
     // password validate
     if (!password || typeof password !== "string") {
       errors.push({ field: "password", message: "invalid input", in: "body" });
+    } else if (password.length < 8) {
+      errors.push({
+        field: "password",
+        message: "Password must be at least 8 character",
+        in: "body",
+      });
     }
 
     // throw error

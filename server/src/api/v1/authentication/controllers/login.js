@@ -35,7 +35,7 @@ const login = async (req, res, next) => {
 
     // response
     const response = {
-      code: 201,
+      code: 200,
       message: "Login successful",
       data: {
         access_token: token,
@@ -44,7 +44,7 @@ const login = async (req, res, next) => {
         self: "/api/v1/auth/signin",
       },
     };
-    res.status(201).json(response);
+    res.status(200).json(response);
   } catch (e) {
     next(e);
   }

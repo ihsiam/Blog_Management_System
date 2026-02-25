@@ -52,7 +52,7 @@ const getComments = async (req, res, next) => {
     }
 
     // invalid id
-    if (typeof postId !== "string") {
+    if (postId !== undefined && typeof postId !== "string") {
       errors.push({
         field: "id",
         message: "invalid input",

@@ -3,7 +3,7 @@ const schemaOptions = require("./schemaOptions");
 
 const CommentSchema = new Schema(
   {
-    body: String,
+    body: { type: String, required: true },
     status: {
       type: String,
       enum: ["public", "hidden"],
@@ -12,10 +12,12 @@ const CommentSchema = new Schema(
     article: {
       type: Schema.Types.ObjectId,
       ref: "Article",
+      required: true,
     },
     author: {
       type: Schema.Types.ObjectId,
       ref: "User",
+      required: true,
     },
   },
   schemaOptions,

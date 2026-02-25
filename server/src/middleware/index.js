@@ -1,4 +1,5 @@
 const express = require("express");
+const cors = require("cors");
 const swaggerUI = require("swagger-ui-express");
 const YAML = require("yamljs");
 const morgan = require("morgan");
@@ -7,6 +8,7 @@ const swaggerDocs = YAML.load("./swagger.yaml");
 
 const applyMiddleware = (app) => {
   app.use(express.json());
+  app.use(cors());
   app.use(morgan("dev"));
   app.use("/docs", swaggerUI.serve, swaggerUI.setup(swaggerDocs));
 };

@@ -5,7 +5,7 @@ const findUserByEmail = async (email) => {
   // find user
   const user = await User.findOne({ email });
 
-  return user ? user.toObject() : false;
+  return user ? user.toObject() : null;
 };
 
 // find user by id

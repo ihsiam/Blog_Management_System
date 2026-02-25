@@ -25,16 +25,16 @@ const main = async () => {
     // connect db
     await connectDB();
 
-    // run server
-    server.listen(PORT, () => {
-      console.log("server is running");
-      console.log(`API documentation: http://localhost:${PORT}/docs`);
-    });
-
     // Handle server-level errors (e.g., port already in use)
     server.on("error", (err) => {
       console.error("Server failed to start: ", err);
       process.exit(1);
+    });
+
+    // run server
+    server.listen(PORT, () => {
+      console.log("server is running");
+      console.log(`API documentation: http://localhost:${PORT}/docs`);
     });
   } catch (e) {
     // catch error

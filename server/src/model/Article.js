@@ -3,7 +3,7 @@ const schemaOptions = require("./schemaOptions");
 
 const ArticleSchema = new Schema(
   {
-    title: String,
+    title: { type: String, required: true },
     body: String,
     cover: String,
     status: {
@@ -14,6 +14,7 @@ const ArticleSchema = new Schema(
     author: {
       type: Schema.Types.ObjectId,
       ref: "User",
+      required: true,
     },
   },
   schemaOptions,

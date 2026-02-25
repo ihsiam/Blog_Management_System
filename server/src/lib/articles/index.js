@@ -168,7 +168,7 @@ const findArticleById = async (id) => {
 };
 
 // check ownership
-const CheckOwner = async ({ resourceId, userId, allowMissing = false }) => {
+const checkOwner = async ({ resourceId, userId, allowMissing = false }) => {
   // find article
   const article = await findArticleById(resourceId);
 
@@ -188,11 +188,6 @@ const getArticleAuthor = async (articleID) => {
   // find article
   const article = await findSingleItem({ id: articleID });
 
-  // if article not found
-  if (!article) {
-    throw notFound();
-  }
-
   // find user
   const user = await UserServices.findUserById(article.author);
 
@@ -207,7 +202,7 @@ module.exports = {
   updateOrCreate,
   updateItemPatch,
   deleteItem,
-  CheckOwner,
+  checkOwner,
   findArticleById,
   getArticleAuthor,
 };

@@ -25,7 +25,7 @@ const ownership =
 
       // ownership for article model
       if (model === "article") {
-        const isOwner = await articleService.CheckOwner({
+        const isOwner = await articleService.checkOwner({
           resourceId: req.params.id,
           userId: req.user.id,
           allowMissing: options.allowMissing,

@@ -1,15 +1,15 @@
 const jwt = require("jsonwebtoken");
 const { badRequest, unauthorized } = require("../../utils/error");
 
-// jwt secret
-const { JWT_SECRET } = process.env;
-
 // jwt validity
 const JWT_EXPIRES_IN = "7d";
 
 // auth token generate
 const generateToken = (payload) => {
   try {
+    // jwt secret
+    const { JWT_SECRET } = process.env;
+
     // generate token
     return jwt.sign(payload, JWT_SECRET, {
       algorithm: "HS256",
@@ -26,6 +26,9 @@ const generateToken = (payload) => {
 // verify auth token
 const verifyToken = (token) => {
   try {
+    // jwt secret
+    const { JWT_SECRET } = process.env;
+
     // if no token
     if (!token) {
       throw unauthorized("Authorization token missing");
