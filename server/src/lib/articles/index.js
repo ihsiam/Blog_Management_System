@@ -145,19 +145,10 @@ const updateItemPatch = async (id, { title, body, cover, status }) => {
   return article.toObject();
 };
 
-// delete item
-const deleteItem = async (id) => {
-  // find article
-  const article = await Article.findById(id);
-
-  // if not found
-  if (!article) {
-    throw notFound();
-  }
-
-  // todo: delete all associated articles if needed
-  return Article.findByIdAndDelete(id);
-};
+// delete article
+const deleteItem = async (id) =>
+  // find and delete article
+  Article.findByIdAndDelete(id);
 
 // find article by id
 const findArticleById = async (id) => {

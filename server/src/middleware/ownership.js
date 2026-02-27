@@ -1,5 +1,6 @@
 const articleService = require("../lib/articles");
 const { forbidden, unauthorized, badRequest } = require("../utils/error");
+const commentService = require("../lib/comments");
 
 // Ownership Middleware
 const ownership =
@@ -25,6 +26,7 @@ const ownership =
 
       // ownership for article model
       if (model === "article") {
+        // check owner
         const isOwner = await articleService.checkOwner({
           resourceId: req.params.id,
           userId: req.user.id,
@@ -40,6 +42,25 @@ const ownership =
           forbidden("You do not have permission to access this article"),
         );
       }
+
+      if (model === "comment") {
+        // check owner
+        const isOwner = await commentService.checkOwner({
+          resourceId: req.params.id,
+          userId: req.user.id,
+        });
+
+        // if owner
+        if (isOwner) {
+          return next();
+        }
+
+        return next(
+          forbidden("You do not have permission to access this comment"),
+        );
+      }
+
+      // return
       return next(forbidden("You are not allowed to access this resource"));
     } catch (e) {
       return next(e);

@@ -1,22 +1,13 @@
 const defaults = require("../../config/defaults");
 const Comment = require("../../model/Comment");
-const { badRequest, notFound } = require("../../utils/error");
-const articleServices = require("../articles");
+const { notFound } = require("../../utils/error");
 
-// get comment for article
-const getCommentByArticle = async ({
+// find comments  by article id
+const getCommentsByArticle = async ({
   articleID,
   page = defaults.page,
   limit = defaults.limit,
 }) => {
-  // find article with id
-  const article = await articleServices.findArticleById(articleID);
-
-  // if article not found
-  if (!article) {
-    throw notFound();
-  }
-
   // find comments
   const comments = await Comment.find({ article: articleID }) // filter comment by article id
     .populate({ path: "author", select: "name" }) // populate author
@@ -27,42 +18,19 @@ const getCommentByArticle = async ({
 };
 
 // get all comments
-const getComments = async ({
+const getAllComments = async ({
   page = defaults.page,
   limit = defaults.limit,
-  sortType = defaults.sortType,
-  sortBy = defaults.sortBy,
+  sortKey,
   postId,
 }) => {
-  // sort option
-  const sortKey = `${sortType === "desc" ? "-" : ""}${sortBy}`;
-
-  // if post id exists
-  if (postId) {
-    // find article with id
-    const article = await articleServices.findArticleById(postId);
-
-    // if article not found
-    if (!article) {
-      throw notFound();
-    }
-
-    // find comments
-    const comments = await Comment.find({ article: postId }) // filter comment by article id
-      .sort(sortKey) // sort data
-      .skip(page * limit - limit) // skip based on page
-      .limit(limit); // retrieved data
-
-    return comments;
-  }
-
-  // get all comments of the page
-  const comments = await Comment.find() // filter comment by article id
+  // find comments
+  const comments = await Comment.find(postId ? { article: postId } : {}) // filter comment by article id
     .sort(sortKey) // sort data
     .skip(page * limit - limit) // skip based on page
     .limit(limit); // retrieved data
 
-  return comments;
+  return comments.map((comment) => comment.toObject());
 };
 
 // count comments
@@ -80,23 +48,71 @@ const create = async ({
   status = defaults.commentStatus,
   author,
 }) => {
-  // find article with id
-  const article = await articleServices.findArticleById(articleID);
-
-  // if article not found
-  if (!article) {
-    throw badRequest(
-      [{ field: "id", message: "invalid id", in: "params" }],
-      "invalid id",
-    );
-  }
-
   // create comment
   const comment = new Comment({ body, status, article: articleID, author });
-
   await comment.save();
 
   return comment.toObject();
 };
 
-module.exports = { getCommentByArticle, getComments, create, count };
+// update comment
+const updateComment = async ({ id, body }) => {
+  // find comment
+  const comment = await Comment.findById(id);
+
+  // if not found
+  if (!comment) {
+    throw notFound();
+  }
+
+  // update comment
+  comment.body = body;
+  await comment.save();
+
+  return comment.toObject();
+};
+
+// delete comment
+const deleteItem = async (id) => {
+  // delete
+  const comment = await Comment.findByIdAndDelete(id);
+
+  // if not found
+  if (!comment) {
+    throw notFound();
+  }
+
+  return !!comment;
+};
+
+// delete many
+const deleteMany = async (filter) => {
+  // delete multiple comment
+  const result = await Comment.deleteMany(filter);
+
+  return !!result;
+};
+
+// comment ownership
+const checkOwner = async ({ resourceId, userId }) => {
+  // find comment
+  const comment = await Comment.findById(resourceId);
+
+  // if not found
+  if (!comment) {
+    throw notFound();
+  }
+
+  return comment.author.toString() === userId.toString();
+};
+
+module.exports = {
+  getCommentsByArticle,
+  getAllComments,
+  create,
+  count,
+  updateComment,
+  checkOwner,
+  deleteItem,
+  deleteMany,
+};

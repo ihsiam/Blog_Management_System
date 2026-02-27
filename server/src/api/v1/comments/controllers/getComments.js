@@ -1,6 +1,7 @@
 const defaults = require("../../../../config/defaults");
 const { badRequest } = require("../../../../utils/error");
-const commentService = require("../../../../lib/comments");
+const commentServices = require("../../../../lib/comments");
+const commentArticleServices = require("../../../../lib/commentArticle");
 const { query } = require("../../../../utils");
 
 const getComments = async (req, res, next) => {
@@ -66,7 +67,7 @@ const getComments = async (req, res, next) => {
     }
 
     // get comments
-    const data = await commentService.getComments({
+    const data = await commentArticleServices.getComments({
       page,
       limit,
       sortType,
@@ -77,9 +78,9 @@ const getComments = async (req, res, next) => {
     // get total
     let totalItem;
     if (postId) {
-      totalItem = await commentService.count({ article: postId });
+      totalItem = await commentServices.count({ article: postId });
     } else {
-      totalItem = await commentService.count();
+      totalItem = await commentServices.count();
     }
 
     // get pagination

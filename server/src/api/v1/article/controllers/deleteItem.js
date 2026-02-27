@@ -1,4 +1,4 @@
-const articleServices = require("../../../../lib/articles");
+const commentArticleServices = require("../../../../lib/commentArticle");
 const { badRequest } = require("../../../../utils/error");
 
 const deleteItem = async (req, res, next) => {
@@ -15,7 +15,7 @@ const deleteItem = async (req, res, next) => {
     }
 
     // delete article
-    await articleServices.deleteItem(id);
+    await commentArticleServices.deleteArticle(id);
 
     // response
     res.status(204).end();
