@@ -13,7 +13,7 @@ const findUserById = async (id) => {
   // find user
   const user = await User.findById(id);
 
-  return user ? user.toObject() : false;
+  return user ? user.toObject() : null;
 };
 
 // user existence
