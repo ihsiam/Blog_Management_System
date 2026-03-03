@@ -1,7 +1,7 @@
 const defaults = require("../../../../config/defaults");
 const { badRequest } = require("../../../../utils/error");
 const commentServices = require("../../../../lib/comments");
-const commentArticleServices = require("../../../../lib/commentArticle");
+const serviceRegistry = require("../../../../lib/service registry");
 const { query } = require("../../../../utils");
 
 const getComments = async (req, res, next) => {
@@ -67,7 +67,7 @@ const getComments = async (req, res, next) => {
     }
 
     // get comments
-    const data = await commentArticleServices.getComments({
+    const data = await serviceRegistry.getComments({
       page,
       limit,
       sortType,
@@ -77,6 +77,8 @@ const getComments = async (req, res, next) => {
 
     // get total
     let totalItem;
+
+    // get data
     if (postId) {
       totalItem = await commentServices.count({ article: postId });
     } else {

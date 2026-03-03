@@ -27,6 +27,22 @@ const UserSchema = new Schema(
   schemaOptions,
 );
 
+// Virtual populate
+UserSchema.virtual("articles", {
+  ref: "Article",
+  localField: "_id",
+  foreignField: "author",
+  justOne: false,
+});
+
+// Virtual populate
+UserSchema.virtual("comments", {
+  ref: "Comment",
+  localField: "_id",
+  foreignField: "author",
+  justOne: false,
+});
+
 const User = model("User", UserSchema);
 
 module.exports = User;

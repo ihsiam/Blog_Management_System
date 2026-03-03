@@ -1,7 +1,7 @@
-const serviceRegistry = require("../../../../lib/service registry");
 const { badRequest } = require("../../../../utils/error");
+const serviceRegistry = require("../../../../lib/service registry");
 
-const deleteItem = async (req, res, next) => {
+const deleteUser = async (req, res, next) => {
   try {
     // extract article id
     const { id } = req.params;
@@ -14,8 +14,8 @@ const deleteItem = async (req, res, next) => {
       );
     }
 
-    // delete article
-    await serviceRegistry.deleteArticle(id);
+    // delete user and it's credentials
+    await serviceRegistry.deleteUser(id);
 
     // response
     res.status(204).end();
@@ -24,4 +24,4 @@ const deleteItem = async (req, res, next) => {
   }
 };
 
-module.exports = deleteItem;
+module.exports = deleteUser;

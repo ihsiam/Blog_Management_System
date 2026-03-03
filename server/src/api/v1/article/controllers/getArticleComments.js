@@ -1,7 +1,7 @@
 const defaults = require("../../../../config/defaults");
 const { badRequest } = require("../../../../utils/error");
 const commentServices = require("../../../../lib/comments");
-const commentArticleServices = require("../../../../lib/commentArticle");
+const serviceRegistry = require("../../../../lib/service registry");
 const { query } = require("../../../../utils");
 
 const getArticleComments = async (req, res, next) => {
@@ -30,7 +30,7 @@ const getArticleComments = async (req, res, next) => {
     }
 
     // get comment data from comment service
-    const comments = await commentArticleServices.getCommentByArticle({
+    const comments = await serviceRegistry.getCommentByArticle({
       articleID,
       page,
       limit,

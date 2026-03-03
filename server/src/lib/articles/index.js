@@ -1,7 +1,6 @@
 const Article = require("../../model/Article");
 const defaults = require("../../config/defaults");
 const { notFound, badRequest } = require("../../utils/error");
-const UserServices = require("../user");
 
 // find all articles
 const findAll = async ({
@@ -150,12 +149,28 @@ const deleteItem = async (id) =>
   // find and delete article
   Article.findByIdAndDelete(id);
 
+const deleteMany = async (filter) => {
+  // delete articles based on filter
+  const result = await Article.deleteMany(filter);
+
+  return !!result;
+};
+
 // find article by id
 const findArticleById = async (id) => {
   // find article
   const article = await Article.findById(id);
 
   return article;
+};
+
+// find articles by user id
+const findArticlesByUser = async (id) => {
+  // get articles
+  const articles = await Article.find({ author: id }).select("_id");
+
+  // return object id
+  return articles.map((article) => article._id);
 };
 
 // check ownership
@@ -175,16 +190,6 @@ const checkOwner = async ({ resourceId, userId, allowMissing = false }) => {
   return article.author.toString() === userId.toString();
 };
 
-const getArticleAuthor = async (articleID) => {
-  // find article
-  const article = await findSingleItem({ id: articleID });
-
-  // find user
-  const user = await UserServices.findUserById(article.author);
-
-  return user;
-};
-
 module.exports = {
   findAll,
   count,
@@ -195,5 +200,6 @@ module.exports = {
   deleteItem,
   checkOwner,
   findArticleById,
-  getArticleAuthor,
+  findArticlesByUser,
+  deleteMany,
 };

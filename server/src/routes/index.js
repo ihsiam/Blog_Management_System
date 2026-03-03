@@ -3,6 +3,7 @@ const rateLimit = require("express-rate-limit");
 const { articleController } = require("../api/v1/article");
 const { authController } = require("../api/v1/authentication");
 const { commentsController } = require("../api/v1/comments");
+const { userController } = require("../api/v1/user");
 const authenticate = require("../middleware/authenticate");
 const authorize = require("../middleware/authorize");
 const ownership = require("../middleware/ownership");
@@ -85,5 +86,21 @@ router
     ownership("comment"),
     commentsController.deleteComment,
   );
+
+// user routes (admin only)
+router
+  .route("/api/v1/users")
+  .get(authenticate, authorize(["admin"]), userController.getAllUsers)
+  .post(authenticate, authorize(["admin"]), userController.createUser);
+
+router
+  .route("/api/v1/users/:id")
+  .get(authenticate, authorize(["admin"]), userController.getSingleUser)
+  .patch(authenticate, authorize(["admin"]), userController.updateUser)
+  .delete(authenticate, authorize(["admin"]), userController.deleteUser);
+
+router
+  .route("/api/v1/users/:id/changePassword")
+  .patch(authenticate, authorize(["admin"]), userController.changePassword);
 
 module.exports = router;

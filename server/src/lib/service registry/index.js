@@ -1,5 +1,6 @@
 const commentServices = require("../comments");
 const articleServices = require("../articles");
+const UserServices = require("../user");
 const { notFound, badRequest } = require("../../utils/error");
 const defaults = require("../../config/defaults");
 
@@ -103,9 +104,50 @@ const createComment = async ({
   return comment;
 };
 
+// get the author of an article
+const getArticleAuthor = async (articleID) => {
+  // find article
+  const article = await articleServices.findSingleItem({ id: articleID });
+
+  // find user
+  const user = await UserServices.findUserById(article.author);
+
+  return user;
+};
+
+// delete user and all related data
+const deleteUser = async (id) => {
+  // check if user exists
+  const user = await UserServices.findUserById(id);
+
+  // if not found
+  if (!user) {
+    throw notFound();
+  }
+
+  // find all articles authored by the user
+  const articleIds = await articleServices.findArticlesByUser(id);
+
+  // delete all comments on the user's articles (by any user)
+  await commentServices.deleteMany({ article: { $in: articleIds } });
+
+  // delete all comments authored by the user (on other articles)
+  await commentServices.deleteMany({ author: id });
+
+  // delete all articles authored by the user
+  await articleServices.deleteMany({ author: id });
+
+  // delete the user
+  await UserServices.deleteItem(id);
+
+  return true;
+};
+
 module.exports = {
   deleteArticle,
   getCommentByArticle,
   getComments,
   createComment,
+  getArticleAuthor,
+  deleteUser,
 };

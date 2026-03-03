@@ -1,6 +1,6 @@
 const defaults = require("../../../../config/defaults");
 const { badRequest } = require("../../../../utils/error");
-const commentArticleServices = require("../../../../lib/commentArticle");
+const serviceRegistry = require("../../../../lib/service registry");
 
 const postComment = async (req, res, next) => {
   try {
@@ -28,7 +28,7 @@ const postComment = async (req, res, next) => {
     }
 
     // create comment
-    const comment = await commentArticleServices.createComment({
+    const comment = await serviceRegistry.createComment({
       articleID,
       body,
       status,

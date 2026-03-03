@@ -1,5 +1,4 @@
-const articleServices = require("../../../../lib/articles");
-const { query } = require("../../../../utils");
+const serviceRegistry = require("../../../../lib/service registry");
 
 const getArticleAuthor = async (req, res, next) => {
   try {
@@ -7,19 +6,16 @@ const getArticleAuthor = async (req, res, next) => {
     const articleID = req.params.id;
 
     // get user
-    const user = await articleServices.getArticleAuthor(articleID);
+    const user = await serviceRegistry.getArticleAuthor(articleID);
 
     // transform data
-    const data = query.transformData({
-      items: [user],
-      selection: ["id", "name", "email"],
-    });
+    const data = { id: user.id, name: user.name, email: user.email };
 
     // response
     res.status(200).json({
       code: 200,
       message: "Data retrieved",
-      data: data[0],
+      data,
       links: {
         self: `/api/v1/articles/${articleID}/author`,
         article: `/api/v1/articles/${articleID}`,
