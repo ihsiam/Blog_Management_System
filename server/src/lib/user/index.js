@@ -27,6 +27,30 @@ const userExist = async (email) => {
   return !!user;
 };
 
+// admin existence
+const adminExist = async () => {
+  // find admin
+  const admin = await User.find({ role: "admin" });
+
+  return !!admin.length;
+};
+
+// create user
+const createAdmin = async ({ name, email, password }) => {
+  // create user
+  const user = new User({
+    name,
+    email,
+    password,
+    role: "admin",
+    status: "approved",
+  });
+
+  await user.save();
+
+  return user.toObject();
+};
+
 // create user
 const createUser = async ({ name, email, password }) => {
   // create user
@@ -208,6 +232,8 @@ const deleteItem = async (id) => {
 
 module.exports = {
   userExist,
+  adminExist,
+  createAdmin,
   createUser,
   findUserByEmail,
   findUserById,

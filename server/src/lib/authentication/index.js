@@ -1,4 +1,4 @@
-const { userExist, createUser, findUserByEmail } = require("../user");
+const userServices = require("../user");
 const { badRequest, unauthorized, forbidden } = require("../../utils/error");
 const { hashing } = require("../../utils");
 const { generateToken } = require("../token");
@@ -6,7 +6,7 @@ const { generateToken } = require("../token");
 // user register
 const register = async ({ name, email, password }) => {
   // existing user check
-  const hasUser = await userExist(email);
+  const hasUser = await userServices.userExist(email);
 
   // if user exist with email
   if (hasUser) {
@@ -20,7 +20,43 @@ const register = async ({ name, email, password }) => {
   const hashPassword = await hashing.generateHash(password);
 
   // create user
-  const user = await createUser({
+  const user = await userServices.createUser({
+    name,
+    email,
+    password: hashPassword,
+  });
+
+  return user;
+};
+
+// system admin initialize
+const systemAdmin = async ({ name, email, password }) => {
+  // existing admin check
+  const isAdminExist = await userServices.adminExist();
+
+  console.log(isAdminExist);
+
+  // if exist
+  if (isAdminExist) {
+    throw forbidden("System admin already exist");
+  }
+
+  // existing email check
+  const hasUser = await userServices.userExist(email);
+
+  // if user exist with email
+  if (hasUser) {
+    throw badRequest(
+      [{ field: "email", message: "User already exists", in: "body" }],
+      "Validation error",
+    );
+  }
+
+  // password hash
+  const hashPassword = await hashing.generateHash(password);
+
+  // create admin
+  const user = await userServices.createAdmin({
     name,
     email,
     password: hashPassword,
@@ -31,7 +67,7 @@ const register = async ({ name, email, password }) => {
 
 const login = async ({ email, password }) => {
   // find user with email
-  const user = await findUserByEmail(email);
+  const user = await userServices.findUserByEmail(email);
 
   // if not found
   if (!user) {
@@ -63,5 +99,6 @@ const login = async ({ email, password }) => {
 
 module.exports = {
   register,
+  systemAdmin,
   login,
 };
