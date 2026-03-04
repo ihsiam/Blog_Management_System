@@ -23,6 +23,10 @@ const UserSchema = new Schema(
       enum: ["pending", "approved", "block", "declined"],
       default: "pending",
     },
+    refreshToken: {
+      type: String,
+      default: null,
+    },
   },
   schemaOptions,
 );

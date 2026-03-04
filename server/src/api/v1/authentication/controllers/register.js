@@ -1,6 +1,7 @@
 const authServices = require("../../../../lib/authentication");
-const { generateToken } = require("../../../../lib/token");
+const tokenServices = require("../../../../lib/token");
 const { badRequest } = require("../../../../utils/error");
+const userServices = require("../../../../lib/user");
 
 const register = async (req, res, next) => {
   try {
@@ -54,20 +55,32 @@ const register = async (req, res, next) => {
     };
 
     // generate token
-    const token = generateToken(payload);
+    const accessToken = tokenServices.generateAccessToken(payload);
+    const refreshToken = tokenServices.generateRefreshToken(payload);
+
+    // save refresh token into db
+    await userServices.saveRefreshToken(user.id, refreshToken);
 
     // response
     const response = {
       code: 201,
       message: "Account created",
       data: {
-        access_token: token,
+        access_token: accessToken,
       },
       links: {
         self: "/api/v1/auth/signUp",
         signin: "/api/v1/auth/signin",
       },
     };
+
+    // set refresh token to cookie
+    res.cookie("refreshToken", refreshToken, {
+      httpOnly: true,
+      secure: true,
+    });
+
+    // send json response
     res.status(201).json(response);
   } catch (e) {
     next(e);

@@ -25,6 +25,8 @@ const authLimit = rateLimit({
 router.post("/api/v1/auth/setup-admin", authLimit, authController.setupAdmin);
 router.post("/api/v1/auth/signUp", authLimit, authController.register);
 router.post("/api/v1/auth/signin", authLimit, authController.login);
+router.post("/api/v1/auth/refresh", authController.refresh);
+router.post("/api/v1/auth/logout", authenticate, authController.logout);
 
 // article routes
 router

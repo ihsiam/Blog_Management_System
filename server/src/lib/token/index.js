@@ -1,59 +1,107 @@
 const jwt = require("jsonwebtoken");
 const { badRequest, unauthorized } = require("../../utils/error");
 
-// jwt validity
-const JWT_EXPIRES_IN = "7d";
+// jwt credentials
+const JWT_REFRESH_EXPIRES = process.env.JWT_REFRESH_EXPIRES || "7d";
+const JWT_ACCESS_EXPIRES = process.env.JWT_ACCESS_EXPIRES || "15m";
+const REFRESH_SECRET = process.env.JWT_REFRESH_SECRET;
+const ACCESS_SECRET = process.env.JWT_ACCESS_SECRET;
 
-// auth token generate
-const generateToken = (payload) => {
+// access token generate
+const generateAccessToken = (payload) => {
   try {
-    // jwt secret
-    const { JWT_SECRET } = process.env;
-
     // generate token
-    return jwt.sign(payload, JWT_SECRET, {
+    return jwt.sign(payload, ACCESS_SECRET, {
       algorithm: "HS256",
-      expiresIn: JWT_EXPIRES_IN,
+      expiresIn: JWT_ACCESS_EXPIRES,
     });
   } catch (e) {
-    console.log("[JWT GENERATE]:", e);
+    console.log("[JWT ACCESS GENERATE]:", e);
     throw new Error(
       "We are sorry for the inconvenience. Please try again later.",
     );
   }
 };
 
-// verify auth token
-const verifyToken = (token) => {
+// refresh token generate
+const generateRefreshToken = (payload) => {
   try {
-    // jwt secret
-    const { JWT_SECRET } = process.env;
+    // generate token
+    return jwt.sign(payload, REFRESH_SECRET, {
+      algorithm: "HS256",
+      expiresIn: JWT_REFRESH_EXPIRES,
+    });
+  } catch (e) {
+    console.log("[JWT REFRESH GENERATE]:", e);
+    throw new Error(
+      "We are sorry for the inconvenience. Please try again later.",
+    );
+  }
+};
 
+// verify access token
+const verifyAccessToken = (token) => {
+  try {
     // if no token
     if (!token) {
       throw unauthorized("Authorization token missing");
     }
 
     // verify token
-    return jwt.verify(token, JWT_SECRET, {
+    return jwt.verify(token, ACCESS_SECRET, {
       algorithms: ["HS256"],
     });
   } catch (e) {
-    console.log("[JWT VERIFY]:", e);
+    console.log("[JWT ACCESS VERIFY]:", e);
 
     // Token expired
     if (e.name === "TokenExpiredError") {
-      throw unauthorized("JWT token expired");
+      throw unauthorized("Access token expired");
     }
 
     // Invalid token
     if (e.name === "JsonWebTokenError") {
-      throw unauthorized("Invalid JWT token");
+      throw unauthorized("Invalid access token");
     }
 
     // Token not active yet
     if (e.name === "NotBeforeError") {
-      throw unauthorized("JWT token not active yet");
+      throw unauthorized("Access token not active yet");
+    }
+
+    // Fallback
+    throw unauthorized("Authentication failed");
+  }
+};
+
+// verify auth token
+const verifyRefreshToken = (token) => {
+  try {
+    // if no token
+    if (!token) {
+      throw unauthorized("Refresh token missing");
+    }
+
+    // verify token
+    return jwt.verify(token, REFRESH_SECRET, {
+      algorithms: ["HS256"],
+    });
+  } catch (e) {
+    console.log("[JWT REFRESH VERIFY]:", e);
+
+    // Token expired
+    if (e.name === "TokenExpiredError") {
+      throw unauthorized("Refresh token expired");
+    }
+
+    // Invalid token
+    if (e.name === "JsonWebTokenError") {
+      throw unauthorized("Invalid Refresh token");
+    }
+
+    // Token not active yet
+    if (e.name === "NotBeforeError") {
+      throw unauthorized("Refresh token not active yet");
     }
 
     // Fallback
@@ -80,7 +128,9 @@ const decodeToken = (token) => {
 };
 
 module.exports = {
-  generateToken,
-  verifyToken,
+  generateAccessToken,
+  generateRefreshToken,
+  verifyAccessToken,
+  verifyRefreshToken,
   decodeToken,
 };

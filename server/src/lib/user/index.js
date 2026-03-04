@@ -97,6 +97,16 @@ const createUserByAdmin = async ({ name, email, password }) => {
   return userData;
 };
 
+// save refresh token into user db
+const saveRefreshToken = async (id, refreshToken) => {
+  await User.findByIdAndUpdate(id, { $set: { refreshToken } });
+};
+
+// remove refresh token from user database
+const clearRefreshToken = async (id) => {
+  await User.findByIdAndUpdate(id, { $set: { refreshToken: null } });
+};
+
 // get all user
 const getAllUsers = async ({
   page = defaults.page,
@@ -238,6 +248,8 @@ module.exports = {
   findUserByEmail,
   findUserById,
   createUserByAdmin,
+  saveRefreshToken,
+  clearRefreshToken,
   getAllUsers,
   countTotal,
   getSingleUser,

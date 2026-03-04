@@ -1,5 +1,5 @@
-const { verifyToken } = require("../lib/token");
-const { findUserByEmail } = require("../lib/user");
+const tokenServices = require("../lib/token");
+const userServices = require("../lib/user");
 const { unauthorized, forbidden } = require("../utils/error");
 
 // Authentication Middleware
@@ -17,10 +17,10 @@ const authenticate = async (req, res, next) => {
     const token = authHeader.split(" ")[1];
 
     // Verify token
-    const decoded = verifyToken(token);
+    const decoded = tokenServices.verifyAccessToken(token);
 
     // find user from db
-    const user = await findUserByEmail(decoded.email);
+    const user = await userServices.findUserByEmail(decoded.email);
 
     // if not found
     if (!user) {

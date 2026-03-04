@@ -31,19 +31,30 @@ const login = async (req, res, next) => {
     }
 
     // generate token
-    const token = await authServices.login({ email, password });
+    const { accessToken, refreshToken } = await authServices.login({
+      email,
+      password,
+    });
 
     // response
     const response = {
       code: 200,
       message: "Login successful",
       data: {
-        access_token: token,
+        access_token: accessToken,
       },
       links: {
         self: "/api/v1/auth/signin",
       },
     };
+
+    // set refresh token to cookie
+    res.cookie("refreshToken", refreshToken, {
+      httpOnly: true,
+      secure: true,
+    });
+
+    // send json response
     res.status(200).json(response);
   } catch (e) {
     next(e);
