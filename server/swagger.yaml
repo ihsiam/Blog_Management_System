@@ -2,10 +2,29 @@ openapi: 3.0.0
 info:
   version: "1.0.0"
   title: "Blog Management System"
-  description: "This is a Blog Management System where we can create or login into our account. Registered users can post article, which will be visible for everyone. And registered users can also comment on articles."
+  description: |
+    A scalable Blog Management System API that enables users to register, verify their email, and
+    authenticate using JWT-based authentication (access and refresh tokens). The system supports
+    secure password management, including password change and email-based password reset
+    functionality.
+
+    Authenticated users can create, update, publish, and delete blog posts, as well as engage with
+    content through comments. The platform enforces role-based access control (RBAC), allowing
+    administrators to manage system resources while regular users interact with blog content.
+
+    The API provides advanced querying capabilities such as pagination, filtering, sorting, and 
+    searching to efficiently retrieve blog data.
+
+    The application follows production-grade backend practices including caching, structured logging,
+    automated testing, and comprehensive error handling.
+
+    For scalable and reliable deployment, the system is containerized using Docker and supports load
+    balancing, database replication, and CI/CD pipelines
+
   contact:
     name: Md Ismile Hosen Siam
     email: siam679ihs@gmail.com
+
 servers:
   - description: dev
     url: http://localhost:4000/api/v1
@@ -21,20 +40,22 @@ tags:
     description: User endpoints
 
 paths:
-  "/auth/signUp":
+  "/auth/sign-up":
     post:
-      description: Create an user account
+      summary: Create user account
+      description: Register a new user account and sends verification email to user.
       tags: [Auth]
       requestBody:
+        required: true
         content:
-          "application/json":
+          application/json:
             schema:
-              $ref: "#/components/schemas/createUser"
+              $ref: "#/components/schemas/CreateUserRequest"
       responses:
         "201":
-          description: SignUp successful
+          description: Sign-up successful
           content:
-            "application/json":
+            application/json:
               schema:
                 type: object
                 properties:
@@ -44,24 +65,23 @@ paths:
                     example: 201
                   message:
                     type: string
-                    example: Account created
+                    example: Account created. An activation token sent to your email.
                   data:
-                    type: object
-                    properties:
-                      access_token:
-                        type: string
-                        example: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkpvaG4gRG9lIiwiYWRtaW4iOnRydWUsImlhdCI6MTUxNjIzOTAyMn0.KMUFsIDTnFmyG3nMiGM6H9FNFUROf3wh7SmqJp-QV30"
+                    allOf:
+                      - $ref: "#/components/schemas/UserCreateUpdateResponse"
+                      - type: object
+                        properties:
+                          status:
+                            type: string
+                            enum: [pending, approved, blocked, declined]
+                            example: pending
                   links:
                     type: object
                     properties:
                       self:
                         type: string
-                        format: url
-                        example: "/auth/signUp"
-                      signin:
-                        type: string
-                        format: url
-                        example: "/auth/signin"
+                        format: uri
+                        example: "/auth/sign-up"
         "400":
           $ref: "#/components/responses/BadRequest"
         "500":
@@ -69,18 +89,20 @@ paths:
 
   "/auth/setup-admin":
     post:
-      description: Setup the initial admin account
+      summary: Setup initial admin
+      description: Create the initial admin account. This endpoint should only succeed once
       tags: [Auth]
       requestBody:
+        required: true
         content:
-          "application/json":
+          application/json:
             schema:
-              $ref: "#/components/schemas/createUser"
+              $ref: "#/components/schemas/CreateUserRequest"
       responses:
         "201":
           description: Admin account created
           content:
-            "application/json":
+            application/json:
               schema:
                 type: object
                 properties:
@@ -94,16 +116,16 @@ paths:
                   data:
                     type: object
                     properties:
-                      access_token:
+                      accessToken:
                         type: string
-                        example: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkpvaG4gRG9lIiwiYWRtaW4iOnRydWUsImlhdCI6MTUxNjIzOTAyMn0.KMUFsIDTnFmyG3nMiGM6H9FNFUROf3wh7SmqJp-QV30"
+                        example: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
                   links:
                     type: object
                     properties:
-                      signin:
+                      signIn:
                         type: string
-                        format: url
-                        example: "/auth/signin"
+                        format: uri
+                        example: "/auth/sign-in"
         "400":
           $ref: "#/components/responses/BadRequest"
         "403":
@@ -111,13 +133,15 @@ paths:
         "500":
           $ref: "#/components/responses/ServerError"
 
-  "/auth/signin":
+  "/auth/sign-in":
     post:
-      description: Login into user account
+      summary: Sign in
+      description: Authenticate a user and return an access token and also set a refreshToken HttpOnly cookie.
       tags: [Auth]
       requestBody:
+        required: true
         content:
-          "application/json":
+          application/json:
             schema:
               type: object
               properties:
@@ -134,7 +158,7 @@ paths:
         "200":
           description: Login successful
           content:
-            "application/json":
+            application/json:
               schema:
                 type: object
                 properties:
@@ -148,16 +172,16 @@ paths:
                   data:
                     type: object
                     properties:
-                      access_token:
+                      accessToken:
                         type: string
-                        example: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkpvaG4gRG9lIiwiYWRtaW4iOnRydWUsImlhdCI6MTUxNjIzOTAyMn0.KMUFsIDTnFmyG3nMiGM6H9FNFUROf3wh7SmqJp-QV30"
+                        example: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
                   links:
                     type: object
                     properties:
                       self:
                         type: string
-                        format: url
-                        example: "/auth/signin"
+                        format: uri
+                        example: "/auth/sign-in"
         "400":
           $ref: "#/components/responses/BadRequest"
         "401":
@@ -169,13 +193,18 @@ paths:
 
   "/auth/refresh":
     post:
-      description: Refresh access token using refresh token cookie
+      summary: Refresh access token
+      description: >
+        Refresh the access token using the refreshToken cookie.
+        The refresh token is expected to be stored in an HttpOnly cookie.
       tags: [Auth]
+      security:
+        - refreshCookie: []
       responses:
         "200":
           description: Token refreshed
           content:
-            "application/json":
+            application/json:
               schema:
                 type: object
                 properties:
@@ -189,9 +218,9 @@ paths:
                   data:
                     type: object
                     properties:
-                      access_token:
+                      accessToken:
                         type: string
-                        example: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkpvaG4gRG9lIiwiYWRtaW4iOnRydWUsImlhdCI6MTUxNjIzOTAyMn0.KMUFsIDTnFmyG3nMiGM6H9FNFUROf3wh7SmqJp-QV30"
+                        example: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
         "401":
           $ref: "#/components/responses/Unauthorized"
         "403":
@@ -201,15 +230,17 @@ paths:
 
   "/auth/logout":
     post:
+      summary: Logout
+      description: Logout the current user and invalidate the refresh token.
+      tags: [Auth]
       security:
         - bearerAuth: []
-      description: Logout and invalidate refresh token
-      tags: [Auth]
+          refreshCookie: []
       responses:
         "200":
           description: Logged out successfully
           content:
-            "application/json":
+            application/json:
               schema:
                 type: object
                 properties:
@@ -225,9 +256,182 @@ paths:
         "500":
           $ref: "#/components/responses/ServerError"
 
+  "/auth/verify-email/{token}":
+    get:
+      summary: Verify email
+      description: Verify user email address using the token sent to their email during registration.
+      tags: [Auth]
+      parameters:
+        - in: path
+          name: token
+          required: true
+          schema:
+            type: string
+            example: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+          description: Email verification token
+      responses:
+        "200":
+          description: Email verified successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  code:
+                    type: integer
+                    format: int32
+                    example: 200
+                  message:
+                    type: string
+                    example: Email verified successfully
+                  links:
+                    type: object
+                    properties:
+                      signIn:
+                        type: string
+                        format: uri
+                        example: "/auth/sign-in"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/ServerError"
+
+  "/auth/resend-verification":
+    post:
+      summary: Resend verification email
+      description: Resend the email verification token to the user's email address.
+      tags: [Auth]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                email:
+                  type: string
+                  format: email
+                  example: example@gmail.com
+              required: [email]
+      responses:
+        "200":
+          description: Verification email sent
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  code:
+                    type: integer
+                    format: int32
+                    example: 200
+                  message:
+                    type: string
+                    example: Verification email sent
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/ServerError"
+
+  "/auth/forgot-password":
+    post:
+      summary: Forgot password
+      description: Request a password reset link to be sent to the user's email address.
+      tags: [Auth]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                email:
+                  type: string
+                  format: email
+                  example: example@gmail.com
+              required: [email]
+      responses:
+        "200":
+          description: Password reset email sent
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  code:
+                    type: integer
+                    format: int32
+                    example: 200
+                  message:
+                    type: string
+                    example: If the email exists, a password reset link has been sent
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "500":
+          $ref: "#/components/responses/ServerError"
+
+  "/auth/reset-password/{token}":
+    patch:
+      summary: Reset password
+      description: Reset user password using the token received via email.
+      tags: [Auth]
+      parameters:
+        - in: path
+          name: token
+          required: true
+          schema:
+            type: string
+            example: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+          description: Password reset token
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                password:
+                  type: string
+                  format: password
+                  example: newPassword1234
+              required: [password]
+      responses:
+        "200":
+          description: Password reset successful
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  code:
+                    type: integer
+                    format: int32
+                    example: 200
+                  message:
+                    type: string
+                    example: Password reset successful
+                  links:
+                    type: object
+                    properties:
+                      signIn:
+                        type: string
+                        format: uri
+                        example: "/auth/sign-in"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/ServerError"
+
   "/articles":
     get:
-      description: Retrieved all published articles.
+      summary: List published articles
+      description: Retrieve published articles visible to the public.
       tags: [Article]
       parameters:
         - $ref: "#/components/parameters/pageParam"
@@ -239,7 +443,7 @@ paths:
         "200":
           description: Return a list of articles
           content:
-            "application/json":
+            application/json:
               schema:
                 type: object
                 properties:
@@ -264,13 +468,13 @@ paths:
                               example: First article
                             cover:
                               type: string
-                              format: url
+                              format: uri
                               example: "https://s.aws.com/myfirstblog/123.jpg"
                             author:
                               $ref: "#/components/schemas/AuthorDetails"
                             link:
                               type: string
-                              format: url
+                              format: uri
                               example: "/articles/507f1f77bcf86cd799439011"
                           required: [id, title, author, link]
                         - $ref: "#/components/schemas/Timestamp"
@@ -281,15 +485,15 @@ paths:
                     properties:
                       self:
                         type: string
-                        format: url
+                        format: uri
                         example: "/articles?page=2&limit=10"
                       next:
                         type: string
-                        format: url
+                        format: uri
                         example: "/articles?page=3&limit=10"
                       prev:
                         type: string
-                        format: url
+                        format: uri
                         example: "/articles?page=1&limit=10"
         "400":
           $ref: "#/components/responses/BadRequest"
@@ -297,31 +501,17 @@ paths:
           $ref: "#/components/responses/ServerError"
 
     post:
+      summary: Create article
+      description: Create an article. Requires authentication.
+      tags: [Article]
       security:
         - bearerAuth: []
-      description: Create an article
-      tags: [Article]
       requestBody:
+        required: true
         content:
-          "application/json":
+          application/json:
             schema:
-              type: object
-              properties:
-                title:
-                  type: string
-                  example: first article
-                body:
-                  type: string
-                  example: first article body
-                cover:
-                  type: string
-                  format: url
-                  example: https://s.aws.com/myfirstblog/123.jpg
-                status:
-                  type: string
-                  enum: [draft, published]
-                  example: draft
-              required: [title]
+              $ref: "#/components/schemas/CreateOrPutUpdateArticleRequest"
       responses:
         "201":
           $ref: "#/components/responses/ArticleCreated"
@@ -334,22 +524,113 @@ paths:
         "500":
           $ref: "#/components/responses/ServerError"
 
+  "/articles/all":
+    get:
+      summary: List all articles
+      description: Retrieve all articles, including hidden and published articles. Only admins should be allowed.
+      tags: [Article]
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/pageParam"
+        - $ref: "#/components/parameters/limitParam"
+        - $ref: "#/components/parameters/sortTypeParam"
+        - $ref: "#/components/parameters/sortByParam"
+        - $ref: "#/components/parameters/searchParam"
+        - in: query
+          name: status
+          description: Filter articles by publication status
+          required: false
+          schema:
+            type: string
+            enum: [hidden, published]
+            example: hidden
+      responses:
+        "200":
+          description: Return a list of all articles
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  code:
+                    type: integer
+                    format: int32
+                    example: 200
+                  message:
+                    type: string
+                    example: Data retrieved
+                  data:
+                    type: array
+                    items:
+                      allOf:
+                        - type: object
+                          properties:
+                            id:
+                              type: string
+                              example: 507f1f77bcf86cd799439011
+                            title:
+                              type: string
+                              example: First article
+                            cover:
+                              type: string
+                              format: uri
+                              example: "https://s.aws.com/myfirstblog/123.jpg"
+                            status:
+                              type: string
+                              enum: [hidden, published]
+                              example: hidden
+                            author:
+                              $ref: "#/components/schemas/AuthorDetails"
+                            link:
+                              type: string
+                              format: uri
+                              example: "/articles/507f1f77bcf86cd799439011"
+                          required: [id, title, status, author, link]
+                        - $ref: "#/components/schemas/Timestamp"
+                  pagination:
+                    $ref: "#/components/schemas/Pagination"
+                  links:
+                    type: object
+                    properties:
+                      self:
+                        type: string
+                        format: uri
+                        example: "/articles/admin?page=2&limit=10"
+                      next:
+                        type: string
+                        format: uri
+                        example: "/articles/admin?page=3&limit=10"
+                      prev:
+                        type: string
+                        format: uri
+                        example: "/articles/admin?page=1&limit=10"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "500":
+          $ref: "#/components/responses/ServerError"
+
   "/articles/{id}":
     get:
+      summary: Get article
+      description: Retrieve a single article. Public access should only return published articles.
       tags: [Article]
-      description: Retrieved a single article
       parameters:
         - $ref: "#/components/parameters/idPathParam"
         - in: query
           name: expand
           schema:
             type: string
-            example: author, comments
+            example: author,comments
       responses:
         "200":
           description: Retrieved an article
           content:
-            "application/json":
+            application/json:
               schema:
                 type: object
                 properties:
@@ -372,22 +653,29 @@ paths:
                           comments:
                             type: array
                             items:
-                              $ref: "#/components/schemas/Comments"
+                              allOf:
+                                - $ref: "#/components/schemas/CommentBody"
+                                - type: object
+                                  properties:
+                                    author:
+                                      type: string
+                                      example: 507f1f77bcf86cd799439011
+
                   links:
                     type: object
                     properties:
                       self:
                         type: string
-                        format: url
-                        example: "/article/507f1f77bcf86cd799439011"
+                        format: uri
+                        example: "/articles/507f1f77bcf86cd799439011"
                       author:
                         type: string
-                        format: url
-                        example: "/article/507f1f77bcf86cd799439011/author"
+                        format: uri
+                        example: "/articles/507f1f77bcf86cd799439011/author"
                       comments:
                         type: string
-                        format: url
-                        example: "/article/507f1f77bcf86cd799439011/comments"
+                        format: uri
+                        example: "/articles/507f1f77bcf86cd799439011/comments"
         "400":
           $ref: "#/components/responses/BadRequest"
         "404":
@@ -396,36 +684,21 @@ paths:
           $ref: "#/components/responses/ServerError"
 
     put:
+      summary: Create or update article
+      description: >
+        Create or update an article resource. This operation will create a new article if it does not exist, or update the existing article if it already exists.
+        Only the article owner or an administrator is authorized to perform this action.
+      tags: [Article]
       security:
         - bearerAuth: []
-      tags: [Article]
-      description: create or update an article
       parameters:
         - $ref: "#/components/parameters/idPathParam"
       requestBody:
+        required: true
         content:
-          "application/json":
+          application/json:
             schema:
-              type: object
-              properties:
-                id:
-                  type: string
-                  example: 507f1f77bcf86cd799439011
-                title:
-                  type: string
-                  example: updated title
-                body:
-                  type: string
-                  example: updated body
-                cover:
-                  type: string
-                  format: url
-                  example: https://s.aws.com/myfirstblog/123.jpg
-                status:
-                  type: string
-                  enum: [draft, published]
-                  example: draft
-              required: [title, body]
+              $ref: "#/components/schemas/CreateOrPutUpdateArticleRequest"
       responses:
         "200":
           $ref: "#/components/responses/ArticleUpdated"
@@ -441,32 +714,21 @@ paths:
           $ref: "#/components/responses/ServerError"
 
     patch:
+      summary: Update article
+      description: >
+        Partially update an article. Only the article owner or an admin should
+        be allowed to perform this action.
+      tags: [Article]
       security:
         - bearerAuth: []
-      tags: [Article]
-      description: update an article
       parameters:
         - $ref: "#/components/parameters/idPathParam"
       requestBody:
+        required: true
         content:
-          "application/json":
+          application/json:
             schema:
-              type: object
-              properties:
-                title:
-                  type: string
-                  example: updated title
-                body:
-                  type: string
-                  example: updated body
-                cover:
-                  type: string
-                  format: url
-                  example: https://s.aws.com/myfirstblog/123.jpg
-                status:
-                  type: string
-                  enum: [draft, published]
-                  example: draft
+              $ref: "#/components/schemas/PatchArticleRequest"
       responses:
         "200":
           $ref: "#/components/responses/ArticleUpdated"
@@ -482,10 +744,13 @@ paths:
           $ref: "#/components/responses/ServerError"
 
     delete:
+      summary: Delete article
+      description: >
+        Delete an article. Only the article owner or an admin should be allowed
+        to perform this action.
+      tags: [Article]
       security:
         - bearerAuth: []
-      tags: [Article]
-      description: Article deleted
       parameters:
         - $ref: "#/components/parameters/idPathParam"
       responses:
@@ -504,17 +769,20 @@ paths:
 
   "/articles/{id}/comments":
     get:
+      summary: List article comments
+      description: >
+        Retrieve public comments for a specific article. Hidden comments should
+        not be returned to public users.
       tags: [Article]
-      description: Find comments of an article
       parameters:
         - $ref: "#/components/parameters/idPathParam"
         - $ref: "#/components/parameters/pageParam"
         - $ref: "#/components/parameters/limitParam"
       responses:
         "200":
-          description: "Return a list of comments"
+          description: Return a list of comments
           content:
-            "application/json":
+            application/json:
               schema:
                 type: object
                 properties:
@@ -524,15 +792,15 @@ paths:
                     example: 200
                   message:
                     type: string
-                    example: Data retrieved.
+                    example: Data retrieved
                   data:
                     type: array
                     items:
                       allOf:
-                        - $ref: "#/components/schemas/commentBody"
+                        - $ref: "#/components/schemas/CommentBody"
                         - type: object
                           properties:
-                            "author":
+                            author:
                               $ref: "#/components/schemas/AuthorDetails"
                   pagination:
                     $ref: "#/components/schemas/Pagination"
@@ -540,20 +808,20 @@ paths:
                     type: object
                     properties:
                       self:
-                        type: "string"
-                        format: "url"
+                        type: string
+                        format: uri
                         example: "/articles/507f1f77bcf86cd799439011/comments"
                       article:
-                        type: "string"
-                        format: "url"
+                        type: string
+                        format: uri
                         example: "/articles/507f1f77bcf86cd799439011"
                       prev:
-                        type: "string"
-                        format: "url"
+                        type: string
+                        format: uri
                         example: "/articles/507f1f77bcf86cd799439011/comments?page=1&limit=10"
                       next:
-                        type: "string"
-                        format: "url"
+                        type: string
+                        format: uri
                         example: "/articles/507f1f77bcf86cd799439011/comments?page=3&limit=10"
         "400":
           $ref: "#/components/responses/BadRequest"
@@ -563,31 +831,24 @@ paths:
           $ref: "#/components/responses/ServerError"
 
     post:
+      summary: Create article comment
+      description: Create a comment for a specific article. Requires authentication.
+      tags: [Article]
       security:
         - bearerAuth: []
-      description: create a comment for the article
-      tags: [Article]
       parameters:
         - $ref: "#/components/parameters/idPathParam"
       requestBody:
+        required: true
         content:
-          "application/json":
+          application/json:
             schema:
-              type: object
-              properties:
-                body:
-                  type: string
-                  example: this is a comment
-                status:
-                  type: string
-                  enum: [public, hidden]
-                  example: public
-              required: [body]
+              $ref: "#/components/schemas/CreateArticleCommentRequest"
       responses:
         "201":
-          description: comment posted
+          description: Comment posted
           content:
-            "application/json":
+            application/json:
               schema:
                 type: object
                 properties:
@@ -597,19 +858,19 @@ paths:
                     example: 201
                   message:
                     type: string
-                    example: comment posted
+                    example: Comment posted
                   data:
-                    $ref: "#/components/schemas/commentBody"
+                    $ref: "#/components/schemas/CommentBody"
                   links:
                     type: object
                     properties:
                       self:
-                        type: "string"
-                        format: "url"
+                        type: string
+                        format: uri
                         example: "/articles/507f1f77bcf86cd799439011/comments"
                       article:
-                        type: "string"
-                        format: "url"
+                        type: string
+                        format: uri
                         example: "/articles/507f1f77bcf86cd799439011"
         "400":
           $ref: "#/components/responses/BadRequest"
@@ -624,15 +885,16 @@ paths:
 
   "/articles/{id}/author":
     get:
-      description: get the author of an article
+      summary: Get article author
+      description: Retrieve author details for an article.
       tags: [Article]
       parameters:
         - $ref: "#/components/parameters/idPathParam"
       responses:
         "200":
-          description: "get author details of an article"
+          description: Get author details of an article
           content:
-            "application/json":
+            application/json:
               schema:
                 type: object
                 properties:
@@ -649,10 +911,6 @@ paths:
                       id:
                         type: string
                         example: 507f1f77bcf86cd799439011
-                      email:
-                        type: string
-                        format: email
-                        example: test@gmail.com
                       name:
                         type: string
                         example: MD Ismile Hosen Siam
@@ -660,12 +918,12 @@ paths:
                     type: object
                     properties:
                       self:
-                        type: "string"
-                        format: "url"
+                        type: string
+                        format: uri
                         example: "/articles/507f1f77bcf86cd799439011/author"
                       article:
-                        type: "string"
-                        format: "url"
+                        type: string
+                        format: uri
                         example: "/articles/507f1f77bcf86cd799439011"
         "400":
           $ref: "#/components/responses/BadRequest"
@@ -676,25 +934,26 @@ paths:
 
   "/comments":
     get:
+      summary: List comments
+      description: Get all comments including hidden. Only admin should be allowed. Can be filtered by articleId.
+      tags: [Comment]
       security:
         - bearerAuth: []
-      description: get all comments
-      tags: [Comment]
       parameters:
         - $ref: "#/components/parameters/pageParam"
         - $ref: "#/components/parameters/limitParam"
         - $ref: "#/components/parameters/sortTypeParam"
         - $ref: "#/components/parameters/sortByParam"
         - in: query
-          name: postId
+          name: articleId
           schema:
             type: string
             example: 507f1f77bcf86cd799439011
       responses:
         "200":
-          description: get all comment data
+          description: Get all comment data
           content:
-            "application/json":
+            application/json:
               schema:
                 type: object
                 properties:
@@ -708,7 +967,7 @@ paths:
                   data:
                     type: array
                     items:
-                      $ref: "#/components/schemas/Comments"
+                      $ref: "#/components/schemas/Comment"
                   pagination:
                     $ref: "#/components/schemas/Pagination"
                   links:
@@ -716,15 +975,15 @@ paths:
                     properties:
                       self:
                         type: string
-                        format: url
+                        format: uri
                         example: "/comments?page=2&limit=10"
                       next:
                         type: string
-                        format: url
+                        format: uri
                         example: "/comments?page=3&limit=10"
                       prev:
                         type: string
-                        format: url
+                        format: uri
                         example: "/comments?page=1&limit=10"
         "400":
           $ref: "#/components/responses/BadRequest"
@@ -736,32 +995,22 @@ paths:
           $ref: "#/components/responses/ServerError"
 
     post:
+      summary: Create comment
+      description: Create a comment by passing articleId in the body. Only user and admin should be allowed.
+      tags: [Comment]
       security:
         - bearerAuth: []
-      description: create a comment
-      tags: [Comment]
       requestBody:
+        required: true
         content:
-          "application/json":
+          application/json:
             schema:
-              type: object
-              properties:
-                body:
-                  type: string
-                  example: this is a comment
-                articleID:
-                  type: string
-                  example: 507f1f77bcf86cd799439011
-                status:
-                  type: string
-                  enum: [public, hidden]
-                  example: public
-              required: [body, articleID]
+              $ref: "#/components/schemas/CreateCommentRequest"
       responses:
         "201":
-          description: comment posted
+          description: Comment posted
           content:
-            "application/json":
+            application/json:
               schema:
                 type: object
                 properties:
@@ -771,15 +1020,15 @@ paths:
                     example: 201
                   message:
                     type: string
-                    example: comment posted
+                    example: Comment posted
                   data:
-                    $ref: "#/components/schemas/commentBody"
+                    $ref: "#/components/schemas/CommentBody"
                   links:
                     type: object
                     properties:
                       self:
-                        type: "string"
-                        format: "url"
+                        type: string
+                        format: uri
                         example: "/comments/507f1f77bcf86cd799439011"
         "400":
           $ref: "#/components/responses/BadRequest"
@@ -792,28 +1041,26 @@ paths:
 
   "/comments/{id}":
     patch:
+      summary: Update comment
+      description: >
+        Update a comment body or visibility status. Only the comment owner or an admin
+        should be allowed to perform this action.
+      tags: [Comment]
       security:
         - bearerAuth: []
-      description: update a comment body
-      tags: [Comment]
+      parameters:
+        - $ref: "#/components/parameters/idPathParam"
       requestBody:
+        required: true
         content:
-          "application/json":
+          application/json:
             schema:
-              type: object
-              properties:
-                body:
-                  type: string
-                  example: this is a comment
-                status:
-                  type: string
-                  enum: [public, hidden]
-                  example: public
+              $ref: "#/components/schemas/UpdateCommentRequest"
       responses:
         "200":
-          description: comment updated
+          description: Comment updated
           content:
-            "application/json":
+            application/json:
               schema:
                 type: object
                 properties:
@@ -823,15 +1070,15 @@ paths:
                     example: 200
                   message:
                     type: string
-                    example: comment updated
+                    example: Comment updated
                   data:
-                    $ref: "#/components/schemas/commentBody"
+                    $ref: "#/components/schemas/CommentBody"
                   links:
                     type: object
                     properties:
                       self:
-                        type: "string"
-                        format: "url"
+                        type: string
+                        format: uri
                         example: "/comments/507f1f77bcf86cd799439011"
         "400":
           $ref: "#/components/responses/BadRequest"
@@ -845,10 +1092,13 @@ paths:
           $ref: "#/components/responses/ServerError"
 
     delete:
+      summary: Delete comment
+      description: >
+        Delete a comment. Only the comment owner or an admin should be allowed to
+        perform this action.
+      tags: [Comment]
       security:
         - bearerAuth: []
-      description: delete a comment
-      tags: [Comment]
       parameters:
         - $ref: "#/components/parameters/idPathParam"
       responses:
@@ -867,15 +1117,23 @@ paths:
 
   "/users":
     get:
+      summary: List users
+      description: Administrative endpoint to retrieve users.
+      tags: [User]
       security:
         - bearerAuth: []
-      description: Get all users
-      tags: [User]
       parameters:
         - $ref: "#/components/parameters/pageParam"
         - $ref: "#/components/parameters/limitParam"
         - $ref: "#/components/parameters/sortTypeParam"
-        - $ref: "#/components/parameters/sortByParam"
+        - in: query
+          name: sortBy
+          description: Sort by updatedAt, createdAt
+          required: false
+          schema:
+            type: string
+            enum: [updatedAt, createdAt]
+            example: updatedAt
         - in: query
           name: name
           schema:
@@ -889,9 +1147,9 @@ paths:
             example: test@gmail.com
       responses:
         "200":
-          description: get all user data
+          description: Get all user data
           content:
-            "application/json":
+            application/json:
               schema:
                 type: object
                 properties:
@@ -905,7 +1163,7 @@ paths:
                   data:
                     type: array
                     items:
-                      $ref: "#/components/schemas/user"
+                      $ref: "#/components/schemas/User"
                   pagination:
                     $ref: "#/components/schemas/Pagination"
                   links:
@@ -913,15 +1171,15 @@ paths:
                     properties:
                       self:
                         type: string
-                        format: url
+                        format: uri
                         example: "/users?page=2&limit=10"
                       next:
                         type: string
-                        format: url
+                        format: uri
                         example: "/users?page=3&limit=10"
                       prev:
                         type: string
-                        format: url
+                        format: uri
                         example: "/users?page=1&limit=10"
         "400":
           $ref: "#/components/responses/BadRequest"
@@ -933,20 +1191,22 @@ paths:
           $ref: "#/components/responses/ServerError"
 
     post:
+      summary: Create user
+      description: Administrative endpoint to create a user.
+      tags: [User]
       security:
         - bearerAuth: []
-      description: Create an user
-      tags: [User]
       requestBody:
+        required: true
         content:
-          "application/json":
+          application/json:
             schema:
-              $ref: "#/components/schemas/createUser"
+              $ref: "#/components/schemas/CreateUserRequest"
       responses:
         "201":
-          description: account created
+          description: Account created
           content:
-            "application/json":
+            application/json:
               schema:
                 type: object
                 properties:
@@ -958,7 +1218,14 @@ paths:
                     type: string
                     example: Account created
                   data:
-                    $ref: "#/components/schemas/UserCreateUpdateResponse"
+                    allOf:
+                      - $ref: "#/components/schemas/UserCreateUpdateResponse"
+                      - type: object
+                        properties:
+                          status:
+                            type: string
+                            enum: [pending, approved, blocked, declined]
+                            example: approved
         "400":
           $ref: "#/components/responses/BadRequest"
         "401":
@@ -970,21 +1237,23 @@ paths:
 
   "/users/{id}":
     get:
+      summary: Get user
+      description: Retrieve a single user. Usually restricted to admins or the user themselves.
+      tags: [User]
       security:
         - bearerAuth: []
-      description: get a single user data
-      tags: [User]
       parameters:
+        - $ref: "#/components/parameters/idPathParam"
         - in: query
           name: expand
           schema:
             type: string
-            example: articles, comments
+            example: articles,comments
       responses:
         "200":
-          description: Retrieved an user
+          description: Retrieved a user
           content:
-            "application/json":
+            application/json:
               schema:
                 type: object
                 properties:
@@ -997,7 +1266,7 @@ paths:
                     example: Data retrieved
                   data:
                     allOf:
-                      - $ref: "#/components/schemas/user"
+                      - $ref: "#/components/schemas/User"
                       - type: object
                         properties:
                           articles:
@@ -1013,7 +1282,7 @@ paths:
                                   example: first article
                                 status:
                                   type: string
-                                  enum: [draft, published]
+                                  enum: [hidden, published]
                                   example: published
                       - type: object
                         properties:
@@ -1044,34 +1313,24 @@ paths:
           $ref: "#/components/responses/ServerError"
 
     patch:
+      summary: Update user
+      description: Administrative endpoint to update a user info.
+      tags: [User]
       security:
         - bearerAuth: []
-      description: update an user data
-      tags: [User]
       parameters:
         - $ref: "#/components/parameters/idPathParam"
       requestBody:
+        required: true
         content:
-          "application/json":
+          application/json:
             schema:
-              type: object
-              properties:
-                name:
-                  type: string
-                  example: MD Ismile Hosen Siam
-                role:
-                  type: string
-                  enum: [user, admin]
-                  example: user
-                status:
-                  type: string
-                  enum: [pending, approved, block, declined]
-                  example: approved
+              $ref: "#/components/schemas/UpdateUserRequest"
       responses:
         "200":
-          description: account updated
+          description: Account updated
           content:
-            "application/json":
+            application/json:
               schema:
                 type: object
                 properties:
@@ -1083,7 +1342,14 @@ paths:
                     type: string
                     example: Account updated
                   data:
-                    $ref: "#/components/schemas/UserCreateUpdateResponse"
+                    allOf:
+                      - $ref: "#/components/schemas/UserCreateUpdateResponse"
+                      - type: object
+                        properties:
+                          status:
+                            type: string
+                            enum: [pending, approved, blocked, declined]
+                            example: blocked
         "400":
           $ref: "#/components/responses/BadRequest"
         "401":
@@ -1096,10 +1362,11 @@ paths:
           $ref: "#/components/responses/ServerError"
 
     delete:
+      summary: Delete user
+      description: Administrative endpoint to delete a user.
+      tags: [User]
       security:
         - bearerAuth: []
-      description: delete an user data
-      tags: [User]
       parameters:
         - $ref: "#/components/parameters/idPathParam"
       responses:
@@ -1116,27 +1383,36 @@ paths:
         "500":
           $ref: "#/components/responses/ServerError"
 
-  "/users/{id}/changePassword":
+  "/users/{id}/change-password":
     patch:
+      summary: Change password
+      description: Change a user's password. Usually restricted to the user themselves.
+      tags: [User]
       security:
         - bearerAuth: []
-      description: change password
-      tags: [User]
+      parameters:
+        - $ref: "#/components/parameters/idPathParam"
       requestBody:
+        required: true
         content:
-          "application/json":
+          application/json:
             schema:
               type: object
               properties:
-                password:
+                oldPassword:
                   type: string
                   format: password
                   example: password1234
+                newPassword:
+                  type: string
+                  format: password
+                  example: password1234
+              required: [oldPassword, newPassword]
       responses:
         "200":
-          description: password updated
+          description: Password updated
           content:
-            "application/json":
+            application/json:
               schema:
                 type: object
                 properties:
@@ -1146,7 +1422,7 @@ paths:
                     example: 200
                   message:
                     type: string
-                    example: password updated
+                    example: Password updated
                   data:
                     $ref: "#/components/schemas/UserCreateUpdateResponse"
         "400":
@@ -1167,6 +1443,11 @@ components:
       scheme: bearer
       bearerFormat: JWT
 
+    refreshCookie:
+      type: apiKey
+      in: cookie
+      name: refreshToken
+
   schemas:
     Article:
       allOf:
@@ -1183,16 +1464,16 @@ components:
               example: first article body
             cover:
               type: string
-              format: url
+              format: uri
               example: https://s.aws.com/myfirstblog/123.jpg
             status:
               type: string
-              enum: [draft, published]
-              example: draft
-          required: [id, author, title, body, status]
+              enum: [hidden, published]
+              example: published
+          required: [id, title, body, status]
         - $ref: "#/components/schemas/Timestamp"
 
-    user:
+    User:
       allOf:
         - type: object
           properties:
@@ -1212,11 +1493,11 @@ components:
               example: user
             status:
               type: string
-              enum: [pending, approved, block, decline]
+              enum: [pending, approved, blocked, declined]
               example: pending
         - $ref: "#/components/schemas/Timestamp"
 
-    createUser:
+    CreateUserRequest:
       type: object
       properties:
         name:
@@ -1248,7 +1529,40 @@ components:
               example: example@gmail.com
         - $ref: "#/components/schemas/Timestamp"
 
-    Comments:
+    CreateOrPutUpdateArticleRequest:
+      type: object
+      properties:
+        title:
+          type: string
+          example: first article
+        body:
+          type: string
+          example: first article body
+        cover:
+          type: string
+          format: uri
+          example: https://s.aws.com/myfirstblog/123.jpg
+      required: [title, body]
+
+    PatchArticleRequest:
+      type: object
+      properties:
+        title:
+          type: string
+          example: updated title
+        body:
+          type: string
+          example: updated body
+        cover:
+          type: string
+          format: uri
+          example: https://s.aws.com/myfirstblog/123.jpg
+        status:
+          type: string
+          enum: [hidden, published]
+          example: hidden
+
+    Comment:
       allOf:
         - type: object
           properties:
@@ -1271,7 +1585,7 @@ components:
           required: [id, author, article, body, status]
         - $ref: "#/components/schemas/Timestamp"
 
-    commentBody:
+    CommentBody:
       allOf:
         - type: object
           properties:
@@ -1287,6 +1601,51 @@ components:
               example: public
           required: [id, body, status]
         - $ref: "#/components/schemas/Timestamp"
+
+    CreateArticleCommentRequest:
+      type: object
+      properties:
+        body:
+          type: string
+          example: this is a comment
+      required: [body]
+
+    CreateCommentRequest:
+      type: object
+      properties:
+        body:
+          type: string
+          example: this is a comment
+        articleId:
+          type: string
+          example: 507f1f77bcf86cd799439011
+      required: [body, articleId]
+
+    UpdateCommentRequest:
+      type: object
+      properties:
+        body:
+          type: string
+          example: this is a comment
+        status:
+          type: string
+          enum: [public, hidden]
+          example: public
+
+    UpdateUserRequest:
+      type: object
+      properties:
+        name:
+          type: string
+          example: MD Ismile Hosen Siam
+        role:
+          type: string
+          enum: [user, admin]
+          example: user
+        status:
+          type: string
+          enum: [pending, approved, blocked, declined]
+          example: approved
 
     Timestamp:
       type: object
@@ -1337,11 +1696,7 @@ components:
           type: integer
           format: int32
           example: 200
-      required:
-        - page
-        - limit
-        - totalPage
-        - totalItems
+      required: [page, limit, totalPage, totalItems]
 
   responses:
     BadRequest:
@@ -1371,7 +1726,7 @@ components:
                       example: invalid input
                     in:
                       type: string
-                      enum: [query, body]
+                      enum: [path, query, header, cookie, body]
                       example: body
 
     ServerError:
@@ -1426,10 +1781,10 @@ components:
                 example: Forbidden
               message:
                 type: string
-                example: You don't have the right permission.
+                example: You do not have permission.
 
     NotFound:
-      description: Resource not found.
+      description: Resource not found
       content:
         application/json:
           schema:
@@ -1444,12 +1799,12 @@ components:
                 example: Not found
               message:
                 type: string
-                example: Requested resource not Not Found
+                example: Requested resource not found
 
     ArticleCreated:
       description: Article created
       content:
-        "application/json":
+        application/json:
           schema:
             type: object
             properties:
@@ -1459,7 +1814,7 @@ components:
                 example: 201
               message:
                 type: string
-                example: article created
+                example: Article created
               data:
                 allOf:
                   - $ref: "#/components/schemas/Article"
@@ -1473,13 +1828,13 @@ components:
                 properties:
                   self:
                     type: string
-                    format: url
-                    example: "/article/507f1f77bcf86cd799439011"
+                    format: uri
+                    example: "/articles/507f1f77bcf86cd799439011"
 
     ArticleUpdated:
       description: Article updated
       content:
-        "application/json":
+        application/json:
           schema:
             type: object
             properties:
@@ -1489,7 +1844,7 @@ components:
                 example: 200
               message:
                 type: string
-                example: successfully updated article data
+                example: Successfully updated article data
               data:
                 allOf:
                   - $ref: "#/components/schemas/Article"
@@ -1503,34 +1858,37 @@ components:
                 properties:
                   self:
                     type: string
-                    format: url
-                    example: "/article/507f1f77bcf86cd799439011"
+                    format: uri
+                    example: "/articles/507f1f77bcf86cd799439011"
 
   parameters:
     pageParam:
       in: query
       name: page
-      description: current page number
-      required: true
+      description: Current page number
+      required: false
       schema:
         type: integer
         format: int32
+        default: 1
         example: 2
 
     limitParam:
       in: query
       name: limit
-      description: number of  should return
-      required: true
+      description: Number of items to return
+      required: false
       schema:
         type: integer
         format: int32
+        default: 10
         example: 10
 
     sortTypeParam:
       in: query
-      name: sort_type
-      description: sort by ascending or descending
+      name: sortType
+      description: Sort in ascending or descending order
+      required: false
       schema:
         type: string
         enum: [asc, desc]
@@ -1538,16 +1896,19 @@ components:
 
     sortByParam:
       in: query
-      name: sort_by
-      description: sort by updatedAt or title
+      name: sortBy
+      description: Sort by updatedAt, createdAt or title
+      required: false
       schema:
         type: string
+        enum: [updatedAt, createdAt, title]
         example: updatedAt
 
     searchParam:
       in: query
       name: search
-      description: search article based on title
+      description: Search article by title
+      required: false
       schema:
         type: string
         example: title
