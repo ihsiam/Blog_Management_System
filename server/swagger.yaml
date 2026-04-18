@@ -368,7 +368,7 @@ paths:
                     example: 200
                   message:
                     type: string
-                    example: If the email exists, a password reset link has been sent
+                    example: A password reset link has been sent.
         "400":
           $ref: "#/components/responses/BadRequest"
         "500":
@@ -949,6 +949,12 @@ paths:
           schema:
             type: string
             example: 507f1f77bcf86cd799439011
+        - in: query
+          name: status
+          schema:
+            type: string
+            enum: [public, hidden]
+            example: hidden
       responses:
         "200":
           description: Get all comment data
@@ -1145,6 +1151,12 @@ paths:
             type: string
             format: email
             example: test@gmail.com
+        - in: query
+          name: status
+          schema:
+            type: string
+            enum: [pending, approved, blocked, declined]
+            example: pending
       responses:
         "200":
           description: Get all user data
@@ -1423,8 +1435,6 @@ paths:
                   message:
                     type: string
                     example: Password updated
-                  data:
-                    $ref: "#/components/schemas/UserCreateUpdateResponse"
         "400":
           $ref: "#/components/responses/BadRequest"
         "401":
