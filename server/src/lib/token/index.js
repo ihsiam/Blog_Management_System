@@ -1,135 +1,114 @@
 const jwt = require("jsonwebtoken");
 const { badRequest, unauthorized } = require("../../utils/error");
 
-// jwt credentials
-const JWT_REFRESH_EXPIRES = process.env.JWT_REFRESH_EXPIRES || "7d";
-const JWT_ACCESS_EXPIRES = process.env.JWT_ACCESS_EXPIRES || "15m";
-const REFRESH_SECRET = process.env.JWT_REFRESH_SECRET;
-const ACCESS_SECRET = process.env.JWT_ACCESS_SECRET;
+// =========================
+// Config
+// =========================
+const CONFIG = {
+  ACTIVE_RESET_EXPIRES: process.env.JWT_ACTIVE_RESET_EXPIRES || "5m",
+  REFRESH_EXPIRES: process.env.JWT_REFRESH_EXPIRES || "7d",
+  ACCESS_EXPIRES: process.env.JWT_ACCESS_EXPIRES || "15m",
 
-// access token generate
-const generateAccessToken = (payload) => {
+  ACTIVE_RESET_SECRET: process.env.JWT_ACTIVE_RESET_SECRET,
+  REFRESH_SECRET: process.env.JWT_REFRESH_SECRET,
+  ACCESS_SECRET: process.env.JWT_ACCESS_SECRET,
+};
+
+// =========================
+// Generic Helpers
+// =========================
+const signToken = (payload, secret, expiresIn, label) => {
   try {
-    // generate token
-    return jwt.sign(payload, ACCESS_SECRET, {
+    return jwt.sign(payload, secret, {
       algorithm: "HS256",
-      expiresIn: JWT_ACCESS_EXPIRES,
+      expiresIn,
     });
-  } catch (e) {
-    console.log("[JWT ACCESS GENERATE]:", e);
+  } catch (err) {
+    console.error(`[JWT SIGN ERROR - ${label}]`, err);
     throw new Error(
       "We are sorry for the inconvenience. Please try again later.",
     );
   }
 };
 
-// refresh token generate
-const generateRefreshToken = (payload) => {
+const verifyToken = (token, secret, label) => {
   try {
-    // generate token
-    return jwt.sign(payload, REFRESH_SECRET, {
-      algorithm: "HS256",
-      expiresIn: JWT_REFRESH_EXPIRES,
-    });
-  } catch (e) {
-    console.log("[JWT REFRESH GENERATE]:", e);
-    throw new Error(
-      "We are sorry for the inconvenience. Please try again later.",
-    );
-  }
-};
+    if (!token) throw unauthorized(`${label} token missing`);
 
-// verify access token
-const verifyAccessToken = (token) => {
-  try {
-    // if no token
-    if (!token) {
-      throw unauthorized("Authorization token missing");
-    }
-
-    // verify token
-    return jwt.verify(token, ACCESS_SECRET, {
+    return jwt.verify(token, secret, {
       algorithms: ["HS256"],
     });
-  } catch (e) {
-    console.log("[JWT ACCESS VERIFY]:", e);
+  } catch (err) {
+    console.error(`[JWT VERIFY ERROR - ${label}]`, err);
 
-    // Token expired
-    if (e.name === "TokenExpiredError") {
-      throw unauthorized("Access token expired");
+    switch (err.name) {
+      case "TokenExpiredError":
+        throw unauthorized(`${label} token expired`);
+      case "JsonWebTokenError":
+        throw unauthorized(`Invalid ${label} token`);
+      case "NotBeforeError":
+        throw unauthorized(`${label} token not active yet`);
+      default:
+        throw unauthorized("Authentication failed");
     }
-
-    // Invalid token
-    if (e.name === "JsonWebTokenError") {
-      throw unauthorized("Invalid access token");
-    }
-
-    // Token not active yet
-    if (e.name === "NotBeforeError") {
-      throw unauthorized("Access token not active yet");
-    }
-
-    // Fallback
-    throw unauthorized("Authentication failed");
   }
 };
 
-// verify auth token
-const verifyRefreshToken = (token) => {
-  try {
-    // if no token
-    if (!token) {
-      throw unauthorized("Refresh token missing");
-    }
+// =========================
+// Token Generators
+// =========================
+const generateActiveResetToken = (payload) =>
+  signToken(
+    payload,
+    CONFIG.ACTIVE_RESET_SECRET,
+    CONFIG.ACTIVE_RESET_EXPIRES,
+    "ACTIVE_RESET",
+  );
 
-    // verify token
-    return jwt.verify(token, REFRESH_SECRET, {
-      algorithms: ["HS256"],
-    });
-  } catch (e) {
-    console.log("[JWT REFRESH VERIFY]:", e);
+const generateAccessToken = (payload) =>
+  signToken(payload, CONFIG.ACCESS_SECRET, CONFIG.ACCESS_EXPIRES, "ACCESS");
 
-    // Token expired
-    if (e.name === "TokenExpiredError") {
-      throw unauthorized("Refresh token expired");
-    }
+const generateRefreshToken = (payload) =>
+  signToken(payload, CONFIG.REFRESH_SECRET, CONFIG.REFRESH_EXPIRES, "REFRESH");
 
-    // Invalid token
-    if (e.name === "JsonWebTokenError") {
-      throw unauthorized("Invalid Refresh token");
-    }
+// =========================
+// Token Verifiers
+// =========================
+const verifyActiveResetToken = (token) =>
+  verifyToken(token, CONFIG.ACTIVE_RESET_SECRET, "Active/Reset");
 
-    // Token not active yet
-    if (e.name === "NotBeforeError") {
-      throw unauthorized("Refresh token not active yet");
-    }
+const verifyAccessToken = (token) =>
+  verifyToken(token, CONFIG.ACCESS_SECRET, "Access");
 
-    // Fallback
-    throw unauthorized("Authentication failed");
-  }
-};
+const verifyRefreshToken = (token) =>
+  verifyToken(token, CONFIG.REFRESH_SECRET, "Refresh");
 
-// decode the token
+// =========================
+// Decode
+// =========================
 const decodeToken = (token) => {
   try {
-    // decode token
     const decoded = jwt.decode(token);
 
-    // if not decoded
     if (!decoded) {
       throw badRequest(null, "Invalid JWT token format");
     }
 
     return decoded;
-  } catch (e) {
-    console.log("[JWT DECODE]:", e);
+  } catch (err) {
+    console.error("[JWT DECODE ERROR]", err);
     throw badRequest(null, "Invalid JWT token");
   }
 };
 
+// =========================
+// Export
+// =========================
 module.exports = {
+  generateActiveResetToken,
   generateAccessToken,
   generateRefreshToken,
+  verifyActiveResetToken,
   verifyAccessToken,
   verifyRefreshToken,
   decodeToken,
