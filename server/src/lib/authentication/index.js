@@ -104,7 +104,7 @@ const refreshToken = async (token) => {
   const decoded = tokenServices.verifyRefreshToken(token);
 
   // find user
-  const user = userServices.findUserById(decoded.id);
+  const user = await userServices.findUserById(decoded.id);
 
   // if user not found
   if (!user) {

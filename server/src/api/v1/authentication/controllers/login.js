@@ -1,63 +1,89 @@
 const authServices = require("../../../../lib/authentication");
 const { badRequest } = require("../../../../utils/error");
 
+/**
+ * User login controller
+ * - Validates input
+ * - Authenticates user
+ * - Issues access + refresh tokens
+ */
 const login = async (req, res, next) => {
   try {
-    // extract login data from request body
     const { email, password } = req.body;
 
-    // 400 error data
+    // Collect validation errors
     const errors = [];
 
-    // email validation
+    /**
+     * Validate email
+     */
     if (!email || typeof email !== "string") {
-      errors.push({ field: "email", message: "invalid input", in: "body" });
+      errors.push({
+        field: "email",
+        message: "Email is required",
+        in: "body",
+      });
     } else {
-      // email format validation
-      const emailOk = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim());
+      const isValidEmail = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim());
 
-      if (!emailOk)
-        errors.push({ field: "email", message: "invalid input", in: "body" });
+      if (!isValidEmail) {
+        errors.push({
+          field: "email",
+          message: "Invalid email format",
+          in: "body",
+        });
+      }
     }
 
-    // password validation
+    /**
+     * Validate password
+     */
     if (!password || typeof password !== "string") {
-      errors.push({ field: "password", message: "invalid input", in: "body" });
+      errors.push({
+        field: "password",
+        message: "Password is required",
+        in: "body",
+      });
     }
 
-    // throw error
-    if (errors.length) {
-      throw badRequest(errors, "invalid input");
+    /**
+     * Throw validation error if needed
+     */
+    if (errors.length > 0) {
+      throw badRequest(errors, "Validation failed");
     }
 
-    // generate token
+    /**
+     * Authenticate user & generate tokens
+     */
     const { accessToken, refreshToken } = await authServices.login({
       email,
       password,
     });
 
-    // response
-    const response = {
-      code: 200,
-      message: "Login successful",
-      data: {
-        access_token: accessToken,
-      },
-      links: {
-        self: "/api/v1/auth/signin",
-      },
-    };
-
-    // set refresh token to cookie
+    /**
+     * Set refresh token in HTTP-only cookie
+     */
     res.cookie("refreshToken", refreshToken, {
       httpOnly: true,
       secure: true,
     });
 
-    // send json response
-    res.status(200).json(response);
-  } catch (e) {
-    next(e);
+    /**
+     * Send response
+     */
+    return res.status(200).json({
+      code: 200,
+      message: "Login successful",
+      data: {
+        accessToken,
+      },
+      links: {
+        self: "/api/v1/auth/signin",
+      },
+    });
+  } catch (err) {
+    return next(err);
   }
 };
 

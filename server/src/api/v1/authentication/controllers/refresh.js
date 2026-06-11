@@ -1,36 +1,47 @@
-const tokenServices = require("../../../../lib/token");
+const authServices = require("../../../../lib/authentication");
 const { unauthorized } = require("../../../../utils/error");
 
+/**
+ * Refresh access token using refresh token from cookies
+ */
 const refresh = async (req, res, next) => {
   try {
-    // extract data
-    const token = req.cookies?.refreshToken;
+    // Extract refresh token from HTTP-only cookie
+    const refreshToken = req.cookies?.refreshToken;
 
-    // if token not found
-    if (!token) {
-      throw unauthorized("Refresh token missing");
+    /**
+     * Ensure refresh token exists
+     */
+    if (!refreshToken) {
+      throw unauthorized("Refresh token is missing");
     }
 
-    // get new tokens
+    /**
+     * Generate new access + refresh tokens
+     */
     const { newAccessToken, newRefreshToken } =
-      await tokenServices.refreshToken(token);
+      await authServices.refreshToken(refreshToken);
 
-    // set into cookies
+    /**
+     * Update refresh token cookie
+     */
     res.cookie("refreshToken", newRefreshToken, {
       httpOnly: true,
       secure: true,
     });
 
-    // sent json response
-    res.status(200).json({
+    /**
+     * Return new access token
+     */
+    return res.status(200).json({
       code: 200,
-      message: "Token refreshed",
+      message: "Token refreshed successfully",
       data: {
-        access_token: newAccessToken,
+        accessToken: newAccessToken,
       },
     });
-  } catch (e) {
-    next(e);
+  } catch (err) {
+    return next(err);
   }
 };
 
