@@ -1,89 +1,137 @@
 const authServices = require("../../../../lib/authentication");
 const tokenServices = require("../../../../lib/token");
 const { badRequest } = require("../../../../utils/error");
-const userServices = require("../../../../lib/user");
+const emailService = require("../../../../lib/email");
 
+/**
+ * Register a new user and send account activation email
+ */
 const register = async (req, res, next) => {
   try {
-    // extract register data from request body
     const { name, email, password } = req.body;
 
-    // 400 error data
+    // Collect validation errors instead of failing fast
     const errors = [];
 
-    // name validate
+    /**
+     * Validate name
+     * - must exist
+     * - must be a non-empty string
+     */
     if (!name || typeof name !== "string" || !name.trim()) {
-      errors.push({ field: "name", message: "invalid input", in: "body" });
-    }
-
-    // email validate
-    if (!email) {
-      errors.push({ field: "email", message: "invalid input", in: "body" });
-    } else {
-      // email format validation
-      const emailOk = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim());
-
-      if (!emailOk) {
-        errors.push({ field: "email", message: "invalid input", in: "body" });
-      }
-    }
-
-    // password validate
-    if (!password || typeof password !== "string") {
-      errors.push({ field: "password", message: "invalid input", in: "body" });
-    } else if (password.length < 8) {
       errors.push({
-        field: "password",
-        message: "Password must be at least 8 character",
+        field: "name",
+        message: "Name is required and must be a valid string",
         in: "body",
       });
     }
 
-    // throw error
-    if (errors.length) {
-      throw badRequest(errors, "invalid input");
+    /**
+     * Validate email
+     * - must exist
+     * - must follow basic email format
+     */
+    if (!email) {
+      errors.push({
+        field: "email",
+        message: "Email is required",
+        in: "body",
+      });
+    } else {
+      const isValidEmail = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim());
+
+      if (!isValidEmail) {
+        errors.push({
+          field: "email",
+          message: "Invalid email format",
+          in: "body",
+        });
+      }
     }
 
-    // create user
+    /**
+     * Validate password
+     * - must exist
+     * - must be string
+     * - must have minimum length
+     */
+    if (!password || typeof password !== "string") {
+      errors.push({
+        field: "password",
+        message: "Password is required",
+        in: "body",
+      });
+    } else if (password.length < 8) {
+      errors.push({
+        field: "password",
+        message: "Password must be at least 8 characters long",
+        in: "body",
+      });
+    }
+
+    /**
+     * If validation fails, throw structured bad request error
+     */
+    if (errors.length > 0) {
+      throw badRequest(errors, "Validation failed");
+    }
+
+    /**
+     * Create user in database
+     */
     const user = await authServices.register({ name, email, password });
 
-    // token payload
+    /**
+     * Prepare JWT payload for activation token
+     */
     const payload = {
       id: user.id,
       role: user.role,
       email: user.email,
     };
 
-    // generate token
-    const accessToken = tokenServices.generateAccessToken(payload);
-    const refreshToken = tokenServices.generateRefreshToken(payload);
+    /**
+     * Generate activation token
+     */
+    const activationToken = tokenServices.generateActiveResetToken(payload);
 
-    // save refresh token into db
-    await userServices.saveRefreshToken(user.id, refreshToken);
+    /**
+     * Build activation URL (consider moving to config in production)
+     */
+    const activationUrl = `${process.env.APP_URL}/auth/verify-email/${activationToken}`;
 
-    // response
+    /**
+     * Send activation email
+     */
+    await emailService.sendMail({
+      email,
+      subject: "Activate your account",
+      text: `Hello ${user.name},\n\nPlease activate your account using the link below:\n${activationUrl}`,
+    });
+
+    /**
+     * API response payload
+     */
     const response = {
       code: 201,
-      message: "Account created",
+      message:
+        "Account created successfully. Please check your email to activate your account.",
       data: {
-        access_token: accessToken,
+        id: user.id,
+        name: user.name,
+        email: user.email,
+        status: user.status,
+        createdAt: user.createdAt,
+        updatedAt: user.updatedAt,
       },
       links: {
-        self: "/api/v1/auth/signUp",
-        signin: "/api/v1/auth/signin",
+        self: "/api/v1/auth/sign-up",
       },
     };
 
-    // set refresh token to cookie
-    res.cookie("refreshToken", refreshToken, {
-      httpOnly: true,
-      secure: true,
-    });
-
-    // send json response
-    res.status(201).json(response);
-  } catch (e) {
-    next(e);
+    return res.status(201).json(response);
+  } catch (err) {
+    return next(err);
   }
 };
 
