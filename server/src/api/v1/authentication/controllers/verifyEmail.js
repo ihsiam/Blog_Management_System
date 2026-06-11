@@ -47,8 +47,9 @@ const verifyEmail = async (req, res, next) => {
       email: updatedUser.email,
     };
 
-    // Generate refresh token
+    // Generate tokens
     const refreshToken = tokenServices.generateRefreshToken(payload);
+    const accessToken = tokenServices.generateAccessToken(payload);
 
     // Persist refresh token for future authentication
     await userServices.saveRefreshToken(updatedUser.id, refreshToken);
@@ -62,6 +63,9 @@ const verifyEmail = async (req, res, next) => {
     return res.status(200).json({
       code: 200,
       message: "Email verified successfully.",
+      data: {
+        accessToken,
+      },
       links: {
         signin: "/api/v1/auth/sign-in",
       },

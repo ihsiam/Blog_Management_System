@@ -284,6 +284,12 @@ paths:
                   message:
                     type: string
                     example: Email verified successfully
+                  data:
+                    type: object
+                    properties:
+                      accessToken:
+                        type: string
+                        example: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
                   links:
                     type: object
                     properties:
