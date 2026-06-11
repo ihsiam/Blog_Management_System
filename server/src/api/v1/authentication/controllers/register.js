@@ -98,7 +98,7 @@ const register = async (req, res, next) => {
     /**
      * Build activation URL (consider moving to config in production)
      */
-    const activationUrl = `${process.env.APP_URL}/auth/verify-email/${activationToken}`;
+    const activationUrl = `${process.env.APP_URL}/api/v1/auth/verify-email/${activationToken}`;
 
     /**
      * Send activation email

@@ -1,6 +1,6 @@
 const tokenServices = require("../../../../lib/token");
 const userServices = require("../../../../lib/user");
-const { badRequest } = require("../../../../utils/error");
+const { badRequest, notFound } = require("../../../../utils/error");
 
 /**
  * Verify user email and activate account
@@ -9,19 +9,18 @@ const verifyEmail = async (req, res, next) => {
   try {
     const { token } = req.params;
 
-    /**
-     * Validate and decode activation token
-     */
+    // Validate and decode activation token
     const userInfo = tokenServices.verifyActiveResetToken(token);
 
-    /**
-     * Retrieve user from database
-     */
-    const user = await userServices.getUserById(userInfo.id);
+    // Retrieve user from database
+    const user = await userServices.findUserById(userInfo.id);
 
-    /**
-     * Prevent re-verification of an already activated account
-     */
+    // Ensure user exists
+    if (!user) {
+      throw notFound("User not found");
+    }
+
+    // Prevent re-verification of an already activated account
     if (user.status === "approved") {
       throw badRequest(
         [
@@ -35,45 +34,31 @@ const verifyEmail = async (req, res, next) => {
       );
     }
 
-    /**
-     * Activate user account
-     */
+    // Activate user account
     const updatedUser = await userServices.updateUser({
       id: user.id,
       status: "approved",
     });
 
-    /**
-     * Prepare JWT payload
-     */
+    // Prepare JWT payload
     const payload = {
       id: updatedUser.id,
       role: updatedUser.role,
       email: updatedUser.email,
     };
 
-    /**
-     * Generate refresh token
-     */
+    // Generate refresh token
     const refreshToken = tokenServices.generateRefreshToken(payload);
 
-    /**
-     * Persist refresh token for future authentication
-     */
+    // Persist refresh token for future authentication
     await userServices.saveRefreshToken(updatedUser.id, refreshToken);
 
-    /**
-     * Store refresh token in a secure HTTP-only cookie
-     */
+    // Store refresh token in a secure HTTP-only cookie
     res.cookie("refreshToken", refreshToken, {
       httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
-      sameSite: "strict",
+      secure: true,
     });
 
-    /**
-     * Send success response
-     */
     return res.status(200).json({
       code: 200,
       message: "Email verified successfully.",
