@@ -1,4 +1,5 @@
 const userServices = require("../../../../lib/user");
+const tokenServices = require("../../../../lib/token");
 const { unauthorized } = require("../../../../utils/error");
 
 /**
@@ -23,7 +24,6 @@ const { unauthorized } = require("../../../../utils/error");
 const logout = async (req, res, next) => {
   try {
     const refreshToken = req.cookies?.refreshToken;
-    const userId = req.user?.id;
 
     /**
      * If no refresh token exists, user is already logged out
@@ -33,10 +33,24 @@ const logout = async (req, res, next) => {
       throw unauthorized("Already logged out");
     }
 
-    // Remove refresh token from database to prevent reuse.
-    if (userId) {
-      await userServices.clearRefreshToken(userId);
+    // verify token
+    const decoded = tokenServices.verifyRefreshToken(refreshToken);
+
+    // find user
+    const user = await userServices.findUserById(decoded.id);
+
+    if (!user) {
+      throw unauthorized("Invalid session");
     }
+
+    // validate token match
+    if (user.refreshToken !== refreshToken) {
+      await userServices.clearRefreshToken(decoded.id);
+      throw unauthorized("Session already invalidated");
+    }
+
+    // clear session
+    await userServices.clearRefreshToken(decoded.id);
 
     // Clear authentication cookie from browser.
     res.clearCookie("refreshToken", {
