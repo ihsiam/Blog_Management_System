@@ -24,7 +24,13 @@ const authLimit = rateLimit({
 // auth routes
 router.post("/api/v1/auth/setup-admin", authLimit, authController.setupAdmin);
 router.post("/api/v1/auth/sign-up", authLimit, authController.register);
-router.post("/api/v1/auth/verify-email/:token", authController.verifyEmail);
+router.get("/api/v1/auth/verify-email/:token", authController.verifyEmail);
+router.post(
+  "/api/v1/auth/resend-verification",
+  authController.resendVerificationMail,
+);
+router.post("/api/v1/auth/forgot-password", authController.forgotPassword);
+router.post("/api/v1/auth/reset-password/:token", authController.resetPassword);
 router.post("/api/v1/auth/sign-in", authLimit, authController.login);
 router.post("/api/v1/auth/refresh", authController.refresh);
 router.post("/api/v1/auth/logout", authenticate, authController.logout);
