@@ -4,19 +4,32 @@ const userServices = require("../../../../lib/user");
 const { badRequest } = require("../../../../utils/error");
 
 /**
- * Create system administrator account
- * This is a privileged endpoint and should be protected in production
+ * Creates the initial system administrator account.
+ *
+ * This endpoint is intended for one-time system bootstrap and should
+ * be disabled or protected after initial setup.
+ *
+ * @param {import("express").Request} req - Express request object
+ * @param {Object} req.body - Request payload
+ * @param {string} req.body.name - Administrator name
+ * @param {string} req.body.email - Administrator email address
+ * @param {string} req.body.password - Administrator password
+ *
+ * @param {import("express").Response} res - Express response object
+ * @param {Function} next - Express error handling middleware
+ *
+ * @returns {Promise<void>} Sends authentication response
+ *
+ * @throws {Error} BadRequest error when validation fails
  */
 const setupAdmin = async (req, res, next) => {
   try {
     const { name, email, password } = req.body;
 
-    // Collect validation errors
+    // Collect validation errors and return them together
     const errors = [];
 
-    /**
-     * Validate name
-     */
+    // Validate administrator name.
     if (!name || typeof name !== "string" || !name.trim()) {
       errors.push({
         field: "name",
@@ -25,9 +38,7 @@ const setupAdmin = async (req, res, next) => {
       });
     }
 
-    /**
-     * Validate email
-     */
+    // Validate email format
     if (!email) {
       errors.push({
         field: "email",
@@ -46,9 +57,7 @@ const setupAdmin = async (req, res, next) => {
       }
     }
 
-    /**
-     * Validate password
-     */
+    // Validate password
     if (!password || typeof password !== "string") {
       errors.push({
         field: "password",
@@ -63,49 +72,35 @@ const setupAdmin = async (req, res, next) => {
       });
     }
 
-    /**
-     * Throw validation error if any
-     */
+    // Returns structured error response
     if (errors.length > 0) {
       throw badRequest(errors, "Validation failed");
     }
 
-    /**
-     * Create system admin user
-     */
+    // Create administrator account.
     const user = await authServices.systemAdmin({ name, email, password });
 
-    /**
-     * Prepare JWT payload
-     */
+    // JWT payload
     const payload = {
       id: user.id,
       role: user.role,
       email: user.email,
     };
 
-    /**
-     * Generate tokens
-     */
+    // Generate authentication token pair
     const accessToken = tokenServices.generateAccessToken(payload);
     const refreshToken = tokenServices.generateRefreshToken(payload);
 
-    /**
-     * Save refresh token in DB
-     */
+    // Stores refresh token into DB.
     await userServices.saveRefreshToken(user.id, refreshToken);
 
-    /**
-     * Set refresh token in HTTP-only cookie
-     */
+    // Store refresh token in cookie
     res.cookie("refreshToken", refreshToken, {
       httpOnly: true,
       secure: true,
     });
 
-    /**
-     * Send response
-     */
+    // Successful creation response
     return res.status(201).json({
       code: 201,
       message: "System administrator created successfully",

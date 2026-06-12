@@ -3,24 +3,35 @@ const userServices = require("../../../../lib/user");
 const { badRequest, notFound } = require("../../../../utils/error");
 
 /**
- * Verify user email and activate account
+ * Verifies user email and activates the account.
+ *
+ * @param {import("express").Request} req - Express request object
+ * @param {Object} req.params - Route parameters
+ * @param {string} req.params.token - Email verification JWT token
+ *
+ * @param {import("express").Response} res - Express response object
+ * @param {Function} next - Express error handler middleware
+ *
+ * @returns {Promise<void>} Sends authentication response after verification
+ *
+ * @throws {Error} NotFound error if user does not exist
+ * @throws {Error} BadRequest error if account is already verified
  */
 const verifyEmail = async (req, res, next) => {
   try {
     const { token } = req.params;
 
-    // Validate and decode activation token
+    // Decode and validate activation token.
     const userInfo = tokenServices.verifyActiveResetToken(token);
 
-    // Retrieve user from database
+    // Fetch user from database using decoded token payload.
     const user = await userServices.findUserById(userInfo.id);
 
-    // Ensure user exists
     if (!user) {
       throw notFound("User not found");
     }
 
-    // Prevent re-verification of an already activated account
+    // Prevent duplicate verification attempts.
     if (user.status === "approved") {
       throw badRequest(
         [
@@ -34,32 +45,36 @@ const verifyEmail = async (req, res, next) => {
       );
     }
 
-    // Activate user account
+    // Activate user account in database.
     const updatedUser = await userServices.updateUser({
       id: user.id,
       status: "approved",
     });
 
-    // Prepare JWT payload
+    // JWT payload
     const payload = {
       id: updatedUser.id,
       role: updatedUser.role,
       email: updatedUser.email,
     };
 
-    // Generate tokens
+    // Generate authentication token pair
     const refreshToken = tokenServices.generateRefreshToken(payload);
     const accessToken = tokenServices.generateAccessToken(payload);
 
-    // Persist refresh token for future authentication
+    // Stores refresh token into DB.
     await userServices.saveRefreshToken(updatedUser.id, refreshToken);
 
-    // Store refresh token in a secure HTTP-only cookie
+    /**
+     * Store refresh token in cookie.
+     */
     res.cookie("refreshToken", refreshToken, {
       httpOnly: true,
       secure: true,
+      sameSite: "strict",
     });
 
+    // Successful activation response
     return res.status(200).json({
       code: 200,
       message: "Email verified successfully.",
