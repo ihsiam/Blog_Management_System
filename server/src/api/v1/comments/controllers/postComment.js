@@ -2,27 +2,49 @@ const defaults = require("../../../../config/defaults");
 const { badRequest } = require("../../../../utils/error");
 const serviceRegistry = require("../../../../lib/service registry");
 
+/**
+ * Creates a new comment for an article.
+ *
+ * @param {import("express").Request} req - Express request object
+ * @param {Object} req.body - Request payload
+ * @param {string} req.body.body - Comment content
+ * @param {string} req.body.articleID - Target article ID
+ * @param {string} [req.body.status] - Optional comment status
+ *
+ * @param {import("express").Response} res - Express response object
+ * @param {Function} next - Express error handler middleware
+ *
+ * @returns {Promise<void>} Returns created comment response
+ */
 const postComment = async (req, res, next) => {
   try {
     // extract data from request
     const { body, articleID } = req.body;
-    const status = req.body.status || defaults.commentStatus;
+
+    // default comment status
+    const status = defaults.commentStatus;
+
+    // authenticated user
     const author = req.user.id;
 
-    // 400 error
+    // collect validation errors
     const errors = [];
 
-    // if body not found
+    // validate comment body
     if (!body || typeof body !== "string" || !body.trim()) {
       errors.push({ field: "body", message: "invalid input", in: "body" });
     }
 
-    // if articleID not found
+    // validate article ID
     if (!articleID || typeof articleID !== "string" || !articleID.trim()) {
-      errors.push({ field: "articleId", message: "invalid input", in: "body" });
+      errors.push({
+        field: "articleId",
+        message: "invalid input",
+        in: "body",
+      });
     }
 
-    // throw err
+    // throw validation error if any
     if (errors.length) {
       throw badRequest(errors, "invalid input");
     }
@@ -36,7 +58,7 @@ const postComment = async (req, res, next) => {
     });
 
     // response
-    res.status(201).json({
+    return res.status(201).json({
       code: 201,
       message: "comment posted",
       data: comment,
@@ -44,8 +66,8 @@ const postComment = async (req, res, next) => {
         self: `/api/v1/comments/${comment.id}`,
       },
     });
-  } catch (e) {
-    next(e);
+  } catch (err) {
+    return next(err);
   }
 };
 

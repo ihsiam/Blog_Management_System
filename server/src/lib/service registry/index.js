@@ -43,31 +43,34 @@ const getCommentByArticle = async ({
   return comments;
 };
 
-// get all comments
 const getComments = async ({
   page = defaults.page,
   limit = defaults.limit,
   sortType = defaults.sortType,
   sortBy = defaults.sortBy,
   postId,
+  status,
 }) => {
-  // sort option
   const sortKey = `${sortType === "desc" ? "-" : ""}${sortBy}`;
 
-  // prepare query for getting comments
-  const query = { page, limit, sortKey };
+  const query = {
+    page,
+    limit,
+    sortKey,
+  };
 
-  // if post id exists
   if (postId) {
     const article = await articleServices.findArticleById(postId);
 
-    // if article not found
     if (!article) {
       throw notFound();
     }
 
-    // add postId into query
     query.postId = postId;
+  }
+
+  if (status) {
+    query.status = status;
   }
 
   return commentServices.getAllComments(query);

@@ -1,14 +1,37 @@
 const { badRequest } = require("../../../../utils/error");
 const commentServices = require("../../../../lib/comments");
 
+/**
+ * Updates an existing comment.
+ *
+ * - If `req.adminOverride` is true → only comment status can be updated
+ * - If normal user → can update comment body (and admin may optionally update status)
+ *
+ * @param {import("express").Request} req - Express request object
+ * @param {Object} req.params - Route parameters
+ * @param {string} req.params.id - Comment ID
+ *
+ * @param {Object} req.body - Request payload
+ * @param {string} [req.body.body] - Comment text content
+ * @param {string} [req.body.status] - Comment status (public | hidden)
+ *
+ * @param {import("express").Response} res - Express response object
+ * @param {Function} next - Express error handler middleware
+ *
+ * @returns {Promise<void>} Returns updated comment response
+ */
 const updateComment = async (req, res, next) => {
   try {
     // extract data
     const { id } = req.params;
     const { body, status } = req.body;
 
-    // admin overriding ownership: only status update allowed
+    /**
+     * Admin override flow:
+     * Only status update is allowed
+     */
     if (req.adminOverride) {
+      // validate status strictly for admin override
       if (
         status === undefined ||
         typeof status !== "string" ||
@@ -20,6 +43,7 @@ const updateComment = async (req, res, next) => {
         );
       }
 
+      // update only status
       const comment = await commentServices.updateComment({
         id,
         status,
@@ -38,7 +62,9 @@ const updateComment = async (req, res, next) => {
     // validation errors
     const errors = [];
 
-    // body validation (required for non-adminOverride flow)
+    /**
+     * Validate comment body
+     */
     if (!body || typeof body !== "string" || !body.trim()) {
       errors.push({
         field: "body",
@@ -47,7 +73,9 @@ const updateComment = async (req, res, next) => {
       });
     }
 
-    // status validation ONLY if user is admin
+    /**
+     * Validate status only if user is admin and status is provided
+     */
     if (req.user.role === "admin" && status !== undefined) {
       if (
         typeof status !== "string" ||
@@ -61,7 +89,7 @@ const updateComment = async (req, res, next) => {
       }
     }
 
-    // throw errors if any
+    // throw validation errors if any
     if (errors.length) {
       throw badRequest(errors, "invalid input");
     }
@@ -72,7 +100,9 @@ const updateComment = async (req, res, next) => {
       body,
     };
 
-    // only admin can actually update status
+    /**
+     * Only admin can update status in normal flow
+     */
     if (req.user.role === "admin" && status !== undefined) {
       updateData.status = status;
     }
@@ -88,8 +118,8 @@ const updateComment = async (req, res, next) => {
         self: `/api/v1/comments/${comment.id}`,
       },
     });
-  } catch (e) {
-    return next(e);
+  } catch (err) {
+    return next(err);
   }
 };
 
