@@ -17,9 +17,9 @@ const { badRequest } = require("../../../../utils/error");
  * @param {import("express").Response} res - Express response object
  * @param {Function} next - Express error-handling middleware
  *
- * @returns {Promise<void>} Sends JSON response with access token
+ * @returns {Promise<void>} Sends authentication response with access token
  *
- * @throws {Error} BadRequest error when validation fails
+ * @throws {Error} BadRequest when validation fails
  */
 const login = async (req, res, next) => {
   try {
@@ -28,8 +28,9 @@ const login = async (req, res, next) => {
     // Collect validation errors
     const errors = [];
 
-    // Email validation
-
+    /**
+     * Email validation
+     */
     if (!email || typeof email !== "string") {
       errors.push({
         field: "email",
@@ -48,7 +49,9 @@ const login = async (req, res, next) => {
       }
     }
 
-    // Password validation
+    /**
+     * Password validation
+     */
     if (!password || typeof password !== "string") {
       errors.push({
         field: "password",
@@ -57,25 +60,30 @@ const login = async (req, res, next) => {
       });
     }
 
-    // Returns structured error response
+    /**
+     * Stop execution if validation fails
+     */
     if (errors.length > 0) {
       throw badRequest(errors, "Validation failed");
     }
 
-    // Authenticate user and generate token pair
+    /**
+     * Authenticate user and generate token pair
+     */
     const { accessToken, refreshToken } = await authServices.login({
       email,
       password,
     });
 
-    // Store refresh token in cookie
+    /**
+     * Store refresh token in secure HTTP-only cookie
+     */
     res.cookie("refreshToken", refreshToken, {
       httpOnly: true,
       secure: true,
       sameSite: "strict",
     });
 
-    // Successful authentication response
     return res.status(200).json({
       code: 200,
       message: "Login successful",

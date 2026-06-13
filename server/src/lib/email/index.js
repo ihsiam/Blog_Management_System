@@ -1,7 +1,7 @@
 const nodemailer = require("nodemailer");
 
 /**
- * SMTP transporter instance.
+ * SMTP transporter instance used for sending emails.
  */
 const transporter = nodemailer.createTransport({
   service: process.env.EMAIL_SERVICE,
@@ -12,25 +12,30 @@ const transporter = nodemailer.createTransport({
 });
 
 /**
- * Sends an email using SMTP transport.
+ * Sends an email via configured SMTP transporter.
  *
  * @param {Object} params - Email payload
  * @param {string} params.email - Recipient email address
  * @param {string} params.subject - Email subject line
- * @param {string} params.text - Plain text email body content
+ * @param {string} params.text - Plain text email body
  *
- * @throws {Error} If required fields are missing or email delivery fails
+ * @returns {Promise<Object>} Nodemailer response containing message metadata
  *
- * @returns {Promise<Object>} Nodemailer response object containing message metadata
+ * @throws {Error} If required fields are missing
+ * @throws {Error} If SMTP delivery fails
  */
 const sendMail = async ({ email, subject, text }) => {
-  // Validate required fields before attempting SMTP communication
+  /**
+   * Validate required fields before SMTP request
+   */
   if (!email || !subject || !text) {
     throw new Error("Missing required email fields (email, subject, text)");
   }
 
   try {
-    // Send email through configured SMTP transport
+    /**
+     * Send email via SMTP transport
+     */
     const info = await transporter.sendMail({
       from: process.env.EMAIL_USER,
       to: email,
@@ -38,7 +43,9 @@ const sendMail = async ({ email, subject, text }) => {
       text,
     });
 
-    // for monitoring delivery success
+    /**
+     * Delivery log (for debugging + monitoring)
+     */
     console.log("EMAIL SENT:", {
       to: email,
       subject,
@@ -47,10 +54,11 @@ const sendMail = async ({ email, subject, text }) => {
 
     return info;
   } catch (err) {
-    // Log internal error details
+    /**
+     * Internal error logging (do not expose SMTP internals upward)
+     */
     console.error("Failed to send email:", err);
 
-    // Avoid leaking low-level SMTP errors to higher layers
     throw new Error(`Email sending failed: ${err.message}`);
   }
 };

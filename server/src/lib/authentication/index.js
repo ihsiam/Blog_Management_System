@@ -12,9 +12,11 @@ const tokenServices = require("../token");
  * @param {string} params.password - Plain text password
  *
  * @returns {Promise<Object>} Created user record
+ *
+ * @throws {Error} BadRequest if email already exists
  */
 const register = async ({ name, email, password }) => {
-  // Ensure email uniqueness
+  // Check email uniqueness
   const hasUser = await userServices.userExist(email);
 
   if (hasUser) {
@@ -24,7 +26,7 @@ const register = async ({ name, email, password }) => {
     );
   }
 
-  // Hash password
+  // Hash password before persistence
   const hashPassword = await hashing.generateHash(password);
 
   return await userServices.createUser({
@@ -37,17 +39,21 @@ const register = async ({ name, email, password }) => {
 /**
  * Creates the first system administrator account.
  *
- * Intended to run only once during system initialization.
+ * This is a one-time bootstrap operation.
+ * It should be disabled or protected after initial setup.
  *
  * @param {Object} params
- * @param {string} params.name User full name
- * @param {string} params.email Unique user email
- * @param {string} params.password Plain text password
+ * @param {string} params.name - Admin full name
+ * @param {string} params.email - Unique admin email
+ * @param {string} params.password - Plain text password
  *
- * @throws {Error} If admin already exists or email is taken
+ * @returns {Promise<Object>} Created admin user
+ *
+ * @throws {Error} Forbidden if admin already exists
+ * @throws {Error} BadRequest if email is already taken
  */
 const systemAdmin = async ({ name, email, password }) => {
-  // checks if there is already an admin.
+  // Check if system admin already exists
   const isAdminExist = await userServices.adminExist();
 
   if (isAdminExist) {
@@ -64,7 +70,7 @@ const systemAdmin = async ({ name, email, password }) => {
     );
   }
 
-  // Hash password
+  // Secure password hashing
   const hashPassword = await hashing.generateHash(password);
 
   return await userServices.createAdmin({
@@ -80,18 +86,21 @@ const systemAdmin = async ({ name, email, password }) => {
  * Account must be approved before login is allowed
  *
  * @param {Object} params
- * @param {string} params.email Unique user email
- * @param {string} params.password Plain text password
+ * @param {string} params.email - User email
+ * @param {string} params.password - Plain text password
  *
  * @returns {Promise<{accessToken: string, refreshToken: string}>}
+ *
+ * @throws {Error} Unauthorized if credentials are invalid
+ * @throws {Error} Forbidden if account is not active
  */
 const login = async ({ email, password }) => {
   // Fetch user by email
   const user = await userServices.findUserByEmail(email);
 
   /**
-   * Prevent account enumeration attacks:
-   * Same response for "user not found" and "wrong password"
+   * Prevent user enumeration:
+   * Same error for invalid email and password
    */
   if (!user) {
     throw unauthorized("Invalid credentials");
@@ -104,7 +113,6 @@ const login = async ({ email, password }) => {
     throw unauthorized("Invalid credentials");
   }
 
-  // Only approved users can login
   if (user.status !== "approved") {
     throw forbidden("Account is not active");
   }
@@ -116,6 +124,8 @@ const login = async ({ email, password }) => {
     email: user.email,
   };
 
+  // generates auth token pairs
+
   const accessToken = tokenServices.generateAccessToken(payload);
   const refreshToken = tokenServices.generateRefreshToken(payload);
 
@@ -126,15 +136,14 @@ const login = async ({ email, password }) => {
 };
 
 /**
- * Rotates refresh token and issues new access tokens.
- *
- * Validates against stored DB token
- *
- * Rotates refresh token on every request
+ * Rotates refresh token and issues new JWT pair.
  *
  * @param {string} token - Refresh token from client
  *
  * @returns {Promise<{newAccessToken: string, newRefreshToken: string}>}
+ *
+ * @throws {Error} Unauthorized if token is invalid or revoked
+ * @throws {Error} Forbidden if account is inactive
  */
 const refreshToken = async (token) => {
   // Verify token
@@ -147,7 +156,6 @@ const refreshToken = async (token) => {
     throw unauthorized("Invalid refresh token");
   }
 
-  // Only approved users can refresh session
   if (user.status !== "approved") {
     throw forbidden("Account is not active");
   }

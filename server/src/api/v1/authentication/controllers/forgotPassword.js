@@ -4,7 +4,7 @@ const tokenServices = require("../../../../lib/token");
 const emailService = require("../../../../lib/email");
 
 /**
- * Sends password reset email to a registered user.
+ * Sends a password reset email to a registered user.
  *
  * @param {import("express").Request} req - Express request object
  * @param {Object} req.body - Request payload
@@ -17,13 +17,15 @@ const emailService = require("../../../../lib/email");
  *
  * @throws {Error} BadRequest if email is invalid
  * @throws {Error} NotFound if user does not exist
- * @throws {Error} Forbidden if account is declined
+ * @throws {Error} Forbidden if account is not allowed to reset password
  */
 const forgotPassword = async (req, res, next) => {
   try {
     const { email } = req.body;
 
-    // Validate email
+    /**
+     * Validate email presence and format
+     */
     if (!email) {
       throw badRequest([
         {
@@ -46,39 +48,53 @@ const forgotPassword = async (req, res, next) => {
       ]);
     }
 
-    // Fetch user by email
+    /**
+     * Fetch user by email
+     */
     const user = await userServices.findUserByEmail(email);
 
     if (!user) {
       throw notFound("User not found");
     }
 
-    // Prevent reset for declined users
+    /**
+     * Restrict password reset for declined accounts
+     */
     if (user.status === "declined") {
       throw forbidden("Your registration has been declined");
     }
 
-    // JWT payload
+    /**
+     * Build JWT payload for reset token
+     */
     const payload = {
       id: user.id,
       role: user.role,
       email: user.email,
     };
 
-    // Generate reset token
+    /**
+     * Generate password reset token
+     */
     const resetToken = tokenServices.generateActiveResetToken(payload);
 
-    // Build reset URL
+    /**
+     * Construct password reset URL
+     */
     const resetUrl = `${process.env.APP_URL}/api/v1/auth/reset-password/${resetToken}`;
 
-    // Send reset email
+    /**
+     * Send password reset email
+     */
     await emailService.sendMail({
       email,
       subject: "Reset your password",
       text: `Hello ${user.name},\n\nPlease reset your password using the link below:\n${resetUrl}`,
     });
 
-    // Success response
+    /**
+     * Response
+     */
     return res.status(200).json({
       code: 200,
       message: "Password reset email sent",

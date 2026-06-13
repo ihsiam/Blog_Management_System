@@ -2,7 +2,7 @@ const authServices = require("../../../../lib/authentication");
 const { unauthorized } = require("../../../../utils/error");
 
 /**
- * Refreshes access token using a valid refresh token.
+ * Refreshes the access token using a valid refresh token.
  *
  * Reads refresh token from HTTP-only cookie
  * Validates and rotates tokens via authentication service
@@ -10,11 +10,11 @@ const { unauthorized } = require("../../../../utils/error");
  * Updates refresh token cookie
  *
  * @param {import("express").Request} req - Express request object
- * @param {Object} req.cookies - Incoming cookies
- * @param {string} req.cookies.refreshToken - Refresh token stored in cookie
+ * @param {Object} req.cookies - Request cookies
+ * @param {string} [req.cookies.refreshToken] - Refresh token cookie
  *
  * @param {import("express").Response} res - Express response object
- * @param {Function} next - Express error handler middleware
+ * @param {Function} next - Express error-handling middleware
  *
  * @returns {Promise<void>} Sends new access token to client
  *
@@ -22,26 +22,31 @@ const { unauthorized } = require("../../../../utils/error");
  */
 const refresh = async (req, res, next) => {
   try {
-    // Extract refresh token from secure cookie
+    // Extract refresh token from cookie
     const refreshToken = req.cookies?.refreshToken;
 
-    // Prevents token refresh attempts without refresh token
+    /**
+     * Ensure refresh token exists before processing
+     */
     if (!refreshToken) {
       throw unauthorized("Refresh token is missing");
     }
 
-    // Validates current refresh token and generates a new token pair.
+    /**
+     * Validate refresh token and rotate session tokens
+     */
     const { newAccessToken, newRefreshToken } =
       await authServices.refreshToken(refreshToken);
 
-    // Update refresh token cookie
+    /**
+     * Update refresh token cookie with new rotated token
+     */
     res.cookie("refreshToken", newRefreshToken, {
       httpOnly: true,
       secure: true,
       sameSite: "strict",
     });
 
-    // Return fresh access token to client
     return res.status(200).json({
       code: 200,
       message: "Token refreshed successfully",

@@ -3,7 +3,7 @@ const userServices = require("../../../../lib/user");
 const { badRequest } = require("../../../../utils/error");
 
 /**
- * Resets user password using a valid reset token.
+ * Resets a user's password using a valid password reset token.
  *
  * @param {import("express").Request} req - Express request object
  * @param {Object} req.params - Route parameters
@@ -13,18 +13,20 @@ const { badRequest } = require("../../../../utils/error");
  * @param {string} req.body.password - New user password
  *
  * @param {import("express").Response} res - Express response object
- * @param {Function} next - Express error handler middleware
+ * @param {Function} next - Express error-handling middleware
  *
  * @returns {Promise<void>} Sends password reset confirmation response
  *
- * @throws {Error} BadRequest error if password is invalid
+ * @throws {Error} BadRequest if password validation fails
  */
 const resetPassword = async (req, res, next) => {
   try {
     const { token } = req.params;
     const { password } = req.body;
 
-    // Validate password
+    /**
+     * Validate password presence and type
+     */
     if (!password || typeof password !== "string") {
       throw badRequest([
         {
@@ -35,6 +37,9 @@ const resetPassword = async (req, res, next) => {
       ]);
     }
 
+    /**
+     * Validate password strength
+     */
     if (password.length < 8) {
       throw badRequest([
         {
@@ -45,19 +50,24 @@ const resetPassword = async (req, res, next) => {
       ]);
     }
 
-    // Verify reset token and extract user
+    /**
+     * Verify reset token and extract user payload
+     */
     const user = tokenServices.verifyActiveResetToken(token);
 
-    // Update password in database
+    /**
+     * Update user password
+     */
     await userServices.updatePassword({
       id: user.id,
       password,
     });
 
-    // Invalidate all active sessions after password change
+    /**
+     * Invalidate all active sessions after password change
+     */
     await userServices.clearRefreshToken(user.id);
 
-    // success response
     return res.status(200).json({
       code: 200,
       message: "Password reset successful",

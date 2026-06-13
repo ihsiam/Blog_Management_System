@@ -10,56 +10,66 @@ const { unauthorized } = require("../../../../utils/error");
  *
  * @param {import("express").Request} req - Express request object
  * @param {Object} req.cookies - Request cookies
- * @param {string} req.cookies.refreshToken - User refresh token cookie
- * @param {Object} req.user - Authenticated user (set by auth middleware)
- * @param {string} req.user.id - Authenticated user ID
+ * @param {string} [req.cookies.refreshToken] - Refresh token cookie
+ *
+ * @param {Object} req.user - Authenticated user (if attached by middleware)
+ * @param {string} req.user.id - User ID
  *
  * @param {import("express").Response} res - Express response object
- * @param {Function} next - Express error handler middleware
+ * @param {Function} next - Express error-handling middleware
  *
  * @returns {Promise<void>} Sends logout confirmation response
  *
- * @throws {Error} Unauthorized error if user is already logged out
+ * @throws {Error} Unauthorized error when session is invalid or already logged out
  */
 const logout = async (req, res, next) => {
   try {
     const refreshToken = req.cookies?.refreshToken;
 
     /**
-     * If no refresh token exists, user is already logged out
-     * or session is invalid.
+     * No refresh token means session is already invalid or missing
      */
     if (!refreshToken) {
       throw unauthorized("Already logged out");
     }
 
-    // verify token
+    /**
+     * Verify refresh token signature and decode payload
+     */
     const decoded = tokenServices.verifyRefreshToken(refreshToken);
 
-    // find user
+    /**
+     * Fetch user
+     */
     const user = await userServices.findUserById(decoded.id);
 
     if (!user) {
       throw unauthorized("Invalid session");
     }
 
-    // validate token match
+    /**
+     * Ensure token matches stored session token
+     * Prevents reuse of old or revoked tokens
+     */
     if (user.refreshToken !== refreshToken) {
       await userServices.clearRefreshToken(decoded.id);
       throw unauthorized("Session already invalidated");
     }
 
-    // clear session
+    /**
+     * Invalidate session in database
+     */
     await userServices.clearRefreshToken(decoded.id);
 
-    // Clear authentication cookie from browser.
+    /**
+     * Remove refresh token cookie from client
+     */
     res.clearCookie("refreshToken", {
       httpOnly: true,
       secure: true,
       sameSite: "strict",
     });
 
-    // Logout success response
     return res.status(200).json({
       code: 200,
       message: "Logged out successfully",

@@ -16,20 +16,22 @@ const { badRequest } = require("../../../../utils/error");
  * @param {string} req.body.password - Administrator password
  *
  * @param {import("express").Response} res - Express response object
- * @param {Function} next - Express error handling middleware
+ * @param {Function} next - Express error-handling middleware
  *
  * @returns {Promise<void>} Sends authentication response
  *
- * @throws {Error} BadRequest error when validation fails
+ * @throws {Error} BadRequest if validation fails
  */
 const setupAdmin = async (req, res, next) => {
   try {
     const { name, email, password } = req.body;
 
-    // Collect validation errors and return them together
+    // Collect validation errors (batch validation improves UX)
     const errors = [];
 
-    // Validate administrator name.
+    /**
+     * Validate name
+     */
     if (!name || typeof name !== "string" || !name.trim()) {
       errors.push({
         field: "name",
@@ -38,7 +40,9 @@ const setupAdmin = async (req, res, next) => {
       });
     }
 
-    // Validate email format
+    /**
+     * Validate email format
+     */
     if (!email) {
       errors.push({
         field: "email",
@@ -57,7 +61,9 @@ const setupAdmin = async (req, res, next) => {
       }
     }
 
-    // Validate password
+    /**
+     * Validate password strength
+     */
     if (!password || typeof password !== "string") {
       errors.push({
         field: "password",
@@ -72,35 +78,46 @@ const setupAdmin = async (req, res, next) => {
       });
     }
 
-    // Returns structured error response
+    /**
+     * Stop execution if validation fails
+     */
     if (errors.length > 0) {
       throw badRequest(errors, "Validation failed");
     }
 
-    // Create administrator account.
+    /**
+     * Create system administrator account
+     */
     const user = await authServices.systemAdmin({ name, email, password });
 
-    // JWT payload
+    /**
+     * Build JWT payload
+     */
     const payload = {
       id: user.id,
       role: user.role,
       email: user.email,
     };
 
-    // Generate authentication token pair
+    /**
+     * Generate token pair
+     */
     const accessToken = tokenServices.generateAccessToken(payload);
     const refreshToken = tokenServices.generateRefreshToken(payload);
 
-    // Stores refresh token into DB.
+    /**
+     * Persist refresh token for session tracking
+     */
     await userServices.saveRefreshToken(user.id, refreshToken);
 
-    // Store refresh token in cookie
+    /**
+     * Set refresh token in secure HTTP-only cookie
+     */
     res.cookie("refreshToken", refreshToken, {
       httpOnly: true,
       secure: true,
     });
 
-    // Successful creation response
     return res.status(201).json({
       code: 201,
       message: "System administrator created successfully",

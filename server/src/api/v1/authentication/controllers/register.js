@@ -18,9 +18,9 @@ const emailService = require("../../../../lib/email");
  * @param {string} req.body.password - Plain text password
  *
  * @param {import("express").Response} res - Express response object
- * @param {Function} next - Express error handler middleware
+ * @param {Function} next - Express error-handling middleware
  *
- * @returns {Promise<void>} Sends user registration confirmation response
+ * @returns {Promise<void>} Sends registration confirmation response
  *
  * @throws {Error} BadRequest error if validation fails
  */
@@ -28,10 +28,12 @@ const register = async (req, res, next) => {
   try {
     const { name, email, password } = req.body;
 
-    // Collect validation errors for structured response
+    // Collect validation errors
     const errors = [];
 
-    // Name validation
+    /**
+     * Validate name
+     */
     if (!name || typeof name !== "string" || !name.trim()) {
       errors.push({
         field: "name",
@@ -40,7 +42,9 @@ const register = async (req, res, next) => {
       });
     }
 
-    // Email validation
+    /**
+     * Validate email format
+     */
     if (!email) {
       errors.push({
         field: "email",
@@ -59,7 +63,9 @@ const register = async (req, res, next) => {
       }
     }
 
-    // Password validation
+    /**
+     * Validate password strength
+     */
     if (!password || typeof password !== "string") {
       errors.push({
         field: "password",
@@ -74,35 +80,46 @@ const register = async (req, res, next) => {
       });
     }
 
-    // Returns structured error response
+    /**
+     * Stop execution if validation fails
+     */
     if (errors.length > 0) {
       throw badRequest(errors, "Validation failed");
     }
 
-    // Create user in system (initial state: pending)
+    /**
+     * Create user (initial state: pending verification)
+     */
     const user = await authServices.register({ name, email, password });
 
-    // JWT payload used for account activation
+    /**
+     * Build JWT payload for activation token
+     */
     const payload = {
       id: user.id,
       role: user.role,
       email: user.email,
     };
 
-    // Generate activation token
+    /**
+     * Generate activation token
+     */
     const activationToken = tokenServices.generateActiveResetToken(payload);
 
-    // Activation link sent to user email
+    /**
+     * Build activation URL
+     */
     const activationUrl = `${process.env.APP_URL}/api/v1/auth/verify-email/${activationToken}`;
 
-    // Send account activation email
+    /**
+     * Send activation email
+     */
     await emailService.sendMail({
       email,
       subject: "Activate your account",
       text: `Hello ${user.name},\n\nPlease activate your account using the link below:\n${activationUrl}`,
     });
 
-    // Registration response
     return res.status(201).json({
       code: 201,
       message:
