@@ -1,26 +1,43 @@
 const { badRequest } = require("../../../../utils/error");
 const serviceRegistry = require("../../../../lib/service registry");
 
+/**
+ * Deletes a user and all related credentials from the system.
+ *
+ * @param {import("express").Request} req
+ * @param {Object} req.params
+ * @param {string} req.params.id - User ID to delete
+ *
+ * @param {import("express").Response} res
+ * @param {Function} next
+ *
+ * @returns {Promise<void>}
+ */
 const deleteUser = async (req, res, next) => {
   try {
-    // extract article id
+    // extract user id from request params
     const { id } = req.params;
 
-    // Validate id
+    // validation errors
+    const errors = [];
+
+    // id validation
     if (!id || typeof id !== "string") {
-      throw badRequest(
-        [{ field: "id", message: "invalid input", in: "params" }],
-        "invalid input",
-      );
+      errors.push({ field: "id", message: "invalid input", in: "params" });
     }
 
-    // delete user and it's credentials
+    // throw validation error if any
+    if (errors.length) {
+      throw badRequest(errors, "invalid input");
+    }
+
+    // delete user and related credentials
     await serviceRegistry.deleteUser(id);
 
-    // response
-    res.status(204).end();
+    // response (no content)
+    return res.status(204).end();
   } catch (e) {
-    next(e);
+    return next(e);
   }
 };
 

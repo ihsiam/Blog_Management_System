@@ -3,41 +3,67 @@ const { badRequest, notFound } = require("../../utils/error");
 const { hashing } = require("../../utils");
 const defaults = require("../../config/defaults");
 
-// find user by email
+/**
+ * Find user by email
+ *
+ * @param {string} email - User email address
+ * @returns {Promise<Object|null>} User object or null
+ */
 const findUserByEmail = async (email) => {
-  // find user
   const user = await User.findOne({ email });
-
   return user ? user.toObject() : null;
 };
 
-// find user by id
+/**
+ * Find authenticated user by ID
+ *
+ * @param {string} id - User ID
+ * @returns {Promise<Object|null>} Mongoose user document
+ */
+const findAuthUserById = async (id) => await User.findById(id);
+
+/**
+ * Find user by ID (safe output without sensitive fields)
+ *
+ * @param {string} id - User ID
+ * @returns {Promise<Object|null>} Sanitized user object
+ */
 const findUserById = async (id) => {
-  // find user
-  const user = await User.findById(id).select("-password");
-
+  const user = await User.findById(id).select("-password -refreshToken");
   return user ? user.toObject() : null;
 };
 
-// user existence
+/**
+ * Check if user exists by email
+ *
+ * @param {string} email - User email
+ * @returns {Promise<boolean>}
+ */
 const userExist = async (email) => {
-  // find user
   const user = await findUserByEmail(email);
-
   return !!user;
 };
 
-// admin existence
+/**
+ * Check if any admin exists in system
+ *
+ * @returns {Promise<boolean>}
+ */
 const adminExist = async () => {
-  // find admin
   const admin = await User.find({ role: "admin" });
-
   return !!admin.length;
 };
 
-// create user
+/**
+ * Create admin user
+ *
+ * @param {Object} params
+ * @param {string} params.name
+ * @param {string} params.email
+ * @param {string} params.password
+ * @returns {Promise<Object>} Created admin user
+ */
 const createAdmin = async ({ name, email, password }) => {
-  // create user
   const user = new User({
     name,
     email,
@@ -47,23 +73,35 @@ const createAdmin = async ({ name, email, password }) => {
   });
 
   await user.save();
-
   return user.toObject();
 };
 
-// create user
+/**
+ * Create normal user
+ *
+ * @param {Object} params
+ * @param {string} params.name
+ * @param {string} params.email
+ * @param {string} params.password
+ * @returns {Promise<Object>} Created user
+ */
 const createUser = async ({ name, email, password }) => {
-  // create user
   const user = new User({ name, email, password });
 
   await user.save();
-
   return user.toObject();
 };
 
-// create user by admin
+/**
+ * Create user by admin (auto-approval + hashing)
+ *
+ * @param {Object} params
+ * @param {string} params.name
+ * @param {string} params.email
+ * @param {string} params.password
+ * @returns {Promise<Object>} Created user (sanitized)
+ */
 const createUserByAdmin = async ({ name, email, password }) => {
-  // existing user check
   const hasUser = await userExist(email);
 
   // if user exist with email
@@ -77,7 +115,6 @@ const createUserByAdmin = async ({ name, email, password }) => {
   // password hash
   const hashPassword = await hashing.generateHash(password);
 
-  // create user
   const user = new User({
     name,
     email,
@@ -89,7 +126,6 @@ const createUserByAdmin = async ({ name, email, password }) => {
 
   const userData = user.toObject();
 
-  // delete confidential info
   delete userData.password;
   delete userData.role;
   delete userData.status;
@@ -97,17 +133,40 @@ const createUserByAdmin = async ({ name, email, password }) => {
   return userData;
 };
 
-// save refresh token into user db
+/**
+ * Save refresh token
+ *
+ * @param {string} id - User ID
+ * @param {string} refreshToken
+ * @returns {Promise<void>}
+ */
 const saveRefreshToken = async (id, refreshToken) => {
   await User.findByIdAndUpdate(id, { $set: { refreshToken } });
 };
 
-// remove refresh token from user database
+/**
+ * Clear refresh token
+ *
+ * @param {string} id - User ID
+ * @returns {Promise<void>}
+ */
 const clearRefreshToken = async (id) => {
   await User.findByIdAndUpdate(id, { $set: { refreshToken: null } });
 };
 
-// get all user
+/**
+ * Get all users with filters, pagination and sorting
+ *
+ * @param {Object} params
+ * @param {number} params.page
+ * @param {number} params.limit
+ * @param {string} params.sortBy
+ * @param {string} params.sortType
+ * @param {string} [params.name]
+ * @param {string} [params.email]
+ * @param {string} [params.status]
+ * @returns {Promise<Array<Object>>}
+ */
 const getAllUsers = async ({
   page = defaults.page,
   limit = defaults.limit,
@@ -115,54 +174,53 @@ const getAllUsers = async ({
   sortType = defaults.sortType,
   name,
   email,
+  status,
 }) => {
   // sort key
   const sortKey = `${sortType === "desc" ? "-" : ""}${sortBy}`;
 
-  // search option
+  // build filter
   const filter = {};
 
-  // for email
-  if (email) {
-    filter.email = { $regex: email, $options: "i" };
-  }
+  if (email) filter.email = { $regex: email, $options: "i" };
+  if (name) filter.name = { $regex: name, $options: "i" };
+  if (status) filter.status = status;
 
-  // for name
-  if (name) {
-    filter.name = { $regex: name, $options: "i" };
-  }
-
-  // find users
   const users = await User.find(filter)
-    .sort(sortKey) // filter data based on search
-    .skip(page * limit - limit) // skip based on page
-    .limit(limit); // retrieved based on limit
+    .sort(sortKey)
+    .skip(page * limit - limit)
+    .limit(limit);
 
   return users.map((user) => user.toObject());
 };
 
-// count document
-const countTotal = async ({ name, email }) => {
-  // search option
+/**
+ * Count users based on filters
+ *
+ * @param {Object} params
+ * @param {string} [params.name]
+ * @param {string} [params.email]
+ * @param {string} [params.status]
+ * @returns {Promise<number>}
+ */
+const countTotal = async ({ name, email, status }) => {
   const filter = {};
 
-  // for email
-  if (email) {
-    filter.email = { $regex: email, $options: "i" };
-  }
+  if (email) filter.email = { $regex: email, $options: "i" };
+  if (name) filter.name = { $regex: name, $options: "i" };
+  if (status) filter.status = status;
 
-  // for name
-  if (name) {
-    filter.name = { $regex: name, $options: "i" };
-  }
-
-  // count
-  const total = await User.countDocuments(filter);
-
-  return total;
+  return await User.countDocuments(filter);
 };
 
-// get single user
+/**
+ * Get single user with optional expansion
+ *
+ * @param {Object} params
+ * @param {string} params.id
+ * @param {string} [params.expand]
+ * @returns {Promise<Object>}
+ */
 const getSingleUser = async ({ id, expand = "" }) => {
   // extract expand
   const TrimmedExpand = expand
@@ -170,10 +228,8 @@ const getSingleUser = async ({ id, expand = "" }) => {
     .map((item) => item.trim())
     .filter(Boolean);
 
-  // find article
-  const user = await User.findById(id).select("-password");
+  const user = await User.findById(id).select("-password -refreshToken");
 
-  // if not found
   if (!user) {
     throw notFound();
   }
@@ -191,14 +247,24 @@ const getSingleUser = async ({ id, expand = "" }) => {
   return user.toObject();
 };
 
-// update user data
+/**
+ * Update user data
+ *
+ * @param {Object} params
+ * @param {string} params.id
+ * @param {string} [params.name]
+ * @param {string} [params.role]
+ * @param {string} [params.status]
+ * @returns {Promise<Object>}
+ */
 const updateUser = async ({ id, name, role, status }) => {
   const payload = {};
+
   if (name !== undefined) payload.name = name;
   if (role !== undefined) payload.role = role;
   if (status !== undefined) payload.status = status;
 
-  // update data
+  // find user and update data
   const user = await User.findByIdAndUpdate(
     id,
     { $set: payload },
@@ -211,8 +277,15 @@ const updateUser = async ({ id, name, role, status }) => {
   return user.toObject();
 };
 
+/**
+ * Update user password (hashed)
+ *
+ * @param {Object} params
+ * @param {string} params.id
+ * @param {string} params.password
+ * @returns {Promise<Object>}
+ */
 const updatePassword = async ({ id, password }) => {
-  // password payload
   const payload = {};
 
   // password hash
@@ -228,13 +301,17 @@ const updatePassword = async ({ id, password }) => {
     { new: true, runValidators: true },
   ).select("-password");
 
-  // if user not found
   if (!user) throw notFound();
 
   return user.toObject();
 };
 
-// delete item
+/**
+ * Delete user by ID
+ *
+ * @param {string} id
+ * @returns {Promise<boolean>}
+ */
 const deleteItem = async (id) => {
   const result = await User.findByIdAndDelete(id);
   return !!result;
@@ -256,4 +333,5 @@ module.exports = {
   updateUser,
   updatePassword,
   deleteItem,
+  findAuthUserById,
 };

@@ -150,7 +150,7 @@ const refreshToken = async (token) => {
   const decoded = tokenServices.verifyRefreshToken(token);
 
   // Ensure user still exists
-  const user = await userServices.findUserById(decoded.id);
+  const user = await userServices.findAuthUserById(decoded.id);
 
   if (!user) {
     throw unauthorized("Invalid refresh token");

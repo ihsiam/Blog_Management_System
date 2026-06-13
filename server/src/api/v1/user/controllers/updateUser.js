@@ -1,6 +1,24 @@
 const { badRequest } = require("../../../../utils/error");
 const userServices = require("../../../../lib/user");
 
+/**
+ * Updates user profile or account details.
+ *
+ * @param {import("express").Request} req - Express request object
+ *
+ * @param {Object} req.params - Route parameters
+ * @param {string} req.params.id - User ID to update
+ *
+ * @param {Object} req.body - Request payload
+ * @param {string} [req.body.name] - User full name
+ * @param {string} [req.body.role] - User role (user | admin)
+ * @param {string} [req.body.status] - User status (pending | approved | block | declined)
+ *
+ * @param {import("express").Response} res - Express response object
+ * @param {Function} next - Express error handler middleware
+ *
+ * @returns {Promise<void>} Sends updated user data response
+ */
 const updateUser = async (req, res, next) => {
   try {
     // extract data
@@ -21,24 +39,32 @@ const updateUser = async (req, res, next) => {
     }
 
     // role validation
-    if (
-      role !== undefined &&
-      ["user", "admin"].includes(role) &&
-      (typeof role !== "string" || !role.trim())
-    ) {
-      errors.push({ field: "role", message: "invalid input", in: "body" });
+    if (role !== undefined) {
+      const allowedRoles = ["user", "admin"];
+
+      if (
+        typeof role !== "string" ||
+        !role.trim() ||
+        !allowedRoles.includes(role)
+      ) {
+        errors.push({ field: "role", message: "invalid input", in: "body" });
+      }
     }
 
-    // title validation
-    if (
-      status !== undefined &&
-      ["pending", "approved", "block", "declined"].includes(status) &&
-      (typeof status !== "string" || !status.trim())
-    ) {
-      errors.push({ field: "status", message: "invalid input", in: "body" });
+    // status validation
+    if (status !== undefined) {
+      const allowedStatus = ["pending", "approved", "block", "declined"];
+
+      if (
+        typeof status !== "string" ||
+        !status.trim() ||
+        !allowedStatus.includes(status)
+      ) {
+        errors.push({ field: "status", message: "invalid input", in: "body" });
+      }
     }
 
-    // throw error
+    // throw error if any
     if (errors.length) {
       throw badRequest(errors, "invalid input");
     }
@@ -47,13 +73,13 @@ const updateUser = async (req, res, next) => {
     const data = await userServices.updateUser({ id, name, role, status });
 
     // response
-    res.status(200).json({
+    return res.status(200).json({
       code: 200,
       message: "Account updated",
       data,
     });
   } catch (e) {
-    next(e);
+    return next(e);
   }
 };
 

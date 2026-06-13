@@ -34,7 +34,7 @@ const authenticate = async (req, res, next) => {
     const decoded = tokenServices.verifyAccessToken(token);
 
     // Retrieve authenticated user from database
-    const user = await userServices.findUserById(decoded.id);
+    const user = await userServices.findAuthUserById(decoded.id);
 
     if (!user) {
       return next(unauthorized("Invalid authentication token"));

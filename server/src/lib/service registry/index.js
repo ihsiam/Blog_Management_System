@@ -4,7 +4,12 @@ const UserServices = require("../user");
 const { notFound, badRequest } = require("../../utils/error");
 const defaults = require("../../config/defaults");
 
-// delete article and it's associates
+/**
+ * Delete an article and all related data (comments)
+ *
+ * @param {string} id - Article ID
+ * @returns {Promise<boolean>}
+ */
 const deleteArticle = async (id) => {
   // find article
   const article = await articleServices.findArticleById(id);
@@ -14,35 +19,49 @@ const deleteArticle = async (id) => {
     throw notFound();
   }
 
-  // delete article related comments
+  // delete all comments of this article
   await commentServices.deleteMany({ article: article.id });
 
-  // delete comment
+  // delete article itself
   return articleServices.deleteItem(id);
 };
 
+/**
+ * Get comments of a specific article
+ *
+ * @param {Object} params
+ * @param {string} params.articleID
+ * @param {number} params.page
+ * @param {number} params.limit
+ * @param {string} params.status
+ */
 const getCommentByArticle = async ({
   articleID,
   page = defaults.page,
   limit = defaults.limit,
   status,
 }) => {
+  // check if article exists
   const article = await articleServices.findArticleById(articleID);
 
   if (!article) {
     throw notFound();
   }
 
-  const comments = await commentServices.getCommentsByArticle({
+  // fetch comments
+  return commentServices.getCommentsByArticle({
     articleID,
     page,
     limit,
     status,
   });
-
-  return comments;
 };
 
+/**
+ * Get all comments
+ *
+ * @param {Object} params
+ */
 const getComments = async ({
   page = defaults.page,
   limit = defaults.limit,
@@ -51,6 +70,7 @@ const getComments = async ({
   postId,
   status,
 }) => {
+  // build sort key
   const sortKey = `${sortType === "desc" ? "-" : ""}${sortBy}`;
 
   const query = {
@@ -59,6 +79,7 @@ const getComments = async ({
     sortKey,
   };
 
+  // validate postId if provided
   if (postId) {
     const article = await articleServices.findArticleById(postId);
 
@@ -69,6 +90,7 @@ const getComments = async ({
     query.postId = postId;
   }
 
+  // add status filter
   if (status) {
     query.status = status;
   }
@@ -76,17 +98,20 @@ const getComments = async ({
   return commentServices.getAllComments(query);
 };
 
-// create comment
+/**
+ * Create comment on article
+ *
+ * @param {Object} params
+ */
 const createComment = async ({
   articleID,
   body,
   status = defaults.commentStatus,
   author,
 }) => {
-  // find article with id
+  // validate article exists
   const article = await articleServices.findArticleById(articleID);
 
-  // if article not found
   if (!article) {
     throw badRequest(
       [{ field: "id", message: "invalid id", in: "params" }],
@@ -95,50 +120,55 @@ const createComment = async ({
   }
 
   // create comment
-  const comment = await commentServices.create({
+  return commentServices.create({
     articleID,
     body,
     status,
     author,
   });
-
-  return comment;
 };
 
-// get the author of an article
+/**
+ * Get article author
+ *
+ * @param {string} articleID
+ */
 const getArticleAuthor = async (articleID) => {
   // find article
   const article = await articleServices.findSingleItem({ id: articleID });
 
-  // find user
+  // find author
   const user = await UserServices.findUserById(article.author);
 
   return user;
 };
 
-// delete user and all related data
+/**
+ * Delete user and all related data
+ *
+ * @param {string} id
+ */
 const deleteUser = async (id) => {
-  // check if user exists
+  // check user exists
   const user = await UserServices.findUserById(id);
 
-  // if not found
   if (!user) {
     throw notFound();
   }
 
-  // find all articles authored by the user
+  // get all article IDs by user
   const articleIds = await articleServices.findArticlesByUser(id);
 
-  // delete all comments on the user's articles (by any user)
+  // delete comments on user's articles
   await commentServices.deleteMany({ article: { $in: articleIds } });
 
-  // delete all comments authored by the user (on other articles)
+  // delete user's own comments
   await commentServices.deleteMany({ author: id });
 
-  // delete all articles authored by the user
+  // delete user's articles
   await articleServices.deleteMany({ author: id });
 
-  // delete the user
+  // delete user
   await UserServices.deleteItem(id);
 
   return true;

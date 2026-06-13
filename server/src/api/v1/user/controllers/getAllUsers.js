@@ -3,17 +3,40 @@ const { badRequest } = require("../../../../utils/error");
 const UserServices = require("../../../../lib/user");
 const { query } = require("../../../../utils");
 
+/**
+ * Retrieves a paginated list of users.
+ *
+ * - Pagination (page, limit)
+ * - Sorting (sortBy, sortType)
+ * - Filtering (name, email, status)
+ * - HATEOAS links generation
+ *
+ * @param {import("express").Request} req - Express request object
+ * @param {Object} req.query - Query parameters
+ * @param {string} [req.query.page] - Page number
+ * @param {string} [req.query.limit] - Items per page
+ * @param {string} [req.query.sortType] - Sort direction (asc | desc)
+ * @param {string} [req.query.sortBy] - Field to sort by
+ * @param {string} [req.query.name] - Filter by user name
+ * @param {string} [req.query.email] - Filter by user email
+ * @param {string} [req.query.status] - Filter by user status
+ *
+ * @param {import("express").Response} res - Express response object
+ * @param {Function} next - Express error handler middleware
+ *
+ * @returns {Promise<void>} Returns paginated user list
+ */
 const getAllUsers = async (req, res, next) => {
   try {
     // extract params from request
     const page = Number(req.query.page || defaults.page);
     const limit = Number(req.query.limit || defaults.limit);
-    const sortType = req.query.sort_type || defaults.sortType;
-    const sortBy = req.query.sort_by || defaults.sortBy;
-    const name = req.query.name || defaults.searchTerm;
-    const email = req.query.email || defaults.searchTerm;
+    const sortType = req.query.sortType || defaults.sortType;
+    const sortBy = req.query.sortBy || defaults.sortBy;
 
-    // 400 error data
+    const { name, email, status } = req.query;
+
+    // collect validation errors
     const errors = [];
 
     // page validation
@@ -37,15 +60,28 @@ const getAllUsers = async (req, res, next) => {
 
     // sort by validation
     if (typeof sortBy !== "string" || !sortBy.trim()) {
-      errors.push({ field: "sort_by", message: "invalid input", in: "query" });
+      errors.push({
+        field: "sort_by",
+        message: "invalid input",
+        in: "query",
+      });
     }
 
-    // throw error
+    // status validation (optional filter)
+    if (status && typeof status !== "string") {
+      errors.push({
+        field: "status",
+        message: "invalid input",
+        in: "query",
+      });
+    }
+
+    // throw validation errors if any
     if (errors.length) {
       throw badRequest(errors, "invalid input");
     }
 
-    // get user data
+    // fetch users from service layer
     const users = await UserServices.getAllUsers({
       page,
       limit,
@@ -53,21 +89,26 @@ const getAllUsers = async (req, res, next) => {
       sortType,
       name,
       email,
+      status,
     });
 
-    // total items
-    const totalItems = await UserServices.countTotal({ name, email });
+    // count total users
+    const totalItems = await UserServices.countTotal({
+      name,
+      email,
+      status,
+    });
 
-    // transform data
+    // transform response data
     const data = query.transformData({
       items: users,
-      selection: ["id", "name", "email", "createdAt", "updatedAt"],
+      selection: ["id", "name", "email", "status", "createdAt", "updatedAt"],
     });
 
-    // pagination
+    // pagination metadata
     const pagination = query.getPagination(page, limit, totalItems);
 
-    // hateOAS
+    // HATEOAS links
     const links = query.hateOAS({
       url: req.url,
       path: req.path,
@@ -77,16 +118,15 @@ const getAllUsers = async (req, res, next) => {
       page,
     });
 
-    // response
-    res.status(200).json({
+    return res.status(200).json({
       code: 200,
       message: "Data retrieved",
       data,
       pagination,
       links,
     });
-  } catch (e) {
-    next(e);
+  } catch (err) {
+    return next(err);
   }
 };
 
