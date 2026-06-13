@@ -7,7 +7,7 @@ const config = {
   searchTerm: "",
   body: "",
   cover: "",
-  articleStatus: "draft",
+  articleStatus: "published",
   commentStatus: "public",
 };
 

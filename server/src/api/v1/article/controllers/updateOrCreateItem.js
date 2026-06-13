@@ -10,7 +10,7 @@ const updateOrCreateItem = async (req, res, next) => {
     const { body } = req.body;
     const author = req.user.id;
     const cover = req.body.cover || defaults.cover;
-    const status = req.body.status || defaults.articleStatus;
+    const status = defaults.articleStatus;
 
     // 400 error data
     const errors = [];

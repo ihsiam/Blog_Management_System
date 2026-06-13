@@ -18,7 +18,7 @@ const create = async (req, res, next) => {
     // extract article data from request body
     const body = req.body.body || defaults.body;
     const cover = req.body.cover || defaults.cover;
-    const status = req.body.status || defaults.articleStatus;
+    const status = defaults.articleStatus;
     const author = req.user?.id;
 
     // create article

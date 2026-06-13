@@ -9,7 +9,7 @@ const ArticleSchema = new Schema(
     status: {
       type: String,
       enum: ["draft", "published"],
-      default: "draft",
+      default: "published",
     },
     author: {
       type: Schema.Types.ObjectId,

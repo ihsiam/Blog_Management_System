@@ -1,40 +1,49 @@
 const articleService = require("../lib/articles");
-const { forbidden, unauthorized, badRequest } = require("../utils/error");
 const commentService = require("../lib/comments");
+const { forbidden, unauthorized } = require("../utils/error");
 
-// Ownership Middleware
+/**
+ * Ownership-based authorization middleware.
+ * Restricts access to resources based on ownership rules.
+ *
+ * @param {string} model - Resource type (e.g., "article", "comment")
+ * @param {Object} [options={}] - Middleware configuration options
+ * @param {boolean} [options.allowMissing=false] - If true, allows missing resource handling in service layer
+ *
+ * @returns {import("express").RequestHandler} Express middleware function
+ */
 const ownership =
-  (model = "", options = {}) =>
+  (model, options = {}) =>
   async (req, _res, next) => {
     try {
-      // Check if user exists
+      // Ensure user is authenticated
       if (!req.user || !req.user.id) {
         return next(unauthorized("Authentication required"));
       }
 
-      // check params id
+      // Ensure resource ID exists
       if (!req.params?.id) {
-        return next(
-          badRequest(
-            [{ field: "id", message: "Resource ID is required", in: "params" }],
-            "Validation error",
-          ),
-        );
+        return next(forbidden("Resource ID is required"));
       }
 
-      // Model-specific ownership checks
-
-      // ownership for article model
+      /**
+       * ARTICLE ownership check
+       */
       if (model === "article") {
-        // check owner
         const isOwner = await articleService.checkOwner({
           resourceId: req.params.id,
           userId: req.user.id,
           allowMissing: options.allowMissing,
         });
 
-        // if owner or put request
+        // Allow access if owner or service allows missing resource
         if (isOwner === null || isOwner === true) {
+          return next();
+        }
+
+        // Admin override
+        if (req.user.role === "admin") {
+          req.adminOverride = true;
           return next();
         }
 
@@ -43,15 +52,23 @@ const ownership =
         );
       }
 
+      /**
+       * COMMENT ownership check
+       */
       if (model === "comment") {
-        // check owner
         const isOwner = await commentService.checkOwner({
           resourceId: req.params.id,
           userId: req.user.id,
         });
 
-        // if owner
+        // Allow access if user is owner
         if (isOwner) {
+          return next();
+        }
+
+        // Admin override
+        if (req.user.role === "admin") {
+          req.adminOverride = true;
           return next();
         }
 
@@ -60,10 +77,10 @@ const ownership =
         );
       }
 
-      // return
+      // Unsupported model fallback
       return next(forbidden("You are not allowed to access this resource"));
-    } catch (e) {
-      return next(e);
+    } catch (err) {
+      return next(err);
     }
   };
 

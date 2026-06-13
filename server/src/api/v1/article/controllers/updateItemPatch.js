@@ -27,16 +27,46 @@ const updateItemPatch = async (req, res, next) => {
       throw badRequest(errors, "invalid input");
     }
 
-    // update article
-    const article = await articleServices.updateItemPatch(id, {
+    // If admin overriding ownership (editing someone else's article), only allow status change
+    if (req.adminOverride) {
+      if (
+        status === undefined ||
+        typeof status !== "string" ||
+        !status.trim()
+      ) {
+        throw badRequest(
+          [{ field: "status", message: "invalid input", in: "body" }],
+          "invalid input",
+        );
+      }
+
+      const article = await articleServices.updateItemPatch(id, { status });
+
+      return res.status(200).json({
+        code: 200,
+        message: "successfully updated article status",
+        data: article,
+        links: { self: `/api/v1/articles/${article.id}` },
+      });
+    }
+
+    // build update payload
+    const updateData = {
       title,
       body,
       cover,
-      status,
-    });
+    };
+
+    // only admin can update status
+    if (req.user.role === "admin") {
+      updateData.status = status;
+    }
+
+    // update article
+    const article = await articleServices.updateItemPatch(id, updateData);
 
     // response
-    res.status(200).json({
+    return res.status(200).json({
       code: 200,
       message: "successfully updated article data",
       data: article,
@@ -45,7 +75,7 @@ const updateItemPatch = async (req, res, next) => {
       },
     });
   } catch (e) {
-    next(e);
+    return next(e);
   }
 };
 

@@ -55,8 +55,8 @@ const create = async ({
   return comment.toObject();
 };
 
-// update comment
-const updateComment = async ({ id, body }) => {
+// update comment (supports body and/or status)
+const updateComment = async ({ id, body, status }) => {
   // find comment
   const comment = await Comment.findById(id);
 
@@ -65,8 +65,10 @@ const updateComment = async ({ id, body }) => {
     throw notFound();
   }
 
-  // update comment
-  comment.body = body;
+  // update fields
+  if (body !== undefined) comment.body = body;
+  if (status !== undefined) comment.status = status;
+
   await comment.save();
 
   return comment.toObject();

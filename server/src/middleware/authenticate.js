@@ -2,37 +2,58 @@ const tokenServices = require("../lib/token");
 const userServices = require("../lib/user");
 const { unauthorized, forbidden } = require("../utils/error");
 
-// Authentication Middleware
+/**
+ * Authenticates incoming requests using a JWT access token.
+ *
+ * @param {import("express").Request} req - Express request object
+ * @param {Object} req.headers - Incoming request headers
+ * @param {string} [req.headers.authorization] - Bearer access token
+ *
+ * @param {import("express").Response} res - Express response object
+ * @param {Function} next - Express middleware callback
+ *
+ * @returns {Promise<void>} Passes control to the next middleware
+ *
+ * @throws {Error} Unauthorized error for invalid authentication
+ * @throws {Error} Forbidden error for inactive accounts
+ */
 const authenticate = async (req, res, next) => {
   try {
-    // extract token header
+    // Extract Authorization header
     const authHeader = req.headers.authorization;
 
-    //  checking Authorization header's existence
+    // Validate Authorization header format.
     if (!authHeader || !authHeader.startsWith("Bearer ")) {
       return next(unauthorized("Authorization token missing"));
     }
 
-    // Extract token
+    // Extract raw JWT access token
     const token = authHeader.split(" ")[1];
 
-    // Verify token
+    // Verify & decode token
     const decoded = tokenServices.verifyAccessToken(token);
 
-    // find user from db
-    const user = await userServices.findUserByEmail(decoded.email);
+    // Retrieve authenticated user from database
+    const user = await userServices.findUserById(decoded.id);
 
-    // if not found
     if (!user) {
       return next(unauthorized("Invalid authentication token"));
     }
 
-    // Account status check
+    // Ensure user still has a valid session.
+    if (!user.refreshToken) {
+      return next(unauthorized("Session expired"));
+    }
+
+    /**
+     * Prevent access for accounts that have not been
+     * activated or are otherwise restricted.
+     */
     if (user.status !== "approved") {
       return next(forbidden("Your account is not active"));
     }
 
-    // Attach user to request
+    // Attach authenticated user context to the request.
     req.user = {
       id: user.id,
       email: user.email,
@@ -41,8 +62,8 @@ const authenticate = async (req, res, next) => {
     };
 
     return next();
-  } catch (e) {
-    return next(e);
+  } catch (err) {
+    return next(err);
   }
 };
 
