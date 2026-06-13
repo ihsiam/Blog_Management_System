@@ -4,51 +4,79 @@ const commentServices = require("../../../../lib/comments");
 const serviceRegistry = require("../../../../lib/service registry");
 const { query } = require("../../../../utils");
 
+/**
+ * Retrieves paginated public comments for a specific article.
+ *
+ * @param {import("express").Request} req - Express request object
+ * @param {Object} req.params - Route parameters
+ * @param {string} req.params.id - Article ID
+ *
+ * @param {Object} req.query - Query parameters
+ * @param {string} [req.query.page] - Page number
+ * @param {string} [req.query.limit] - Items per page
+ *
+ * @param {import("express").Response} res - Express response object
+ * @param {Function} next - Express error handler middleware
+ *
+ * @returns {Promise<void>} Sends paginated comment list
+ */
 const getArticleComments = async (req, res, next) => {
   try {
-    // extract params from request
-    const articleID = req.params.id;
+    // extract request parameters
+    const { id: articleID } = req.params;
     const page = Number(req.query.page || defaults.page);
     const limit = Number(req.query.limit || defaults.limit);
 
-    // 400 error data
+    // collect validation errors
     const errors = [];
 
     // page validation
     if (!Number.isFinite(page) || page < 1) {
-      errors.push({ field: "page", message: "invalid input", in: "query" });
+      errors.push({
+        field: "page",
+        message: "invalid input",
+        in: "query",
+      });
     }
 
     // limit validation
     if (!Number.isFinite(limit) || limit < 1) {
-      errors.push({ field: "limit", message: "invalid input", in: "query" });
+      errors.push({
+        field: "limit",
+        message: "invalid input",
+        in: "query",
+      });
     }
 
-    // throw error
+    // throw validation error if any
     if (errors.length) {
       throw badRequest(errors, "invalid input");
     }
 
-    // get comment data from comment service
+    // fetch public comments for article
     const comments = await serviceRegistry.getCommentByArticle({
       articleID,
       page,
       limit,
+      status: "public",
     });
 
-    // transform data
+    // transform response data
     const data = query.transformData({
       items: comments,
-      selection: ["id", "body", "status", "author", "createdAt", "updatedAt"],
+      selection: ["id", "body", "author", "createdAt", "updatedAt"],
     });
 
-    // count comments
-    const totalItems = await commentServices.count({ article: articleID });
+    // count total public comments
+    const totalItems = await commentServices.count({
+      article: articleID,
+      status: "public",
+    });
 
-    // get pagination
+    // generate pagination metadata
     const pagination = query.getPagination(page, limit, totalItems);
 
-    // process hateOAS links
+    // generate HATEOAS navigation links
     const links = query.hateOAS({
       url: req.url,
       path: req.path,
@@ -58,11 +86,11 @@ const getArticleComments = async (req, res, next) => {
       page,
     });
 
-    // add article link
+    // add related article link
     links.article = `/api/v1/articles/${articleID}`;
 
     // response
-    res.status(200).json({
+    return res.status(200).json({
       code: 200,
       message: "Data retrieved",
       data,
@@ -70,7 +98,7 @@ const getArticleComments = async (req, res, next) => {
       links,
     });
   } catch (e) {
-    next(e);
+    return next(e);
   }
 };
 

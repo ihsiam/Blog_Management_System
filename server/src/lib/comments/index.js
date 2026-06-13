@@ -2,17 +2,24 @@ const defaults = require("../../config/defaults");
 const Comment = require("../../model/Comment");
 const { notFound } = require("../../utils/error");
 
-// find comments  by article id
 const getCommentsByArticle = async ({
   articleID,
   page = defaults.page,
   limit = defaults.limit,
+  status,
 }) => {
-  // find comments
-  const comments = await Comment.find({ article: articleID }) // filter comment by article id
-    .populate({ path: "author", select: "name" }) // populate author
-    .skip(page * limit - limit) // skip based on page
-    .limit(limit); // retrieved data
+  const filter = {
+    article: articleID,
+  };
+
+  if (status) {
+    filter.status = status;
+  }
+
+  const comments = await Comment.find(filter)
+    .populate({ path: "author", select: "name" })
+    .skip(page * limit - limit)
+    .limit(limit);
 
   return comments.map((comment) => comment.toObject());
 };
@@ -34,8 +41,19 @@ const getAllComments = async ({
 };
 
 // count comments
-const count = async (filter) => {
-  // count article
+const count = async ({ article, status }) => {
+  const filter = {};
+
+  // filter by article
+  if (article) {
+    filter.article = article;
+  }
+
+  // filter by status
+  if (status) {
+    filter.status = status;
+  }
+
   const totalComments = await Comment.countDocuments(filter);
 
   return totalComments;

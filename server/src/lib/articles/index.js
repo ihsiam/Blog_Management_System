@@ -2,41 +2,83 @@ const Article = require("../../model/Article");
 const defaults = require("../../config/defaults");
 const { notFound, badRequest } = require("../../utils/error");
 
-// find all articles
+/**
+ * Retrieves paginated articles with optional filtering.
+ *
+ * @param {Object} params
+ * @param {number} params.page - Page number
+ * @param {number} params.limit - Items per page
+ * @param {string} params.sortBy - Field to sort by
+ * @param {string} params.sortType - Sorting order (asc | desc)
+ * @param {string} params.searchTerm - Search keyword
+ * @param {string} [params.status] - Article status filter
+ *
+ * @returns {Promise<Array<Object>>}
+ */
 const findAll = async ({
   page = defaults.page,
   limit = defaults.limit,
   sortBy = defaults.sortBy,
   sortType = defaults.sortType,
   searchTerm = defaults.searchTerm,
+  status,
 }) => {
-  // sort option
   const sortKey = `${sortType === "desc" ? "-" : ""}${sortBy}`;
 
-  // filter option based on search
-  const filter = { title: { $regex: searchTerm, $options: "i" } };
+  // build query filter
+  const filter = {
+    title: { $regex: searchTerm, $options: "i" },
+  };
 
-  // find articles
-  const articles = await Article.find(filter) // filter data based on search
-    .populate({ path: "author", select: "name" }) // populate author's name and id
-    .sort(sortKey) // sort data
-    .skip(page * limit - limit) // skip based on page
-    .limit(limit); // retrieved based on limit
+  if (status) {
+    filter.status = status;
+  }
+
+  // retrieve articles
+  const articles = await Article.find(filter)
+    .populate({ path: "author", select: "name" })
+    .sort(sortKey)
+    .skip(page * limit - limit)
+    .limit(limit);
 
   return articles.map((article) => article.toObject());
 };
 
-// count articles
-const count = async ({ searchTerm = "" }) => {
-  // filter option based on search
-  const filter = { title: { $regex: searchTerm, $options: "i" } };
-  // count article
-  const totalArticle = await Article.countDocuments(filter);
+/**
+ * Counts total articles based on filter.
+ *
+ * @param {Object} params
+ * @param {string} params.searchTerm
+ * @param {string} [params.status]
+ *
+ * @returns {Promise<number>}
+ */
+const count = async ({ searchTerm = "", status }) => {
+  // build query filter
+  const filter = {
+    title: { $regex: searchTerm, $options: "i" },
+  };
 
-  return totalArticle;
+  if (status) {
+    filter.status = status;
+  }
+
+  // count and return
+  return Article.countDocuments(filter);
 };
 
-// create an article
+/**
+ * Creates a new article.
+ *
+ * @param {Object} params
+ * @param {string} params.title
+ * @param {string} [params.body]
+ * @param {string} [params.cover]
+ * @param {string} params.status
+ * @param {string} params.author
+ *
+ * @returns {Promise<Object>}
+ */
 const create = async ({
   title,
   body = defaults.body,
@@ -44,7 +86,6 @@ const create = async ({
   status = defaults.articleStatus,
   author,
 }) => {
-  // create article
   const article = new Article({ title, body, cover, status, author });
 
   await article.save();
@@ -52,36 +93,55 @@ const create = async ({
   return article.toObject();
 };
 
-// find single item
+/**
+ * Retrieves a single article with optional population.
+ *
+ * @param {Object} params
+ * @param {string} params.id
+ * @param {string} [params.expand]
+ *
+ * @returns {Promise<Object>}
+ */
 const findSingleItem = async ({ id, expand = "" }) => {
-  // extract expand
-  const TrimmedExpand = expand
+  const trimmedExpand = expand
     .split(",")
     .map((item) => item.trim())
     .filter(Boolean);
 
-  // find article
   const article = await Article.findById(id);
 
-  // if not found
   if (!article) {
-    throw notFound();
+    throw notFound("Article not found");
   }
 
-  // expand author
-  if (TrimmedExpand.includes("author")) {
+  // only published article can be retrieved
+  if (article.status !== "published") {
+    throw notFound("Article not found");
+  }
+
+  // populate author if requested
+  if (trimmedExpand.includes("author")) {
     await article.populate({ path: "author", select: "name" });
   }
 
-  // expand comments
-  if (TrimmedExpand.includes("comments")) {
-    await article.populate({ path: "comments", match: { status: "public" } });
+  // populate comments if requested
+  if (trimmedExpand.includes("comments")) {
+    await article.populate({
+      path: "comments",
+      match: { status: "public" },
+    });
   }
 
   return article.toObject();
 };
 
-// create or update an item
+/**
+ * Creates or updates an article
+ *
+ * @param {string} id
+ * @param {Object} data
+ * @returns {Promise<{article: Object, statusCode: number}>}
+ */
 const updateOrCreate = async (
   id,
   {
@@ -92,12 +152,10 @@ const updateOrCreate = async (
     author,
   },
 ) => {
-  // find article
   const article = await Article.findById(id);
 
-  // if not found, create new
+  // create flow
   if (!article) {
-    // if title not found for creation phase
     if (!title || typeof title !== "string" || !title.trim()) {
       throw badRequest(
         [{ field: "title", message: "invalid input", in: "body" }],
@@ -105,12 +163,12 @@ const updateOrCreate = async (
       );
     }
 
-    // create article
     const newArticle = await create({ title, body, cover, status, author });
+
     return { article: newArticle, statusCode: 201 };
   }
 
-  // if found, update
+  // update flow
   const payload = { title, body, cover, status, author };
 
   Object.keys(payload).forEach((key) => {
@@ -122,68 +180,86 @@ const updateOrCreate = async (
   return { article: article.toObject(), statusCode: 200 };
 };
 
-// update item using patch
+/**
+ * Partially updates an article.
+ *
+ * @param {string} id
+ * @param {Object} data
+ * @returns {Promise<Object>}
+ */
 const updateItemPatch = async (id, { title, body, cover, status }) => {
-  // find article
   const article = await Article.findById(id);
 
-  // if not found
   if (!article) {
     throw notFound();
   }
 
-  // update article
+  // updated payload
   const payload = { title, body, cover, status };
 
   Object.keys(payload).forEach((key) => {
     article[key] = payload[key] ?? article[key];
   });
 
+  // save into DB
   await article.save();
 
   return article.toObject();
 };
 
-// delete article
-const deleteItem = async (id) =>
-  // find and delete article
-  Article.findByIdAndDelete(id);
+/**
+ * Deletes an article by ID.
+ *
+ * @param {string} id
+ * @returns {Promise<Object>}
+ */
+const deleteItem = (id) => Article.findByIdAndDelete(id);
 
+/**
+ * Deletes multiple articles based on filter.
+ *
+ * @param {Object} filter
+ * @returns {Promise<boolean>}
+ */
 const deleteMany = async (filter) => {
-  // delete articles based on filter
   const result = await Article.deleteMany(filter);
-
   return !!result;
 };
 
-// find article by id
-const findArticleById = async (id) => {
-  // find article
-  const article = await Article.findById(id);
+/**
+ * Finds article by ID.
+ *
+ * @param {string} id
+ * @returns {Promise<Object|null>}
+ */
+const findArticleById = async (id) => Article.findById(id);
 
-  return article;
-};
-
-// find articles by user id
+/**
+ * Finds all article IDs by a user.
+ *
+ * @param {string} id - User ID
+ * @returns {Promise<Array<string>>}
+ */
 const findArticlesByUser = async (id) => {
-  // get articles
   const articles = await Article.find({ author: id }).select("_id");
-
-  // return object id
   return articles.map((article) => article._id);
 };
 
-// check ownership
+/**
+ * Checks article ownership.
+ *
+ * @param {Object} params
+ * @param {string} params.resourceId
+ * @param {string} params.userId
+ * @param {boolean} [params.allowMissing=false]
+ *
+ * @returns {Promise<boolean|null>}
+ */
 const checkOwner = async ({ resourceId, userId, allowMissing = false }) => {
-  // find article
   const article = await findArticleById(resourceId);
 
-  // if not found
   if (!article) {
-    // for put method
-    if (allowMissing) {
-      return null;
-    }
+    if (allowMissing) return null;
     throw notFound();
   }
 

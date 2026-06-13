@@ -1,35 +1,78 @@
 const articleServices = require("../../../../lib/articles");
 const { badRequest } = require("../../../../utils/error");
 
+/**
+ * Retrieves a single article by ID.
+ *
+ * Supports optional expansion of related fields via `expand` query param.
+ *
+ * Response includes:
+ * - Article data
+ * - HATEOAS-style navigation links
+ *
+ * @param {import("express").Request} req - Express request object
+ * @param {Object} req.params - Route parameters
+ * @param {string} req.params.id - Article ID
+ *
+ * @param {Object} req.query - Query parameters
+ * @param {string} [req.query.expand] - Optional related data expansion (e.g. author, comments)
+ *
+ * @param {import("express").Response} res
+ * @param {Function} next
+ *
+ * @returns {Promise<void>} Sends single article response
+ */
 const findSingleItem = async (req, res, next) => {
   try {
-    // extract params from request
     const { id } = req.params;
     const expand = req.query.expand || "";
 
-    // 400 error data
+    /**
+     * Collect validation errors
+     */
     const errors = [];
 
-    // validate id
+    /**
+     * Validate article ID
+     */
     if (!id || typeof id !== "string") {
-      errors.push({ field: "id", message: "invalid input", in: "params" });
+      errors.push({
+        field: "id",
+        message: "invalid input",
+        in: "params",
+      });
     }
 
-    // expand validation
+    /**
+     * Validate expand query
+     */
     if (typeof expand !== "string") {
-      errors.push({ field: "expand", message: "invalid input", in: "query" });
+      errors.push({
+        field: "expand",
+        message: "invalid input",
+        in: "query",
+      });
     }
 
-    // throw error
+    /**
+     * Throw validation error if any exist
+     */
     if (errors.length) {
       throw badRequest(errors, "invalid input");
     }
 
-    // find single item
-    const article = await articleServices.findSingleItem({ id, expand });
+    /**
+     * Fetch article from service layer
+     */
+    const article = await articleServices.findSingleItem({
+      id,
+      expand,
+    });
 
-    // response
-    res.status(200).json({
+    /**
+     * Response
+     */
+    return res.status(200).json({
       code: 200,
       message: "Data retrieved",
       data: article,
@@ -39,8 +82,8 @@ const findSingleItem = async (req, res, next) => {
         comments: `/api/v1/articles/${article.id}/comments`,
       },
     });
-  } catch (e) {
-    next(e);
+  } catch (err) {
+    return next(err);
   }
 };
 

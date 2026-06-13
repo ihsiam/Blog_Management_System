@@ -21,25 +21,23 @@ const deleteArticle = async (id) => {
   return articleServices.deleteItem(id);
 };
 
-// get comment for article
 const getCommentByArticle = async ({
   articleID,
   page = defaults.page,
   limit = defaults.limit,
+  status,
 }) => {
-  // find article with id
   const article = await articleServices.findArticleById(articleID);
 
-  // if article not found
   if (!article) {
     throw notFound();
   }
 
-  // find comments
   const comments = await commentServices.getCommentsByArticle({
     articleID,
     page,
     limit,
+    status,
   });
 
   return comments;

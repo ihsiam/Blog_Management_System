@@ -30,12 +30,19 @@ router.post(
   authController.resendVerificationMail,
 );
 router.post("/api/v1/auth/forgot-password", authController.forgotPassword);
-router.post("/api/v1/auth/reset-password/:token", authController.resetPassword);
+router.patch(
+  "/api/v1/auth/reset-password/:token",
+  authController.resetPassword,
+);
 router.post("/api/v1/auth/sign-in", authLimit, authController.login);
 router.post("/api/v1/auth/refresh", authController.refresh);
 router.post("/api/v1/auth/logout", authenticate, authController.logout);
 
 // article routes
+router
+  .route("/api/v1/articles/all")
+  .get(authenticate, authorize(["admin"]), articleController.getAllByAdmin);
+
 router
   .route("/api/v1/articles")
   .get(articleController.findAll)

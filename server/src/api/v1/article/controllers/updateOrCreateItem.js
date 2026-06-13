@@ -2,35 +2,79 @@ const defaults = require("../../../../config/defaults");
 const articleServices = require("../../../../lib/articles");
 const { badRequest } = require("../../../../utils/error");
 
+/**
+ * Updates an existing article or creates a new one if it does not exist.
+ *
+ * Response dynamically changes based on operation:
+ * - 200 → updated article
+ * - 201 → newly created article
+ *
+ * @param {import("express").Request} req - Express request object
+ * @param {Object} req.params - Route parameters
+ * @param {string} req.params.id - Article ID
+ *
+ * @param {Object} req.body - Request payload
+ * @param {string} [req.body.title] - Article title
+ * @param {string} [req.body.body] - Article content
+ * @param {string} [req.body.cover] - Article cover image URL
+ *
+ * @param {Object} req.user - Authenticated user (from middleware)
+ * @param {string} req.user.id - Author ID
+ *
+ * @param {import("express").Response} res
+ * @param {Function} next
+ *
+ * @returns {Promise<void>} Sends created/updated article response
+ */
 const updateOrCreateItem = async (req, res, next) => {
   try {
-    // extract article data from request
+    /**
+     * Extract request data
+     */
     const { id } = req.params;
-    const { title } = req.body;
-    const { body } = req.body;
+    const { title, body } = req.body;
+
     const author = req.user.id;
     const cover = req.body.cover || defaults.cover;
     const status = defaults.articleStatus;
 
-    // 400 error data
+    /**
+     * Collect validation errors
+     */
     const errors = [];
 
-    // id validation
+    /**
+     * Validate ID
+     */
     if (!id || typeof id !== "string") {
-      errors.push({ field: "id", message: "invalid input", in: "params" });
+      errors.push({
+        field: "id",
+        message: "invalid input",
+        in: "params",
+      });
     }
 
-    // title validation
+    /**
+     * Validate title (only if provided)
+     */
     if (title !== undefined && (typeof title !== "string" || !title.trim())) {
-      errors.push({ field: "title", message: "invalid input", in: "body" });
+      errors.push({
+        field: "title",
+        message: "invalid input",
+        in: "body",
+      });
     }
 
-    // throw error
+    /**
+     * Throw validation error if any exist
+     */
     if (errors.length) {
       throw badRequest(errors, "invalid input");
     }
 
-    // update or create article
+    /**
+     * Create or update article
+     */
     const { article, statusCode } = await articleServices.updateOrCreate(id, {
       title,
       body,
@@ -39,20 +83,24 @@ const updateOrCreateItem = async (req, res, next) => {
       author,
     });
 
-    // response
-    res.status(statusCode).json({
+    /**
+     * Response message based on operation type
+     */
+    const message =
+      statusCode === 200
+        ? "Successfully updated article"
+        : "Article created successfully";
+
+    return res.status(statusCode).json({
       code: statusCode,
-      message:
-        statusCode === 200
-          ? "successfully updated article data"
-          : "Article created",
+      message,
       data: article,
       links: {
         self: `/api/v1/articles/${article.id}`,
       },
     });
-  } catch (e) {
-    next(e);
+  } catch (err) {
+    return next(err);
   }
 };
 

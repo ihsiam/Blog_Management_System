@@ -7,6 +7,7 @@ const deleteItem = require("./deleteItem");
 const postCommentOnArticle = require("./postCommentOnArticle");
 const getArticleComments = require("./getArticleComments");
 const getArticleAuthor = require("./getArticleAuthor");
+const getAllByAdmin = require("./getAllByAdmin");
 
 module.exports = {
   findAll,
@@ -18,4 +19,5 @@ module.exports = {
   postCommentOnArticle,
   getArticleComments,
   getArticleAuthor,
+  getAllByAdmin,
 };

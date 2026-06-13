@@ -1,18 +1,55 @@
 const serviceRegistry = require("../../../../lib/service registry");
+const { badRequest } = require("../../../../utils/error");
 
+/**
+ * Retrieves the author of a specific article.
+ *
+ * @param {import("express").Request} req - Express request object
+ * @param {Object} req.params - Route parameters
+ * @param {string} req.params.id - Article ID
+ *
+ * @param {import("express").Response} res - Express response object
+ * @param {Function} next - Express error handler middleware
+ *
+ * @returns {Promise<void>} Sends article author details
+ */
 const getArticleAuthor = async (req, res, next) => {
   try {
-    // extract article id
-    const articleID = req.params.id;
+    // extract article id from route params
+    const { id: articleID } = req.params;
 
-    // get user
+    // validate article id
+    if (!articleID || typeof articleID !== "string") {
+      return next(
+        badRequest(
+          [{ field: "id", message: "invalid input", in: "params" }],
+          "invalid input",
+        ),
+      );
+    }
+
+    // fetch author
     const user = await serviceRegistry.getArticleAuthor(articleID);
 
-    // transform data
-    const data = { id: user.id, name: user.name, email: user.email };
+    // handle missing user safely
+    if (!user) {
+      return next(
+        badRequest(
+          [{ field: "id", message: "author not found", in: "params" }],
+          "author not found",
+        ),
+      );
+    }
+
+    // transform response data
+    const data = {
+      id: user.id,
+      name: user.name,
+      email: user.email,
+    };
 
     // response
-    res.status(200).json({
+    return res.status(200).json({
       code: 200,
       message: "Data retrieved",
       data,
@@ -22,7 +59,7 @@ const getArticleAuthor = async (req, res, next) => {
       },
     });
   } catch (e) {
-    next(e);
+    return next(e);
   }
 };
 
