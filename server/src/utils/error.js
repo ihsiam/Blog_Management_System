@@ -1,17 +1,49 @@
+/**
+ * Creates a standardized application error object.
+ *
+ * Used as the base factory for all custom HTTP errors.
+ *
+ * @param {Object} [params={}] - Error configuration
+ * @param {number} [params.statusCode] - HTTP status code
+ * @param {string} [params.error] - Error type/title
+ * @param {string} [params.message] - Human-readable error message
+ * @param {*} [params.data] - Additional error details (validation errors, metadata, etc.)
+ *
+ * @returns {Error} Extended Error instance with custom properties
+ */
 const createError = ({
   statusCode = 500,
   error = "Internal server error",
   message,
   data,
 } = {}) => {
+  // Create native Error instance
   const err = new Error(message || "Internal server error");
+
+  // Attach HTTP status code
   err.statusCode = statusCode;
+
+  // Attach error type
   err.error = error;
-  if (data !== undefined) err.data = data;
+
+  // Attach additional error data when provided
+  if (data !== undefined) {
+    err.data = data;
+  }
+
   return err;
 };
 
-// 400 error
+/**
+ * Creates a 400 Bad Request error.
+ *
+ * Commonly used for request validation failures.
+ *
+ * @param {Array<Object>} data - Validation error details
+ * @param {string} message - Error message
+ *
+ * @returns {Error}
+ */
 const badRequest = (data, message = "invalid input") =>
   createError({
     statusCode: 400,
@@ -20,7 +52,15 @@ const badRequest = (data, message = "invalid input") =>
     data,
   });
 
-// 401 error
+/**
+ * Creates a 401 Unauthorized error.
+ *
+ * Used when authentication fails or credentials are invalid.
+ *
+ * @param {string} message - Error message
+ *
+ * @returns {Error}
+ */
 const unauthorized = (message = "You don't have the right permission.") =>
   createError({
     statusCode: 401,
@@ -28,7 +68,15 @@ const unauthorized = (message = "You don't have the right permission.") =>
     message,
   });
 
-// 403 error
+/**
+ * Creates a 403 Forbidden error.
+ *
+ * Used when the authenticated user lacks required permissions.
+ *
+ * @param {string} message - Error message
+ *
+ * @returns {Error}
+ */
 const forbidden = (message = "Permission denied") =>
   createError({
     statusCode: 403,
@@ -36,7 +84,15 @@ const forbidden = (message = "Permission denied") =>
     message,
   });
 
-// 404 error
+/**
+ * Creates a 404 Not Found error.
+ *
+ * Used when a requested resource does not exist.
+ *
+ * @param {string} message - Error message
+ *
+ * @returns {Error}
+ */
 const notFound = (message = "Requested resource not found") =>
   createError({
     statusCode: 404,

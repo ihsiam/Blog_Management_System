@@ -132,7 +132,20 @@ const findSingleItem = async ({ id, expand = "" }) => {
     });
   }
 
-  return article.toObject();
+  const obj = article.toObject();
+
+  // hide status from article
+  delete obj.status;
+
+  // hide status from comments if exists
+  if (obj.comments && Array.isArray(obj.comments)) {
+    obj.comments = obj.comments.map((comment) => {
+      // eslint-disable-next-line no-unused-vars, no-shadow
+      const { article, status, ...rest } = comment; // both removed
+      return rest;
+    });
+  }
+  return obj;
 };
 
 /**
@@ -144,13 +157,7 @@ const findSingleItem = async ({ id, expand = "" }) => {
  */
 const updateOrCreate = async (
   id,
-  {
-    title,
-    body,
-    cover = defaults.cover,
-    status = defaults.articleStatus,
-    author,
-  },
+  { title, body, cover, status = defaults.articleStatus, author },
 ) => {
   const article = await Article.findById(id);
 

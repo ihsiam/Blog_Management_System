@@ -59,7 +59,7 @@ const getAllUsers = async (req, res, next) => {
     }
 
     // sort by validation
-    if (typeof sortBy !== "string" || !sortBy.trim()) {
+    if (!["createdAt", "updatedAt", "email", "name"].includes(sortBy)) {
       errors.push({
         field: "sort_by",
         message: "invalid input",
@@ -68,7 +68,10 @@ const getAllUsers = async (req, res, next) => {
     }
 
     // status validation (optional filter)
-    if (status && typeof status !== "string") {
+    if (
+      status &&
+      !["pending", "approved", "blocked", "declined"].includes(status)
+    ) {
       errors.push({
         field: "status",
         message: "invalid input",
@@ -102,7 +105,15 @@ const getAllUsers = async (req, res, next) => {
     // transform response data
     const data = query.transformData({
       items: users,
-      selection: ["id", "name", "email", "status", "createdAt", "updatedAt"],
+      selection: [
+        "id",
+        "name",
+        "email",
+        "role",
+        "status",
+        "createdAt",
+        "updatedAt",
+      ],
     });
 
     // pagination metadata

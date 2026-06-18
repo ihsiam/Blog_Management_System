@@ -1,16 +1,24 @@
 const defaults = require("../config/defaults");
 const generateQueryString = require("./queryString");
 
-// generate pagination
+/**
+ * Generates pagination metadata for list responses.
+ *
+ * @param {number} [page=defaults.page] - Current page number
+ * @param {number} [limit=defaults.limit] - Items per page
+ * @param {number} [totalItems=defaults.totalItems] - Total number of items
+ *
+ * @returns {Object} Pagination metadata object
+ */
 const getPagination = (
   page = defaults.page,
   limit = defaults.limit,
   totalItems = defaults.totalItems,
 ) => {
-  // total page count
+  // total number of pages
   const totalPage = Math.ceil(totalItems / limit);
 
-  // pagination
+  // base pagination object
   const pagination = {
     page,
     limit,
@@ -18,12 +26,12 @@ const getPagination = (
     totalPage,
   };
 
-  // Add next page only if current page is not the last page
+  // add next page only if current page is not last page
   if (page < totalPage) {
     pagination.next = page + 1;
   }
 
-  // Add previous page only if current page is greater than 1
+  // add previous page only if current page is greater than first page
   if (page > 1) {
     pagination.prev = page - 1;
   }
@@ -31,14 +39,25 @@ const getPagination = (
   return pagination;
 };
 
-// transform data based on selection items
+/**
+ * Transforms an array of objects based on selected fields.
+ *
+ * @param {Object} params
+ * @param {Array<Object>} params.items - Data items to transform
+ * @param {Array<string>} params.selection - Fields to include in output
+ * @param {string} [params.path=""] - Base path for generating item links
+ *
+ * @returns {Array<Object>} Transformed data array
+ *
+ * @throws {Error} If items or selection are not valid arrays
+ */
 const transformData = ({ items = [], selection = [], path = "" }) => {
-  // for invalid array
+  // validate input types
   if (!Array.isArray(items) || !Array.isArray(selection)) {
     throw new Error("Invalid arguments");
   }
 
-  // if no selection field then return full data
+  // if no selection provided, return full object with link
   if (selection.length === 0) {
     return items.map((item) => ({
       ...item,
@@ -46,15 +65,16 @@ const transformData = ({ items = [], selection = [], path = "" }) => {
     }));
   }
 
-  // selected field with links
+  // transform only selected fields
   return items.map((item) => {
     const result = {};
 
+    // pick only allowed fields
     selection.forEach((key) => {
       result[key] = item[key];
     });
 
-    // if path required
+    // attach resource link if path provided
     if (path) {
       result.link = `${path}/${item.id}`;
     }
@@ -63,7 +83,19 @@ const transformData = ({ items = [], selection = [], path = "" }) => {
   });
 };
 
-// generate hateOAS for navigation links
+/**
+ * Generates HATEOAS navigation links.
+ *
+ * @param {Object} params
+ * @param {string} [params.url="/"] - Current request URL
+ * @param {string} [params.path=""] - Base API path
+ * @param {Object} [params.query={}] - Original query parameters
+ * @param {boolean} [params.hasNext=false] - Whether next page exists
+ * @param {boolean} [params.hasPrev=false] - Whether previous page exists
+ * @param {number} [params.page=defaults.page] - Current page number
+ *
+ * @returns {Object} HATEOAS links object
+ */
 const hateOAS = ({
   url = "/",
   path = "",
@@ -72,7 +104,7 @@ const hateOAS = ({
   hasPrev = false,
   page = defaults.page,
 }) => {
-  // links
+  // base links object
   const links = {
     self: url,
   };
@@ -92,4 +124,8 @@ const hateOAS = ({
   return links;
 };
 
-module.exports = { getPagination, transformData, hateOAS };
+module.exports = {
+  getPagination,
+  transformData,
+  hateOAS,
+};

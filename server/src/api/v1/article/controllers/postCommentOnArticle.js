@@ -1,3 +1,4 @@
+const mongoose = require("mongoose");
 const defaults = require("../../../../config/defaults");
 const { badRequest } = require("../../../../utils/error");
 const serviceRegistry = require("../../../../lib/service registry");
@@ -34,12 +35,22 @@ const postCommentOnArticle = async (req, res, next) => {
     // default comment status from system config
     const status = defaults.commentStatus;
 
+    // collect validation errors
+    const errors = [];
+
+    // validate id
+    if (!articleID || !mongoose.Types.ObjectId.isValid(articleID)) {
+      errors.push({ field: "id", message: "invalid input", in: "params" });
+    }
+
     // validate comment body
     if (!body || typeof body !== "string" || !body.trim()) {
-      throw badRequest(
-        [{ field: "body", message: "invalid input", in: "body" }],
-        "invalid input",
-      );
+      errors.push({ field: "body", message: "invalid input", in: "body" });
+    }
+
+    // throw validation error if any
+    if (errors.length) {
+      throw badRequest(errors, "invalid input");
     }
 
     // create comment via service layer

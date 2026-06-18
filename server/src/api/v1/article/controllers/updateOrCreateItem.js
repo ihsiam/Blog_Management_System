@@ -1,3 +1,4 @@
+const mongoose = require("mongoose");
 const defaults = require("../../../../config/defaults");
 const articleServices = require("../../../../lib/articles");
 const { badRequest } = require("../../../../utils/error");
@@ -35,7 +36,7 @@ const updateOrCreateItem = async (req, res, next) => {
     const { title, body } = req.body;
 
     const author = req.user.id;
-    const cover = req.body.cover || defaults.cover;
+    const { cover } = req.body;
     const status = defaults.articleStatus;
 
     /**
@@ -46,12 +47,8 @@ const updateOrCreateItem = async (req, res, next) => {
     /**
      * Validate ID
      */
-    if (!id || typeof id !== "string") {
-      errors.push({
-        field: "id",
-        message: "invalid input",
-        in: "params",
-      });
+    if (!id || !mongoose.Types.ObjectId.isValid(id)) {
+      errors.push({ field: "id", message: "invalid input", in: "params" });
     }
 
     /**

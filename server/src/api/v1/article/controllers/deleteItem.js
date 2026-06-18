@@ -1,6 +1,6 @@
+const mongoose = require("mongoose");
 const serviceRegistry = require("../../../../lib/service registry");
 const { badRequest } = require("../../../../utils/error");
-
 /**
  * Deletes an article by ID.
  *
@@ -23,9 +23,15 @@ const deleteItem = async (req, res, next) => {
     /**
      * Validate ID
      */
-    if (!id || typeof id !== "string") {
+    if (!id || !mongoose.Types.ObjectId.isValid(id)) {
       throw badRequest(
-        [{ field: "id", message: "invalid input", in: "params" }],
+        [
+          {
+            field: "id",
+            message: "invalid input",
+            in: "params",
+          },
+        ],
         "invalid input",
       );
     }

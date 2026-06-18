@@ -41,7 +41,7 @@ const logout = async (req, res, next) => {
     /**
      * Fetch user
      */
-    const user = await userServices.findUserById(decoded.id);
+    const user = await userServices.findAuthUserById(decoded.id);
 
     if (!user) {
       throw unauthorized("Invalid session");

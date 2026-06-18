@@ -1,3 +1,4 @@
+const mongoose = require("mongoose");
 const serviceRegistry = require("../../../../lib/service registry");
 const { badRequest } = require("../../../../utils/error");
 
@@ -19,7 +20,7 @@ const getArticleAuthor = async (req, res, next) => {
     const { id: articleID } = req.params;
 
     // validate article id
-    if (!articleID || typeof articleID !== "string") {
+    if (!articleID || !mongoose.Types.ObjectId.isValid(articleID)) {
       return next(
         badRequest(
           [{ field: "id", message: "invalid input", in: "params" }],

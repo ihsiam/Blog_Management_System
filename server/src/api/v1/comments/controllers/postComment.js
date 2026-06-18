@@ -1,7 +1,7 @@
+const mongoose = require("mongoose");
 const defaults = require("../../../../config/defaults");
 const { badRequest } = require("../../../../utils/error");
 const serviceRegistry = require("../../../../lib/service registry");
-
 /**
  * Creates a new comment for an article.
  *
@@ -36,7 +36,7 @@ const postComment = async (req, res, next) => {
     }
 
     // validate article ID
-    if (!articleID || typeof articleID !== "string" || !articleID.trim()) {
+    if (!articleID || !mongoose.Types.ObjectId.isValid(articleID)) {
       errors.push({
         field: "articleId",
         message: "invalid input",

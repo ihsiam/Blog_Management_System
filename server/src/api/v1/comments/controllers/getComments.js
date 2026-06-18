@@ -1,9 +1,9 @@
+const mongoose = require("mongoose");
 const defaults = require("../../../../config/defaults");
 const { badRequest } = require("../../../../utils/error");
 const commentServices = require("../../../../lib/comments");
 const serviceRegistry = require("../../../../lib/service registry");
 const { query } = require("../../../../utils");
-
 /**
  * Retrieves paginated comments with filtering, sorting, and optional article filtering.
  *
@@ -67,7 +67,7 @@ const getComments = async (req, res, next) => {
     }
 
     // validate sort by
-    if (typeof sortBy !== "string" || !sortBy.trim()) {
+    if (!["createdAt", "updatedAt"].includes(sortBy)) {
       errors.push({
         field: "sort_by",
         message: "invalid input",
@@ -75,8 +75,8 @@ const getComments = async (req, res, next) => {
       });
     }
 
-    // validate article id (optional filter)
-    if (postId !== undefined && typeof postId !== "string") {
+    // id validation
+    if (postId && !mongoose.Types.ObjectId.isValid(postId)) {
       errors.push({
         field: "articleId",
         message: "invalid input",

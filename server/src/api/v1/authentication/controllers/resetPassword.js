@@ -72,7 +72,7 @@ const resetPassword = async (req, res, next) => {
       code: 200,
       message: "Password reset successful",
       links: {
-        signIn: "/auth/sign-in",
+        "sign-in": "/api/v1/auth/sign-in",
       },
     });
   } catch (err) {

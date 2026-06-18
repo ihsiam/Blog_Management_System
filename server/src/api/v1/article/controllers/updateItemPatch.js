@@ -1,3 +1,4 @@
+const mongoose = require("mongoose");
 const articleServices = require("../../../../lib/articles");
 const { badRequest } = require("../../../../utils/error");
 
@@ -43,12 +44,8 @@ const updateItemPatch = async (req, res, next) => {
     /**
      * Validate article ID
      */
-    if (!id || typeof id !== "string") {
-      errors.push({
-        field: "id",
-        message: "invalid input",
-        in: "params",
-      });
+    if (!id || !mongoose.Types.ObjectId.isValid(id)) {
+      errors.push({ field: "id", message: "invalid input", in: "params" });
     }
 
     /**

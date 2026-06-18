@@ -1,3 +1,4 @@
+const mongoose = require("mongoose");
 const { badRequest } = require("../../../../utils/error");
 const commentServices = require("../../../../lib/comments");
 
@@ -26,6 +27,18 @@ const updateComment = async (req, res, next) => {
     const { id } = req.params;
     const { body, status } = req.body;
 
+    // collect validation errors
+    const errors = [];
+
+    // id validation
+    if (!id || !mongoose.Types.ObjectId.isValid(id)) {
+      errors.push({
+        field: "id",
+        message: "invalid input",
+        in: "params",
+      });
+    }
+
     /**
      * Admin override flow:
      * Only status update is allowed
@@ -37,10 +50,11 @@ const updateComment = async (req, res, next) => {
         typeof status !== "string" ||
         !["public", "hidden"].includes(status)
       ) {
-        throw badRequest(
-          [{ field: "status", message: "invalid input", in: "body" }],
-          "invalid input",
-        );
+        errors.push({ field: "status", message: "invalid input", in: "body" });
+      }
+
+      if (errors.length) {
+        throw badRequest(errors, "invalid input");
       }
 
       // update only status
@@ -59,18 +73,17 @@ const updateComment = async (req, res, next) => {
       });
     }
 
-    // validation errors
-    const errors = [];
-
     /**
      * Validate comment body
      */
-    if (!body || typeof body !== "string" || !body.trim()) {
-      errors.push({
-        field: "body",
-        message: "invalid input",
-        in: "body",
-      });
+    if (body !== undefined) {
+      if (typeof body !== "string" || !body.trim()) {
+        errors.push({
+          field: "body",
+          message: "invalid input",
+          in: "body",
+        });
+      }
     }
 
     /**

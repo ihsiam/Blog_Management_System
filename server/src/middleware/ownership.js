@@ -1,6 +1,8 @@
-const articleService = require("../lib/articles");
-const commentService = require("../lib/comments");
-const { forbidden, unauthorized } = require("../utils/error");
+const mongoose = require("mongoose");
+const articleServices = require("../lib/articles");
+const commentServices = require("../lib/comments");
+const userServices = require("../lib/user");
+const { forbidden, unauthorized, badRequest } = require("../utils/error");
 
 /**
  * Ownership-based authorization middleware.
@@ -26,11 +28,22 @@ const ownership =
         return next(forbidden("Resource ID is required"));
       }
 
+      // id validation
+      if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
+        throw badRequest([
+          {
+            field: "id",
+            message: "invalid input",
+            in: "params",
+          },
+        ]);
+      }
+
       /**
        * ARTICLE ownership check
        */
       if (model === "article") {
-        const isOwner = await articleService.checkOwner({
+        const isOwner = await articleServices.checkOwner({
           resourceId: req.params.id,
           userId: req.user.id,
           allowMissing: options.allowMissing,
@@ -42,7 +55,7 @@ const ownership =
         }
 
         // Admin override
-        if (req.user.role === "admin") {
+        if (req.user.role === "admin" && !options.allowMissing) {
           req.adminOverride = true;
           return next();
         }
@@ -56,7 +69,7 @@ const ownership =
        * COMMENT ownership check
        */
       if (model === "comment") {
-        const isOwner = await commentService.checkOwner({
+        const isOwner = await commentServices.checkOwner({
           resourceId: req.params.id,
           userId: req.user.id,
         });
@@ -74,6 +87,30 @@ const ownership =
 
         return next(
           forbidden("You do not have permission to access this comment"),
+        );
+      }
+
+      /**
+       * User ownership check
+       */
+      if (model === "user") {
+        const isOwner = await userServices.checkOwner({
+          resourceId: req.params.id,
+          userId: req.user.id,
+        });
+
+        // Allow access if user is owner
+        if (isOwner) {
+          return next();
+        }
+
+        // Allow admin access when needed
+        if (options.allowAdmin && req.user.role === "admin") {
+          return next();
+        }
+
+        return next(
+          forbidden("You do not have permission to access this user"),
         );
       }
 

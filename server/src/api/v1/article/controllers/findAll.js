@@ -68,7 +68,7 @@ const findAll = async (req, res, next) => {
     /**
      * Validate sort field
      */
-    if (typeof sortBy !== "string" || !sortBy.trim()) {
+    if (!["id", "title", "createdAt", "updatedAt"].includes(sortBy)) {
       errors.push({ field: "sort_by", message: "invalid input", in: "query" });
     }
 

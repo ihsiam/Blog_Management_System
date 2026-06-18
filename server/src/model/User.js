@@ -20,7 +20,7 @@ const UserSchema = new Schema(
     },
     status: {
       type: String,
-      enum: ["pending", "approved", "block", "declined"],
+      enum: ["pending", "approved", "blocked", "declined"],
       default: "pending",
     },
     refreshToken: {

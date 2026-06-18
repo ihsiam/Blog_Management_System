@@ -1,3 +1,4 @@
+const mongoose = require("mongoose");
 const defaults = require("../../../../config/defaults");
 const { badRequest } = require("../../../../utils/error");
 const commentServices = require("../../../../lib/comments");
@@ -29,6 +30,11 @@ const getArticleComments = async (req, res, next) => {
 
     // collect validation errors
     const errors = [];
+
+    // validate id
+    if (!articleID || !mongoose.Types.ObjectId.isValid(articleID)) {
+      errors.push({ field: "id", message: "invalid input", in: "params" });
+    }
 
     // page validation
     if (!Number.isFinite(page) || page < 1) {

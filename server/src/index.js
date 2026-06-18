@@ -1,47 +1,67 @@
+/**
+ * Application entry point.
+ *
+ * - Loading environment variables
+ * - Connecting to database
+ * - Starting HTTP server
+ * - Handling global process-level errors
+ */
+
 require("dotenv").config();
+
 const http = require("http");
 const { connectDB } = require("./db");
 const app = require("./app");
 
-// create server
+// create HTTP server instance from express app
 const server = http.createServer(app);
 
-// server port
-const PORT = process.env.PORT || 4000;
+// server port configuration
+const PORT = Number(process.env.PORT) || 4000;
 
-// Catch unhandled promise rejections
+/**
+ * Handle unhandled promise rejections
+ */
 process.on("unhandledRejection", (err) => {
-  console.log("Unhandled rejection: ", err);
+  console.log("Unhandled rejection:", err);
 });
 
-// Catch exceptions not handled by try/catch in sync code.
+/**
+ * Handle uncaught exceptions
+ */
 process.on("uncaughtException", (err) => {
-  console.log("Uncaught exception: ", err);
+  console.log("Uncaught exception:", err);
   process.exit(1);
 });
 
+/**
+ * Bootstrap function
+ */
 const main = async () => {
   try {
-    // connect db
+    // connect to database
     await connectDB();
 
-    // Handle server-level errors (e.g., port already in use)
+    /**
+     * Handle server-level errors (port already in use, permission issues, etc).
+     */
     server.on("error", (err) => {
-      console.error("Server failed to start: ", err);
+      console.error("Server failed to start:", err);
       process.exit(1);
     });
 
-    // run server
+    // start HTTP server
     server.listen(PORT, () => {
-      console.log("server is running");
-      console.log(`API documentation: http://localhost:${PORT}/docs`);
+      console.log("Server is running");
+      console.log(`API documentation: ${process.env.APP_URL}/docs`);
     });
   } catch (e) {
-    // catch error
+    // database connection failure handling
     console.log("DB Connection failed");
     console.log(e.message);
     process.exit(1);
   }
 };
 
+// start application
 main();

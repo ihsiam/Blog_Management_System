@@ -125,7 +125,7 @@ const setupAdmin = async (req, res, next) => {
         accessToken,
       },
       links: {
-        signin: "/api/v1/auth/sign-in",
+        "sign-in": "/api/v1/auth/sign-in",
       },
     });
   } catch (err) {

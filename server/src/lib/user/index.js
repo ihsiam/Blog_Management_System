@@ -127,8 +127,7 @@ const createUserByAdmin = async ({ name, email, password }) => {
   const userData = user.toObject();
 
   delete userData.password;
-  delete userData.role;
-  delete userData.status;
+  delete userData.refreshToken;
 
   return userData;
 };
@@ -241,7 +240,10 @@ const getSingleUser = async ({ id, expand = "" }) => {
 
   // expand comments
   if (TrimmedExpand.includes("comments")) {
-    await user.populate({ path: "comments", select: "body status -author" });
+    await user.populate({
+      path: "comments",
+      select: "body status article -author",
+    });
   }
 
   return user.toObject();
@@ -269,7 +271,7 @@ const updateUser = async ({ id, name, role, status }) => {
     id,
     { $set: payload },
     { new: true, runValidators: true },
-  ).select("-password");
+  ).select("-password -refreshToken");
 
   // if user not found
   if (!user) throw notFound();
@@ -317,6 +319,26 @@ const deleteItem = async (id) => {
   return !!result;
 };
 
+/**
+ * Checks ownership of user.
+ *
+ * @param {Object} params
+ * @param {string} params.resourceId - user ID (from params)
+ * @param {string} params.userId - User ID
+ *
+ * @returns {Promise<boolean>} Ownership result
+ * @throws {Error} NotFound if user does not exist
+ */
+const checkOwner = async ({ resourceId, userId }) => {
+  const user = await User.findById(resourceId);
+
+  if (!user) {
+    throw notFound();
+  }
+
+  return user.id.toString() === userId.toString();
+};
+
 module.exports = {
   userExist,
   adminExist,
@@ -334,4 +356,5 @@ module.exports = {
   updatePassword,
   deleteItem,
   findAuthUserById,
+  checkOwner,
 };

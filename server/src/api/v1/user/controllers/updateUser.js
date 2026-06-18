@@ -1,3 +1,4 @@
+const mongoose = require("mongoose");
 const { badRequest } = require("../../../../utils/error");
 const userServices = require("../../../../lib/user");
 
@@ -29,7 +30,7 @@ const updateUser = async (req, res, next) => {
     const errors = [];
 
     // id validation
-    if (!id || typeof id !== "string") {
+    if (!id || !mongoose.Types.ObjectId.isValid(id)) {
       errors.push({ field: "id", message: "invalid input", in: "params" });
     }
 
@@ -40,12 +41,10 @@ const updateUser = async (req, res, next) => {
 
     // role validation
     if (role !== undefined) {
-      const allowedRoles = ["user", "admin"];
-
       if (
         typeof role !== "string" ||
         !role.trim() ||
-        !allowedRoles.includes(role)
+        !["user", "admin"].includes(role)
       ) {
         errors.push({ field: "role", message: "invalid input", in: "body" });
       }

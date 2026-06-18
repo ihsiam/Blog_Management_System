@@ -1,15 +1,26 @@
+/**
+ * Main Express application setup.
+ *
+ * Configures global middleware, routes, health check,
+ * 404 handler, and centralized error handler.
+ */
+
 const express = require("express");
 const applyMiddleware = require("./middleware");
 const routes = require("./routes");
 const { notFound } = require("./utils/error");
 
-// express app
+// create express app instance
 const app = express();
 
-// apply global middlewares
+/**
+ * Apply global middlewares
+ */
 applyMiddleware(app);
 
-// API health
+/**
+ * Health check endpoint
+ */
 app.get("/health", (req, res) => {
   res.status(200).json({
     status: "ok",
@@ -17,20 +28,27 @@ app.get("/health", (req, res) => {
   });
 });
 
-// routing
+/**
+ * Application routes
+ */
 app.use(routes);
 
-// not found routes
+/**
+ * Handle undefined routes (404)
+ */
 app.use((_req, _res, next) => next(notFound("Requested resource not found")));
 
-// error handling
+/**
+ * Global error handler
+ */
 app.use((err, _req, res, _next) => {
-  // status code
+  // fallback status code
   const statusCode = err.statusCode || 500;
 
+  // log full error internally (debugging purpose)
   console.log(err);
 
-  // response
+  // structured error response
   res.status(statusCode).json({
     code: statusCode,
     error: err.error || "Internal server error",

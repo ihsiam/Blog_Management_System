@@ -1,3 +1,4 @@
+const mongoose = require("mongoose");
 const { badRequest } = require("../../../../utils/error");
 const serviceRegistry = require("../../../../lib/service registry");
 
@@ -18,17 +19,12 @@ const deleteUser = async (req, res, next) => {
     // extract user id from request params
     const { id } = req.params;
 
-    // validation errors
-    const errors = [];
-
     // id validation
-    if (!id || typeof id !== "string") {
-      errors.push({ field: "id", message: "invalid input", in: "params" });
-    }
-
-    // throw validation error if any
-    if (errors.length) {
-      throw badRequest(errors, "invalid input");
+    if (!id || !mongoose.Types.ObjectId.isValid(id)) {
+      throw badRequest(
+        [{ field: "id", message: "invalid input", in: "params" }],
+        "invalid input",
+      );
     }
 
     // delete user and related credentials

@@ -1,3 +1,4 @@
+const mongoose = require("mongoose");
 const { badRequest } = require("../../../../utils/error");
 const commentService = require("../../../../lib/comments");
 
@@ -19,7 +20,7 @@ const deleteComment = async (req, res, next) => {
     const { id } = req.params;
 
     // validate comment id
-    if (!id || typeof id !== "string" || !id.trim()) {
+    if (!id || !mongoose.Types.ObjectId.isValid(id)) {
       throw badRequest(
         [{ field: "id", message: "invalid input", in: "params" }],
         "invalid input",

@@ -1,3 +1,4 @@
+const mongoose = require("mongoose");
 const { badRequest } = require("../../../../utils/error");
 const userServices = require("../../../../lib/user");
 
@@ -26,7 +27,7 @@ const getSingleUser = async (req, res, next) => {
     const errors = [];
 
     // validate user id
-    if (!id || typeof id !== "string") {
+    if (!id || !mongoose.Types.ObjectId.isValid(id)) {
       errors.push({ field: "id", message: "invalid input", in: "params" });
     }
 
