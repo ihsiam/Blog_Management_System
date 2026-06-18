@@ -1,0 +1,21 @@
+FROM node:20-alpine
+
+WORKDIR /app
+
+# Enable Corepack so Yarn 4 works
+RUN corepack enable
+
+# Copy package manager files first
+COPY package.json yarn.lock ./
+COPY .yarnrc.yml ./
+COPY .yarn ./.yarn
+
+# Install dependencies
+RUN yarn install --immutable
+
+# Copy the rest of the application
+COPY . .
+
+EXPOSE 4000
+
+CMD ["yarn", "dev"]
