@@ -42,7 +42,7 @@ const getCommentByArticle = async ({
   status,
 }) => {
   // check if article exists
-  const article = await articleServices.findArticleById(articleID);
+  const article = await articleServices.findSingleItem({ id: articleID });
 
   if (!article) {
     throw notFound();
@@ -110,7 +110,7 @@ const createComment = async ({
   author,
 }) => {
   // validate article exists
-  const article = await articleServices.findArticleById(articleID);
+  const article = await articleServices.findSingleItem({ id: articleID });
 
   if (!article) {
     throw badRequest(

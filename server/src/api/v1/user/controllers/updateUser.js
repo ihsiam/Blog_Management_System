@@ -52,7 +52,7 @@ const updateUser = async (req, res, next) => {
 
     // status validation
     if (status !== undefined) {
-      const allowedStatus = ["pending", "approved", "block", "declined"];
+      const allowedStatus = ["pending", "approved", "blocked", "declined"];
 
       if (
         typeof status !== "string" ||
