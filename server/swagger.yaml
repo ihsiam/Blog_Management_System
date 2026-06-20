@@ -1781,6 +1781,9 @@ components:
               error:
                 type: string
                 example: Bad request
+              correlationId:
+                type: string
+                example: 1781953113407
               message:
                 type: string
                 example: Validation failed
@@ -1814,6 +1817,9 @@ components:
               error:
                 type: string
                 example: Internal server error
+              correlationId:
+                type: string
+                example: 1781953113407
               message:
                 type: string
                 example: We are sorry for the inconvenience. Please try again later.
@@ -1832,6 +1838,9 @@ components:
               error:
                 type: string
                 example: Unauthorized
+              correlationId:
+                type: string
+                example: 1781953113407
               message:
                 type: string
                 example: Unauthorized.
@@ -1850,6 +1859,9 @@ components:
               error:
                 type: string
                 example: Forbidden
+              correlationId:
+                type: string
+                example: 1781953113407
               message:
                 type: string
                 example: You do not have permission.
@@ -1868,6 +1880,9 @@ components:
               error:
                 type: string
                 example: Not found
+              correlationId:
+                type: string
+                example: 1781953113407
               message:
                 type: string
                 example: Requested resource not found

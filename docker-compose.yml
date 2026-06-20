@@ -2,7 +2,7 @@ services:
   server:
     build:
       context: ./server
-      dockerfile: Dockerfile
+      dockerfile: dockerfile
     container_name: blog-management-server
     ports:
       - "4000:4000"
@@ -12,8 +12,10 @@ services:
       PORT: 4000
       APP_URL: http://localhost:4000
       DB_URL: mongodb://mongo:27017/Blog_Management_System
+      ELASTIC_URL: http://elasticsearch:9200
     depends_on:
       - mongo
+      - elasticsearch
     volumes:
       - ./server:/app
       - /app/node_modules
@@ -27,5 +29,29 @@ services:
     volumes:
       - mongo_data:/data/db
 
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:8.13.0
+    container_name: blog-management-es
+    environment:
+      - discovery.type=single-node
+      - xpack.security.enabled=false
+      - ES_JAVA_OPTS=-Xms512m -Xmx512m
+    ports:
+      - "9200:9200"
+      - "9300:9300"
+    volumes:
+      - es_data:/usr/share/elasticsearch/data
+
+  kibana:
+    image: docker.elastic.co/kibana/kibana:8.13.0
+    container_name: blog-management-kibana
+    ports:
+      - "5601:5601"
+    environment:
+      - ELASTICSEARCH_HOSTS=http://elasticsearch:9200
+    depends_on:
+      - elasticsearch
+
 volumes:
   mongo_data:
+  es_data:
