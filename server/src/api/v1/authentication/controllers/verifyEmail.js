@@ -38,7 +38,7 @@ const verifyEmail = async (req, res, next) => {
     /**
      * Prevent duplicate account activation
      */
-    if (user.status === "approved") {
+    if (user.status !== "pending") {
       throw badRequest(
         [
           {

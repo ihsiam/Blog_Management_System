@@ -24,6 +24,7 @@ const PORT = Number(process.env.PORT) || 4000;
  */
 process.on("unhandledRejection", (err) => {
   console.log("Unhandled rejection:", err);
+  process.exit(1);
 });
 
 /**

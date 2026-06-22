@@ -1,4 +1,4 @@
-const { badRequest, forbidden, notFound } = require("../../../../utils/error");
+const { badRequest } = require("../../../../utils/error");
 const userServices = require("../../../../lib/user");
 const tokenServices = require("../../../../lib/token");
 const emailService = require("../../../../lib/email");
@@ -14,10 +14,6 @@ const emailService = require("../../../../lib/email");
  * @param {Function} next - Express error handler middleware
  *
  * @returns {Promise<void>} Sends confirmation response
- *
- * @throws {Error} BadRequest if email is invalid
- * @throws {Error} NotFound if user does not exist
- * @throws {Error} Forbidden if account is not allowed to reset password
  */
 const forgotPassword = async (req, res, next) => {
   try {
@@ -53,51 +49,57 @@ const forgotPassword = async (req, res, next) => {
      */
     const user = await userServices.findUserByEmail(email);
 
-    if (!user) {
-      throw notFound("User not found");
+    /**
+     * Always return a generic response to prevent user enumeration
+     */
+    const responseMessage =
+      "If this email is registered, you will receive a password reset link.";
+
+    if (user) {
+      /**
+       * Restrict password reset for declined accounts
+       */
+      if (user.status === "declined") {
+        return res.status(200).json({
+          code: 200,
+          message: responseMessage,
+        });
+      }
+
+      /**
+       * Build JWT payload for reset token
+       */
+      const payload = {
+        id: user.id,
+        role: user.role,
+        email: user.email,
+      };
+
+      /**
+       * Generate password reset token
+       */
+      const resetToken = tokenServices.generateActiveResetToken(payload);
+
+      /**
+       * Construct password reset URL
+       */
+      const resetUrl = `${process.env.APP_URL}/api/v1/auth/reset-password/${resetToken}`;
+
+      /**
+       * Send password reset email
+       */
+      await emailService.sendMail({
+        email: user.email,
+        subject: "Reset your password",
+        text: `Hello ${user.name},\n\nPlease reset your password using the link below:\n${resetUrl}`,
+      });
     }
 
     /**
-     * Restrict password reset for declined accounts
-     */
-    if (user.status === "declined") {
-      throw forbidden("Your registration has been declined");
-    }
-
-    /**
-     * Build JWT payload for reset token
-     */
-    const payload = {
-      id: user.id,
-      role: user.role,
-      email: user.email,
-    };
-
-    /**
-     * Generate password reset token
-     */
-    const resetToken = tokenServices.generateActiveResetToken(payload);
-
-    /**
-     * Construct password reset URL
-     */
-    const resetUrl = `${process.env.APP_URL}/api/v1/auth/reset-password/${resetToken}`;
-
-    /**
-     * Send password reset email
-     */
-    await emailService.sendMail({
-      email,
-      subject: "Reset your password",
-      text: `Hello ${user.name},\n\nPlease reset your password using the link below:\n${resetUrl}`,
-    });
-
-    /**
-     * Response
-     */
+     * Response     */
     return res.status(200).json({
       code: 200,
-      message: "Password reset email sent",
+      message: responseMessage,
     });
   } catch (err) {
     return next(err);

@@ -29,7 +29,7 @@ const register = async ({ name, email, password }) => {
   // Hash password before persistence
   const hashPassword = await hashing.generateHash(password);
 
-  return await userServices.createUser({
+  return userServices.createUser({
     name,
     email,
     password: hashPassword,
