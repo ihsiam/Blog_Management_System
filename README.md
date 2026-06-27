@@ -131,8 +131,8 @@ Blog Management System/
 1. Clone the repository:
 
 ```bash
-git clone <repository-url>
-cd "Blog Management System"
+git clone https://github.com/ihsiam/Blog_Management_System.git
+cd Blog_Management_System
 ```
 
 2. Create environment file from template:
@@ -213,27 +213,61 @@ http://localhost:4000/docs
 
 The OpenAPI spec lives in `server/swagger.yaml`.
 
-### Main Endpoints
+### System
 
-| Method | Endpoint | Description | Auth |
-|--------|----------|-------------|------|
-| POST | `/api/v1/auth/setup-admin` | Create initial admin | Public |
-| POST | `/api/v1/auth/sign-up` | Register new user | Public |
-| POST | `/api/v1/auth/sign-in` | Login | Public |
-| POST | `/api/v1/auth/logout` | Logout | Required |
-| POST | `/api/v1/auth/refresh` | Refresh access token | Cookie |
-| GET | `/api/v1/auth/verify-email/:token` | Verify email | Public |
-| POST | `/api/v1/auth/forgot-password` | Request password reset | Public |
-| PATCH | `/api/v1/auth/reset-password/:token` | Reset password | Public |
+| Method | Endpoint | Description | Access |
+|--------|----------|-------------|--------|
+| GET | `/health` | Health check | Public |
+| GET | `/docs` | Swagger API documentation | Public |
+
+### Authentication
+
+| Method | Endpoint | Description | Access |
+|--------|----------|-------------|--------|
+| POST | `/api/v1/auth/setup-admin` | Create the initial system admin (one-time only) | Public (rate limited) |
+| POST | `/api/v1/auth/sign-up` | Register a new user account | Public (rate limited) |
+| GET | `/api/v1/auth/verify-email/:token` | Verify email and activate account | Public |
+| POST | `/api/v1/auth/resend-verification` | Resend account verification email | Public |
+| POST | `/api/v1/auth/sign-in` | Login and receive access token | Public (rate limited) |
+| POST | `/api/v1/auth/refresh` | Refresh access token using refresh cookie | Public (cookie) |
+| POST | `/api/v1/auth/logout` | Logout and invalidate session | Authenticated |
+| POST | `/api/v1/auth/forgot-password` | Request password reset email | Public |
+| PATCH | `/api/v1/auth/reset-password/:token` | Reset password using reset token | Public |
+
+### Articles
+
+| Method | Endpoint | Description | Access |
+|--------|----------|-------------|--------|
 | GET | `/api/v1/articles` | List published articles | Public |
-| POST | `/api/v1/articles` | Create article | User / Admin |
-| GET | `/api/v1/articles/:id` | Get single article | Public |
-| PATCH | `/api/v1/articles/:id` | Update article | Owner / Admin |
-| DELETE | `/api/v1/articles/:id` | Delete article | Owner / Admin |
-| GET | `/api/v1/articles/all` | List all articles (admin) | Admin |
-| GET/POST | `/api/v1/articles/:id/comments` | Article comments | Mixed |
-| GET/POST | `/api/v1/comments` | Comment management | Admin |
-| GET/POST | `/api/v1/users` | User management | Admin |
+| POST | `/api/v1/articles` | Create a new article | User, Admin |
+| GET | `/api/v1/articles/all` | List all articles (including drafts) | Admin |
+| GET | `/api/v1/articles/:id` | Get a single published article | Public |
+| PUT | `/api/v1/articles/:id` | Update an article, or create if ID does not exist | Owner, Admin |
+| PATCH | `/api/v1/articles/:id` | Partially update an article | Owner, Admin |
+| DELETE | `/api/v1/articles/:id` | Delete an article and its comments | Owner, Admin |
+| GET | `/api/v1/articles/:id/author` | Get the author of an article | Public |
+| GET | `/api/v1/articles/:id/comments` | List comments on an article | Public |
+| POST | `/api/v1/articles/:id/comments` | Post a comment on an article | User, Admin |
+
+### Comments
+
+| Method | Endpoint | Description | Access |
+|--------|----------|-------------|--------|
+| GET | `/api/v1/comments` | List all comments (admin panel) | Admin |
+| POST | `/api/v1/comments` | Create a comment (admin) | Admin |
+| PATCH | `/api/v1/comments/:id` | Update a comment | Owner, Admin |
+| DELETE | `/api/v1/comments/:id` | Delete a comment | Owner, Admin |
+
+### Users
+
+| Method | Endpoint | Description | Access |
+|--------|----------|-------------|--------|
+| GET | `/api/v1/users` | List all users | Admin |
+| POST | `/api/v1/users` | Create a user (auto-approved) | Admin |
+| GET | `/api/v1/users/:id` | Get a single user | Owner, Admin |
+| PATCH | `/api/v1/users/:id` | Update user (name, role, status) | Admin |
+| DELETE | `/api/v1/users/:id` | Delete user and related data | Admin |
+| PATCH | `/api/v1/users/:id/change-password` | Change user password | Owner, Admin |
 
 ## Authentication
 
@@ -276,6 +310,8 @@ The following features are **planned** and will be implemented incrementally:
 
 **Md Ismile Hosen Siam**
 
+- GitHub: [@ihsiam](https://github.com/ihsiam)
+- Repository: [Blog_Management_System](https://github.com/ihsiam/Blog_Management_System)
 - Email: ismile.20cse034@gstu.edu.bd
 
 ## License
