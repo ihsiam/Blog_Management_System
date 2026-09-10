@@ -7,16 +7,24 @@
   "scripts": {
     "start": "node ./src/index.js",
     "dev": "nodemon ./src/index.js",
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "jest",
+    "test:watch": "jest --watch"
   },
   "author": "",
   "license": "ISC",
+  "jest": {
+    "testEnvironment": "node",
+    "clearMocks": true,
+    "restoreMocks": true,
+    "verbose": true
+  },
   "devDependencies": {
     "eslint": "8.2.0",
     "eslint-config-airbnb-base": "15.0.0",
     "eslint-config-prettier": "^9.1.0",
     "eslint-plugin-import": "2.25.2",
     "eslint-plugin-prettier": "^5.1.3",
+    "jest": "^30.5.1",
     "nodemon": "^3.1.14",
     "prettier": "^3.2.5"
   },
