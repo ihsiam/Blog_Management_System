@@ -76,9 +76,7 @@ describe("error factory (src/utils/error)", () => {
     it("should use the given message", () => {
       const err = forbidden("You are not allowed to access this resource");
 
-      expect(err.message).toBe(
-        "You are not allowed to access this resource",
-      );
+      expect(err.message).toBe("You are not allowed to access this resource");
     });
   });
 

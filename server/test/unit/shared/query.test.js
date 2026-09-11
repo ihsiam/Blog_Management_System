@@ -7,7 +7,11 @@
  * file directly verifies their own branches/edge cases in isolation.
  */
 
-const { getPagination, transformData, hateOAS } = require("../../../src/utils/query");
+const {
+  getPagination,
+  transformData,
+  hateOAS,
+} = require("../../../src/utils/query");
 
 describe("query utilities (src/utils/query)", () => {
   describe("getPagination", () => {

@@ -8,9 +8,7 @@ const generateQueryString = require("../../../src/utils/queryString");
 
 describe("generateQueryString (src/utils/queryString)", () => {
   it("should build a query string from simple key-value pairs", () => {
-    expect(generateQueryString({ page: 1, limit: 10 })).toBe(
-      "page=1&limit=10",
-    );
+    expect(generateQueryString({ page: 1, limit: 10 })).toBe("page=1&limit=10");
   });
 
   it("should omit keys with null or undefined values", () => {

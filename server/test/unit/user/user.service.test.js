@@ -16,7 +16,8 @@ const createQueryChain = (result) => {
   chain.skip = jest.fn().mockReturnValue(chain);
   chain.limit = jest.fn().mockReturnValue(chain);
   chain.select = jest.fn().mockReturnValue(chain);
-  chain.then = (resolve, reject) => Promise.resolve(result).then(resolve, reject);
+  chain.then = (resolve, reject) =>
+    Promise.resolve(result).then(resolve, reject);
   chain.catch = (reject) => Promise.resolve(result).catch(reject);
   return chain;
 };
@@ -32,9 +33,7 @@ const createFakeUserDoc = (data) => {
   return doc;
 };
 
-const MockUserModel = jest.fn(function userModelCtor(data) {
-  return createFakeUserDoc(data);
-});
+const MockUserModel = jest.fn((data) => createFakeUserDoc(data));
 MockUserModel.find = jest.fn();
 MockUserModel.findOne = jest.fn();
 MockUserModel.findById = jest.fn();
@@ -233,7 +232,11 @@ describe("user service (src/lib/user)", () => {
       MockUserModel.mockImplementationOnce(() => failingDoc);
 
       await expect(
-        userService.createUser({ name: "Jane", email: "j@test.com", password: "x" }),
+        userService.createUser({
+          name: "Jane",
+          email: "j@test.com",
+          password: "x",
+        }),
       ).rejects.toThrow("save failed");
     });
   });
@@ -330,9 +333,9 @@ describe("user service (src/lib/user)", () => {
     it("should propagate the error when persisting the refresh token fails", async () => {
       MockUserModel.findByIdAndUpdate.mockRejectedValue(new Error("db down"));
 
-      await expect(
-        userService.saveRefreshToken("1", "token"),
-      ).rejects.toThrow("db down");
+      await expect(userService.saveRefreshToken("1", "token")).rejects.toThrow(
+        "db down",
+      );
     });
   });
 
@@ -478,7 +481,10 @@ describe("user service (src/lib/user)", () => {
       const chain = createQueryChain(doc);
       MockUserModel.findById.mockReturnValue(chain);
 
-      await userService.getSingleUser({ id: "1", expand: " articles , comments " });
+      await userService.getSingleUser({
+        id: "1",
+        expand: " articles , comments ",
+      });
 
       expect(doc.populate).toHaveBeenCalledTimes(2);
     });
@@ -501,7 +507,10 @@ describe("user service (src/lib/user)", () => {
       const chain = createQueryChain(updatedDoc);
       MockUserModel.findByIdAndUpdate.mockReturnValue(chain);
 
-      const result = await userService.updateUser({ id: "1", name: "New name" });
+      const result = await userService.updateUser({
+        id: "1",
+        name: "New name",
+      });
 
       expect(MockUserModel.findByIdAndUpdate).toHaveBeenCalledWith(
         "1",
@@ -622,7 +631,9 @@ describe("user service (src/lib/user)", () => {
 
   describe("deleteItem", () => {
     it("should return true when the user was deleted", async () => {
-      MockUserModel.findByIdAndDelete.mockResolvedValue(createFakeUserDoc({ id: "1" }));
+      MockUserModel.findByIdAndDelete.mockResolvedValue(
+        createFakeUserDoc({ id: "1" }),
+      );
 
       const result = await userService.deleteItem("1");
 
@@ -647,7 +658,9 @@ describe("user service (src/lib/user)", () => {
 
   describe("checkOwner", () => {
     it("should return true when the ids match", async () => {
-      MockUserModel.findById.mockResolvedValue(createFakeUserDoc({ id: "user-1" }));
+      MockUserModel.findById.mockResolvedValue(
+        createFakeUserDoc({ id: "user-1" }),
+      );
 
       const result = await userService.checkOwner({
         resourceId: "user-1",
@@ -658,7 +671,9 @@ describe("user service (src/lib/user)", () => {
     });
 
     it("should return false when the ids do not match", async () => {
-      MockUserModel.findById.mockResolvedValue(createFakeUserDoc({ id: "user-1" }));
+      MockUserModel.findById.mockResolvedValue(
+        createFakeUserDoc({ id: "user-1" }),
+      );
 
       const result = await userService.checkOwner({
         resourceId: "user-1",

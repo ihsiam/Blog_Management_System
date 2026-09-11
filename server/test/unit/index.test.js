@@ -149,10 +149,7 @@ describe("Application bootstrap (src/index.js)", () => {
       loadIndex();
       await flushPromises();
 
-      expect(mockServer.on).toHaveBeenCalledWith(
-        "error",
-        expect.any(Function),
-      );
+      expect(mockServer.on).toHaveBeenCalledWith("error", expect.any(Function));
     });
   });
 

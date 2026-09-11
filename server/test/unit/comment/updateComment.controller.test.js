@@ -145,7 +145,11 @@ describe("comments updateComment controller", () => {
     });
 
     it("should allow an admin updating their own comment to change status alongside the body", async () => {
-      mockUpdateComment.mockResolvedValue({ id: validId, body: "new", status: "hidden" });
+      mockUpdateComment.mockResolvedValue({
+        id: validId,
+        body: "new",
+        status: "hidden",
+      });
 
       const req = {
         params: { id: validId },

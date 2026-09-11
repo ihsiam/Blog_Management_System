@@ -39,7 +39,10 @@ describe("logout controller", () => {
     await logoutController(req, res, next);
 
     expect(next).toHaveBeenCalledWith(
-      expect.objectContaining({ statusCode: 401, message: "Already logged out" }),
+      expect.objectContaining({
+        statusCode: 401,
+        message: "Already logged out",
+      }),
     );
     expect(mockVerifyRefreshToken).not.toHaveBeenCalled();
   });

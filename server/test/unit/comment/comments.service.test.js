@@ -19,7 +19,8 @@ const createQueryChain = (result) => {
   chain.sort = jest.fn().mockReturnValue(chain);
   chain.skip = jest.fn().mockReturnValue(chain);
   chain.limit = jest.fn().mockReturnValue(chain);
-  chain.then = (resolve, reject) => Promise.resolve(result).then(resolve, reject);
+  chain.then = (resolve, reject) =>
+    Promise.resolve(result).then(resolve, reject);
   chain.catch = (reject) => Promise.resolve(result).catch(reject);
   return chain;
 };
@@ -39,9 +40,7 @@ const createFakeCommentDoc = (data) => {
   return doc;
 };
 
-const MockCommentModel = jest.fn(function commentModelCtor(data) {
-  return createFakeCommentDoc(data);
-});
+const MockCommentModel = jest.fn((data) => createFakeCommentDoc(data));
 MockCommentModel.find = jest.fn();
 MockCommentModel.findById = jest.fn();
 MockCommentModel.findByIdAndDelete = jest.fn();
@@ -284,7 +283,11 @@ describe("comment service (src/lib/comments)", () => {
     });
 
     it("should update both body and status when both are provided", async () => {
-      const doc = createFakeCommentDoc({ id: "c1", body: "old", status: "public" });
+      const doc = createFakeCommentDoc({
+        id: "c1",
+        body: "old",
+        status: "public",
+      });
       MockCommentModel.findById.mockResolvedValue(doc);
 
       const result = await commentService.updateComment({
@@ -329,9 +332,9 @@ describe("comment service (src/lib/comments)", () => {
     it("should reject when the comment does not exist", async () => {
       MockCommentModel.findByIdAndDelete.mockResolvedValue(null);
 
-      await expect(commentService.deleteItem("missing")).rejects.toMatchObject(
-        { statusCode: 404 },
-      );
+      await expect(commentService.deleteItem("missing")).rejects.toMatchObject({
+        statusCode: 404,
+      });
     });
 
     it("should propagate the error when deletion fails", async () => {
@@ -339,9 +342,7 @@ describe("comment service (src/lib/comments)", () => {
         new Error("db down"),
       );
 
-      await expect(commentService.deleteItem("c1")).rejects.toThrow(
-        "db down",
-      );
+      await expect(commentService.deleteItem("c1")).rejects.toThrow("db down");
     });
   });
 

@@ -146,7 +146,11 @@ describe("comments getComments controller", () => {
       expect(res.status).toHaveBeenCalledWith(200);
       const payload = res.json.mock.calls[0][0];
       expect(payload.data).toBe(comments);
-      expect(payload.pagination).toMatchObject({ page: 1, limit: 10, totalItems: 1 });
+      expect(payload.pagination).toMatchObject({
+        page: 1,
+        limit: 10,
+        totalItems: 1,
+      });
       expect(payload.links.self).toBe("/api/v1/comments");
       expect(next).not.toHaveBeenCalled();
     });

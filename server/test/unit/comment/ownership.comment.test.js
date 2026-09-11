@@ -16,7 +16,9 @@
  */
 
 const mockCheckOwner = jest.fn();
-jest.doMock("../../../src/lib/comments", () => ({ checkOwner: mockCheckOwner }));
+jest.doMock("../../../src/lib/comments", () => ({
+  checkOwner: mockCheckOwner,
+}));
 jest.doMock("../../../src/lib/articles", () => ({ checkOwner: jest.fn() }));
 jest.doMock("../../../src/lib/user", () => ({ checkOwner: jest.fn() }));
 

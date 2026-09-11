@@ -6,7 +6,9 @@
  */
 
 const mockDeleteItem = jest.fn();
-jest.doMock("../../../src/lib/comments", () => ({ deleteItem: mockDeleteItem }));
+jest.doMock("../../../src/lib/comments", () => ({
+  deleteItem: mockDeleteItem,
+}));
 
 const deleteCommentController = require("../../../src/api/v1/comments/controllers/deleteComment");
 const { createMockResponse } = require("../helpers/mockExpress");

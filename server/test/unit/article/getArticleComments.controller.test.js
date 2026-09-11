@@ -117,7 +117,11 @@ describe("article getArticleComments controller", () => {
         },
       ]);
       expect(payload.links.article).toBe(`/api/v1/articles/${validId}`);
-      expect(payload.pagination).toMatchObject({ page: 1, limit: 10, totalItems: 1 });
+      expect(payload.pagination).toMatchObject({
+        page: 1,
+        limit: 10,
+        totalItems: 1,
+      });
       expect(next).not.toHaveBeenCalled();
     });
 

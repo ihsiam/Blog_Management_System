@@ -45,9 +45,7 @@ describe("article findAll controller", () => {
       expect(mockFindAll).not.toHaveBeenCalled();
       const err = next.mock.calls[0][0];
       expect(err.data).toEqual(
-        expect.arrayContaining([
-          expect.objectContaining({ field: "page" }),
-        ]),
+        expect.arrayContaining([expect.objectContaining({ field: "page" })]),
       );
     });
 
@@ -85,9 +83,7 @@ describe("article findAll controller", () => {
       expect(mockFindAll).not.toHaveBeenCalled();
       const err = next.mock.calls[0][0];
       expect(err.data).toEqual(
-        expect.arrayContaining([
-          expect.objectContaining({ field: "sort_by" }),
-        ]),
+        expect.arrayContaining([expect.objectContaining({ field: "sort_by" })]),
       );
     });
   });

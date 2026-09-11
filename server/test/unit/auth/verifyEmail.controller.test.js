@@ -98,7 +98,10 @@ describe("verifyEmail controller", () => {
 
     await verifyEmailController(buildRequest("valid-token"), res, next);
 
-    expect(mockUpdateUser).toHaveBeenCalledWith({ id: "1", status: "approved" });
+    expect(mockUpdateUser).toHaveBeenCalledWith({
+      id: "1",
+      status: "approved",
+    });
     expect(mockSaveRefreshToken).toHaveBeenCalledWith("1", "refresh-token");
     expect(res.cookie).toHaveBeenCalledWith("refreshToken", "refresh-token", {
       httpOnly: true,

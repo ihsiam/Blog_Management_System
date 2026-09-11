@@ -65,9 +65,9 @@ describe("service registry - article-related orchestration", () => {
     it("should reject when the article does not exist", async () => {
       mockFindArticleById.mockResolvedValue(null);
 
-      await expect(serviceRegistry.deleteArticle("missing")).rejects.toMatchObject(
-        { statusCode: 404 },
-      );
+      await expect(
+        serviceRegistry.deleteArticle("missing"),
+      ).rejects.toMatchObject({ statusCode: 404 });
       expect(mockCommentDeleteMany).not.toHaveBeenCalled();
       expect(mockDeleteItem).not.toHaveBeenCalled();
     });
@@ -184,9 +184,9 @@ describe("service registry - article-related orchestration", () => {
         Object.assign(new Error("Article not found"), { statusCode: 404 }),
       );
 
-      await expect(serviceRegistry.getArticleAuthor("missing")).rejects.toMatchObject(
-        { statusCode: 404 },
-      );
+      await expect(
+        serviceRegistry.getArticleAuthor("missing"),
+      ).rejects.toMatchObject({ statusCode: 404 });
       expect(mockFindUserById).not.toHaveBeenCalled();
     });
   });

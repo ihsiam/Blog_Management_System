@@ -6,10 +6,16 @@ const { ElasticsearchTransport } = require("winston-elasticsearch");
 const { combine, timestamp, json } = format;
 
 /**
- * Ensure log directories exist before writing logs
+ * Ensure log directories exist before writing logs.
+ * Skipped under Jest — the workspace `logs/` tree is often root-owned
+ * (Docker), and creating DailyRotateFile against it throws uncaught EACCES.
  */
-fs.mkdirSync("logs/info", { recursive: true });
-fs.mkdirSync("logs/error", { recursive: true });
+const isJest = process.env.JEST_WORKER_ID !== undefined;
+
+if (!isJest) {
+  fs.mkdirSync("logs/info", { recursive: true });
+  fs.mkdirSync("logs/error", { recursive: true });
+}
 
 /**
  * Console transport (used mainly for development/debugging)
@@ -37,30 +43,35 @@ const fileTransport = (level, filename) =>
   });
 
 /**
- * Elasticsearch transport for centralized logging
+ * Build the transport list. File + Elasticsearch transports are omitted
+ * under Jest so integration/unit workers never open root-owned log files
+ * or leave ES connection-pool handles around.
  */
-const elasticSearchTransport = new ElasticsearchTransport({
-  level: "http",
-  clientOpts: {
-    node: process.env.ELASTIC_URL || "http://localhost:9200",
-  },
-  indexPrefix: "blog-management-logs",
-  indexSuffixPattern: "YYYY-MM-DD",
-});
+const loggerTransports = [consoleTransport];
+
+if (!isJest) {
+  loggerTransports.push(
+    fileTransport("info", "logs/info/info-%DATE%.log"),
+    fileTransport("error", "logs/error/error-%DATE%.log"),
+    new ElasticsearchTransport({
+      level: "http",
+      clientOpts: {
+        node: process.env.ELASTIC_URL || "http://localhost:9200",
+      },
+      indexPrefix: "blog-management-logs",
+      indexSuffixPattern: "YYYY-MM-DD",
+    }),
+  );
+}
 
 /**
  * Main application logger instance
  * - Console logs (dev)
- * - Rotating file logs (info/error separation)
- * - Elasticsearch logs (centralized monitoring)
+ * - Rotating file logs (info/error separation) — non-Jest only
+ * - Elasticsearch logs (centralized monitoring) — non-Jest only
  */
 const logger = createLogger({
-  transports: [
-    consoleTransport,
-    fileTransport("info", "logs/info/info-%DATE%.log"),
-    fileTransport("error", "logs/error/error-%DATE%.log"),
-    elasticSearchTransport,
-  ],
+  transports: loggerTransports,
 });
 
 module.exports = logger;

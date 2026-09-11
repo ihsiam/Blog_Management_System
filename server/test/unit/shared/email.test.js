@@ -28,9 +28,9 @@ describe("email service (src/lib/email)", () => {
 
   describe("input validation", () => {
     it("should reject when the email address is missing", async () => {
-      await expect(
-        sendMail({ subject: "Hi", text: "body" }),
-      ).rejects.toThrow("Missing required email fields (email, subject, text)");
+      await expect(sendMail({ subject: "Hi", text: "body" })).rejects.toThrow(
+        "Missing required email fields (email, subject, text)",
+      );
       expect(mockSendMail).not.toHaveBeenCalled();
     });
 

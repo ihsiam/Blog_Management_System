@@ -67,7 +67,10 @@ describe("user changePassword controller", () => {
     });
 
     it("should reject a new password shorter than 8 characters", async () => {
-      const req = buildRequest({ oldPassword: "old-pass", newPassword: "short" });
+      const req = buildRequest({
+        oldPassword: "old-pass",
+        newPassword: "short",
+      });
 
       await changePasswordController(req, res, next);
 
@@ -100,7 +103,10 @@ describe("user changePassword controller", () => {
     });
 
     it("should reject when the old password is incorrect", async () => {
-      mockFindAuthUserById.mockResolvedValue({ id: validId, password: "hashed" });
+      mockFindAuthUserById.mockResolvedValue({
+        id: validId,
+        password: "hashed",
+      });
       mockCompareHash.mockResolvedValue(false);
 
       const req = buildRequest({
@@ -120,7 +126,10 @@ describe("user changePassword controller", () => {
     });
 
     it("should update the password when the old password matches", async () => {
-      mockFindAuthUserById.mockResolvedValue({ id: validId, password: "hashed" });
+      mockFindAuthUserById.mockResolvedValue({
+        id: validId,
+        password: "hashed",
+      });
       mockCompareHash.mockResolvedValue(true);
       mockUpdatePassword.mockResolvedValue({ id: validId });
 
@@ -145,7 +154,10 @@ describe("user changePassword controller", () => {
 
   describe("dependency failures", () => {
     it("should propagate the error when persisting the new password fails", async () => {
-      mockFindAuthUserById.mockResolvedValue({ id: validId, password: "hashed" });
+      mockFindAuthUserById.mockResolvedValue({
+        id: validId,
+        password: "hashed",
+      });
       mockCompareHash.mockResolvedValue(true);
       const dbError = new Error("db down");
       mockUpdatePassword.mockRejectedValue(dbError);

@@ -342,7 +342,9 @@ describe("authentication service (src/lib/authentication)", () => {
       mockVerifyRefreshToken.mockReturnValue(decodedPayload);
       mockFindAuthUserById.mockResolvedValue(null);
 
-      await expect(authService.refreshToken("current-refresh-token")).rejects.toMatchObject({
+      await expect(
+        authService.refreshToken("current-refresh-token"),
+      ).rejects.toMatchObject({
         statusCode: 401,
         error: "Unauthorized",
         message: "Invalid refresh token",
@@ -356,7 +358,9 @@ describe("authentication service (src/lib/authentication)", () => {
         status: "blocked",
       });
 
-      await expect(authService.refreshToken("current-refresh-token")).rejects.toMatchObject({
+      await expect(
+        authService.refreshToken("current-refresh-token"),
+      ).rejects.toMatchObject({
         statusCode: 403,
         error: "Forbidden",
         message: "Account is not active",
@@ -371,7 +375,9 @@ describe("authentication service (src/lib/authentication)", () => {
       });
       mockSaveRefreshToken.mockResolvedValue(undefined);
 
-      await expect(authService.refreshToken("current-refresh-token")).rejects.toMatchObject({
+      await expect(
+        authService.refreshToken("current-refresh-token"),
+      ).rejects.toMatchObject({
         statusCode: 401,
         error: "Unauthorized",
         message: "Refresh token is invalid or revoked",

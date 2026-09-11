@@ -20,7 +20,8 @@ const createQueryChain = (result) => {
   chain.skip = jest.fn().mockReturnValue(chain);
   chain.limit = jest.fn().mockReturnValue(chain);
   chain.select = jest.fn().mockReturnValue(chain);
-  chain.then = (resolve, reject) => Promise.resolve(result).then(resolve, reject);
+  chain.then = (resolve, reject) =>
+    Promise.resolve(result).then(resolve, reject);
   chain.catch = (reject) => Promise.resolve(result).catch(reject);
   return chain;
 };
@@ -41,9 +42,7 @@ const createFakeArticleDoc = (data) => {
   return doc;
 };
 
-const MockArticleModel = jest.fn(function articleModelCtor(data) {
-  return createFakeArticleDoc(data);
-});
+const MockArticleModel = jest.fn((data) => createFakeArticleDoc(data));
 MockArticleModel.find = jest.fn();
 MockArticleModel.findById = jest.fn();
 MockArticleModel.findByIdAndDelete = jest.fn();
@@ -125,7 +124,8 @@ describe("article service (src/lib/articles)", () => {
 
     it("should propagate the error when the query fails", async () => {
       const chain = createQueryChain(null);
-      chain.then = (_resolve, reject) => Promise.reject(new Error("db down")).catch(reject);
+      chain.then = (_resolve, reject) =>
+        Promise.reject(new Error("db down")).catch(reject);
       MockArticleModel.find.mockReturnValue(chain);
 
       await expect(articleService.findAll({})).rejects.toThrow("db down");
@@ -217,7 +217,10 @@ describe("article service (src/lib/articles)", () => {
 
       await expect(
         articleService.findSingleItem({ id: "missing" }),
-      ).rejects.toMatchObject({ statusCode: 404, message: "Article not found" });
+      ).rejects.toMatchObject({
+        statusCode: 404,
+        message: "Article not found",
+      });
     });
 
     it("should reject when the article is not published", async () => {
@@ -226,7 +229,10 @@ describe("article service (src/lib/articles)", () => {
 
       await expect(
         articleService.findSingleItem({ id: "1" }),
-      ).rejects.toMatchObject({ statusCode: 404, message: "Article not found" });
+      ).rejects.toMatchObject({
+        statusCode: 404,
+        message: "Article not found",
+      });
     });
 
     it("should populate the author when expand includes 'author'", async () => {
@@ -245,9 +251,7 @@ describe("article service (src/lib/articles)", () => {
       const doc = createFakeArticleDoc({
         id: "1",
         status: "published",
-        comments: [
-          { id: "c1", body: "hi", status: "public", article: "1" },
-        ],
+        comments: [{ id: "c1", body: "hi", status: "public", article: "1" }],
       });
       MockArticleModel.findById.mockResolvedValue(doc);
 
@@ -271,7 +275,10 @@ describe("article service (src/lib/articles)", () => {
       });
       MockArticleModel.findById.mockResolvedValue(doc);
 
-      await articleService.findSingleItem({ id: "1", expand: " author , comments " });
+      await articleService.findSingleItem({
+        id: "1",
+        expand: " author , comments ",
+      });
 
       expect(doc.populate).toHaveBeenCalledWith(
         expect.objectContaining({ path: "author" }),
@@ -284,9 +291,9 @@ describe("article service (src/lib/articles)", () => {
     it("should propagate the error when the lookup fails", async () => {
       MockArticleModel.findById.mockRejectedValue(new Error("db down"));
 
-      await expect(
-        articleService.findSingleItem({ id: "1" }),
-      ).rejects.toThrow("db down");
+      await expect(articleService.findSingleItem({ id: "1" })).rejects.toThrow(
+        "db down",
+      );
     });
   });
 
