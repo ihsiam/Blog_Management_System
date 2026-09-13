@@ -1,174 +1,182 @@
 # Blog Management System
 
-A RESTful backend API for managing blog posts, comments, and users. Built with Node.js, Express, and MongoDB, featuring JWT-based authentication, role-based access control (RBAC), structured logging, and Docker support for local development.
+A REST API for managing blog articles, comments, users, and authentication in a modular Node.js backend. The project uses Express, MongoDB, JWT-based auth, structured logging, and Docker-based infrastructure for local development.
 
-> **Note:** This repository currently contains the **API server only**.
+## Overview
 
-## Table of Contents
+This repository contains a complete backend service for a blog platform. It supports:
 
-- [Features](#features)
-- [Tech Stack](#tech-stack)
-- [Architecture](#architecture)
-- [Project Structure](#project-structure)
-- [Prerequisites](#prerequisites)
-- [Getting Started](#getting-started)
-- [Environment Variables](#environment-variables)
-- [API Documentation](#api-documentation)
-- [Authentication](#authentication)
-- [User Roles](#user-roles)
-- [Roadmap](#roadmap)
-- [Author](#author)
-
-## Features
-
-### Currently Implemented
-
-- **Authentication**
-  - User registration with email verification
-  - Login / logout with JWT access and refresh tokens
-  - Token refresh via HTTP-only cookies
-  - Password reset via email
-  - One-time initial admin setup (`/api/v1/auth/setup-admin`)
-  - Rate limiting on sensitive auth endpoints
-
-- **Articles**
-  - Create, read, update, and delete blog posts
-  - Public listing of published articles with pagination, sorting, and search
-  - Admin view for all articles (including drafts)
-  - Ownership-based access control
-
-- **Comments**
-  - Post comments on articles
-  - Update and delete own comments
-  - Admin moderation (list, hide, delete)
-
-- **User Management**
-  - Admin CRUD for users
-  - User status workflow: `pending` → `approved` / `blocked` / `declined`
-  - Password change endpoint
-  - Cascade delete (removes user's articles and comments)
-
-- **Infrastructure**
-  - Centralized error handling with correlation IDs
-  - Winston logging with daily file rotation
-  - Elasticsearch + Kibana for log aggregation
-  - Swagger/OpenAPI documentation at `/docs`
-  - Health check endpoint at `/health`
-  - Docker Compose stack (API, MongoDB, Elasticsearch, Kibana)
-
-## Tech Stack
-
-| Layer | Technology |
-|-------|------------|
-| Runtime | Node.js 20 |
-| Framework | Express 4 |
-| Database | MongoDB 7 (Mongoose) |
-| Auth | JWT (jsonwebtoken) + bcryptjs |
-| Email | Nodemailer |
-| Logging | Winston, express-winston, Elasticsearch |
-| API Docs | Swagger UI (yamljs) |
-| Package Manager | Yarn 4 |
-| Containerization | Docker, Docker Compose |
-
-## Architecture
-
-```
-HTTP Request
-    ↓
-Routes          →  URL mapping, middleware chain
-    ↓
-Controllers     →  Request validation, HTTP responses
-    ↓
-Services (lib)  →  Business logic
-    ↓
-Models          →  Mongoose schemas & database access
-```
-
-Middleware stack:
-
-- CORS, JSON parsing, cookie parser
-- Correlation ID (`x-correlation-id`)
-- Request / error logging (Winston)
-- JWT authentication
-- Role authorization (`admin`, `user`)
-- Resource ownership checks
+- User registration and email verification
+- JWT access and refresh token flows
+- Role-based authorization for admin and user access
+- Article CRUD with ownership checks
+- Comment management on articles
+- Admin user management
+- Swagger/OpenAPI documentation
+- Dockerized local stack with MongoDB replica set and Elasticsearch/Kibana
 
 ## Project Structure
 
-```
+```text
 Blog Management System/
-├── docker-compose.yml       # Full stack: server, mongo, elasticsearch, kibana
-├── docs/                    # SRS, ER diagram, DFD, use case diagrams
-└── server/
-    ├── default.env          # Environment variable template
-    ├── dockerfile
-    ├── swagger.yaml         # OpenAPI specification
-    └── src/
-        ├── index.js         # Entry point
-        ├── app.js           # Express app setup
-        ├── api/v1/          # Controllers (auth, article, comment, user)
-        ├── config/          # Default values (pagination, etc.)
-        ├── db/              # MongoDB connection
-        ├── lib/             # Business logic / services
-        ├── middleware/      # Auth, authorize, ownership, logging
-        ├── model/           # Mongoose models (User, Article, Comment)
-        ├── routes/          # Route definitions
-        └── utils/           # Errors, hashing, query helpers, logger
+├── .github/                  # GitHub workflow or automation files
+├── docs/                     # Project documents and design assets
+├── mongo-init/               # MongoDB replica initialization script
+├── server/                   # Application source code and runtime config
+│   ├── coverage/             # Generated test coverage reports
+│   ├── logs/                 # Winston log output files
+│   ├── src/                  # Main application source
+│   │   ├── api/v1/           # Route controllers by module
+│   │   │   ├── article/
+│   │   │   ├── authentication/
+│   │   │   ├── comments/
+│   │   │   └── user/
+│   │   ├── config/           # Default app config values
+│   │   ├── db/               # MongoDB connection logic
+│   │   ├── lib/              # Business logic/services
+│   │   │   ├── articles/
+│   │   │   ├── authentication/
+│   │   │   ├── comments/
+│   │   │   ├── email/
+│   │   │   ├── token/
+│   │   │   └── user/
+│   │   ├── middleware/       # Auth, authorization, ownership, logging
+│   │   ├── model/            # Mongoose schemas and model definitions
+│   │   ├── routes/           # API route registration
+│   │   ├── utils/            # Shared helpers, logger, hashing, errors
+│   │   ├── app.js            # Express app setup
+│   │   ├── index.js          # Bootstraps the app and DB connection
+│   │   └── ...
+│   ├── test/                 # Unit and integration tests
+│   │   ├── unit/
+│   │   └── integration/
+│   ├── default.env           # Template for environment variables
+│   ├── dockerfile            # Server container definition
+│   ├── jest.integration.config.js
+│   ├── package.json          # Scripts and dependencies
+│   ├── swagger.yaml          # OpenAPI definition
+│   └── yarn.lock             # Dependency lock file
+├── docker-compose.yml       # Full local stack orchestration
+├── README.md                # Project documentation
+└── .gitignore               # Git ignore rules
 ```
+
+## Tech Stack
+
+| Layer                | Technology                         |
+| -------------------- | ---------------------------------- |
+| Runtime              | Node.js                            |
+| Framework            | Express.js                         |
+| Database             | MongoDB with Mongoose              |
+| Auth                 | JWT, bcryptjs                      |
+| Email                | Nodemailer                         |
+| Validation & Routing | Express middleware and controllers |
+| Logging              | Winston, express-winston           |
+| Search/Logs          | Elasticsearch + Kibana             |
+| Docs                 | Swagger UI                         |
+| Testing              | Jest + Supertest                   |
+| Containerization     | Docker + Docker Compose            |
+| Package Manager      | Yarn 4                             |
+
+## Features
+
+### Authentication
+
+- User registration with email verification
+- Login and logout with access/refresh token flow
+- Password reset and email verification support
+- Admin bootstrap endpoint for first-time setup
+- Rate-limited auth endpoints
+- Middleware-based JWT authentication and authorization
+
+### Articles
+
+- Create, read, update, and delete articles
+- Public article listing and public single-item lookup
+- Admin-only article listing including drafts
+- Ownership checks for article modification and deletion
+- Comment association on article routes
+
+### Comments
+
+- Add comments to articles
+- Update and delete own comments
+- Admin access for list and moderation operations
+
+### Users
+
+- Admin user management
+- User profile retrieval with role-aware access
+- Password change support
+- Account management and relationship cleanup on delete
+
+### Infrastructure
+
+- Centralized error handling
+- Correlation IDs for request tracing
+- Daily rotating log files
+- Optional Elasticsearch log aggregation
+- Containerized MongoDB replica set setup
+- Swagger endpoint for API exploration
 
 ## Prerequisites
 
-- [Node.js](https://nodejs.org/) 20+
-- [Yarn](https://yarnpkg.com/) 4+ (Corepack enabled)
-- [Docker](https://www.docker.com/) & Docker Compose (optional, recommended)
-- MongoDB (if running without Docker)
-- SMTP credentials for email (registration, password reset)
+Before starting the service, make sure you have:
+
+- Node.js 18+ or newer
+- Yarn 4+
+- Docker and Docker Compose
+- MongoDB (if running outside Docker)
+- SMTP credentials for email-based flows
 
 ## Getting Started
 
 ### Option 1: Docker Compose (Recommended)
 
-1. Clone the repository:
+1. Clone the repository
 
 ```bash
 git clone https://github.com/ihsiam/Blog_Management_System.git
 cd Blog_Management_System
 ```
 
-2. Create environment file from template:
+2. Create your environment file
 
 ```bash
 cp server/default.env server/.env
 ```
 
-3. Fill in the required values in `server/.env` (see [Environment Variables](#environment-variables)).
+3. Fill in the required values in `server/.env`
 
-4. Start all services:
+4. Start the full stack
 
 ```bash
 docker compose up --build
 ```
 
-5. Verify the server is running:
+5. Access the running services:
 
-- API: [http://localhost:4000](http://localhost:4000)
-- Health: [http://localhost:4000/health](http://localhost:4000/health)
-- Swagger docs: [http://localhost:4000/docs](http://localhost:4000/docs)
-- Kibana: [http://localhost:5601](http://localhost:5601)
-- MongoDB: `localhost:27018`
+- API: http://localhost:4000
+- Health check: http://localhost:4000/health
+- Swagger docs: http://localhost:4000/docs
+- MongoDB: localhost:27017, 27018, 27019
+- Elasticsearch: http://localhost:9200
+- Kibana: http://localhost:5601
 
-### Option 2: Local Development (without Docker)
+### Option 2: Local Development
 
-1. Install dependencies:
+1. Install dependencies
 
 ```bash
 cd server
 yarn install
 ```
 
-2. Start MongoDB locally and set `DB_URL` in `.env`.
+2. Create a local `.env` file based on `default.env`
 
-3. Run the development server:
+3. Start MongoDB locally or use an available database connection
+
+4. Run the app in development mode
 
 ```bash
 yarn dev
@@ -182,92 +190,140 @@ yarn start
 
 ## Environment Variables
 
-Copy `server/default.env` to `server/.env` and configure:
+The project ships with a template in `server/default.env`. Copy it into a `.env` file before running the app.
 
-| Variable | Description | Example |
-|----------|-------------|---------|
-| `PORT` | Server port | `4000` |
-| `APP_URL` | Public base URL (used in email links) | `http://localhost:4000` |
-| `DB_URL` | MongoDB connection string | `mongodb://localhost:27017/Blog_Management_System` |
-| `SALT_ROUNDS` | bcrypt salt rounds | `10` |
-| `JWT_ACCESS_SECRET` | Secret for access tokens | Random secure string |
-| `JWT_REFRESH_SECRET` | Secret for refresh tokens | Random secure string |
-| `JWT_ACTIVE_RESET_SECRET` | Secret for email/reset tokens | Random secure string |
-| `JWT_ACCESS_EXPIRES` | Access token lifetime | `15m` |
-| `JWT_REFRESH_EXPIRES` | Refresh token lifetime | `7d` |
-| `JWT_ACTIVE_RESET_EXPIRES` | Activation/reset token lifetime | `5m` |
-| `EMAIL_SERVICE` | Nodemailer service name | `gmail` |
-| `EMAIL_USER` | SMTP email address | `your@gmail.com` |
-| `EMAIL_PASSWORD` | SMTP password / app password | `your-app-password` |
-| `ELASTIC_URL` | Elasticsearch URL (for logging) | `http://localhost:9200` |
+```env
+PORT=
+APP_URL=
 
-> **Security:** Never commit `.env` files. Use strong, unique secrets for each JWT variable in production.
+SALT_ROUNDS=
 
-## API Documentation
+JWT_ACCESS_SECRET=
+JWT_REFRESH_SECRET=
+JWT_ACTIVE_RESET_SECRET=
 
-Interactive Swagger UI is available at:
+JWT_ACCESS_EXPIRES=
+JWT_REFRESH_EXPIRES=
+JWT_ACTIVE_RESET_EXPIRES=
 
-```
-http://localhost:4000/docs
+EMAIL_SERVICE=
+EMAIL_USER=
+EMAIL_PASSWORD=
 ```
 
-The OpenAPI spec lives in `server/swagger.yaml`.
+Additional runtime settings used by Docker:
 
-### System
+- `DB_URL` used by the app when running in compose
+- `ELASTIC_URL` set to `http://elasticsearch:9200` in Docker
 
-| Method | Endpoint | Description | Access |
-|--------|----------|-------------|--------|
-| GET | `/health` | Health check | Public |
-| GET | `/docs` | Swagger API documentation | Public |
+> Never commit real secrets to version control. Use secure values for JWT secrets and email credentials in production.
+
+## API Overview
+
+The API is grouped under `/api/v1` and uses JSON responses.
+
+### Health and Docs
+
+| Method | Endpoint  | Description              |
+| ------ | --------- | ------------------------ |
+| GET    | `/health` | Server health check      |
+| GET    | `/docs`   | Swagger UI documentation |
 
 ### Authentication
 
-| Method | Endpoint | Description | Access |
-|--------|----------|-------------|--------|
-| POST | `/api/v1/auth/setup-admin` | Create the initial system admin (one-time only) | Public (rate limited) |
-| POST | `/api/v1/auth/sign-up` | Register a new user account | Public (rate limited) |
-| GET | `/api/v1/auth/verify-email/:token` | Verify email and activate account | Public |
-| POST | `/api/v1/auth/resend-verification` | Resend account verification email | Public |
-| POST | `/api/v1/auth/sign-in` | Login and receive access token | Public (rate limited) |
-| POST | `/api/v1/auth/refresh` | Refresh access token using refresh cookie | Public (cookie) |
-| POST | `/api/v1/auth/logout` | Logout and invalidate session | Authenticated |
-| POST | `/api/v1/auth/forgot-password` | Request password reset email | Public |
-| PATCH | `/api/v1/auth/reset-password/:token` | Reset password using reset token | Public |
+| Method | Endpoint                             | Description                           |
+| ------ | ------------------------------------ | ------------------------------------- |
+| POST   | `/api/v1/auth/setup-admin`           | Create the initial admin user         |
+| POST   | `/api/v1/auth/sign-up`               | Register a new user                   |
+| GET    | `/api/v1/auth/verify-email/:token`   | Verify email address                  |
+| POST   | `/api/v1/auth/resend-verification`   | Resend verification email             |
+| POST   | `/api/v1/auth/sign-in`               | Sign in and receive tokens            |
+| POST   | `/api/v1/auth/refresh`               | Refresh access token                  |
+| POST   | `/api/v1/auth/logout`                | Logout the current authenticated user |
+| POST   | `/api/v1/auth/forgot-password`       | Request password reset email          |
+| PATCH  | `/api/v1/auth/reset-password/:token` | Reset password using token            |
 
 ### Articles
 
-| Method | Endpoint | Description | Access |
-|--------|----------|-------------|--------|
-| GET | `/api/v1/articles` | List published articles | Public |
-| POST | `/api/v1/articles` | Create a new article | User, Admin |
-| GET | `/api/v1/articles/all` | List all articles (including drafts) | Admin |
-| GET | `/api/v1/articles/:id` | Get a single published article | Public |
-| PUT | `/api/v1/articles/:id` | Update an article, or create if ID does not exist | Owner, Admin |
-| PATCH | `/api/v1/articles/:id` | Partially update an article | Owner, Admin |
-| DELETE | `/api/v1/articles/:id` | Delete an article and its comments | Owner, Admin |
-| GET | `/api/v1/articles/:id/author` | Get the author of an article | Public |
-| GET | `/api/v1/articles/:id/comments` | List comments on an article | Public |
-| POST | `/api/v1/articles/:id/comments` | Post a comment on an article | User, Admin |
+| Method | Endpoint                        | Description                  |
+| ------ | ------------------------------- | ---------------------------- |
+| GET    | `/api/v1/articles`              | List published articles      |
+| POST   | `/api/v1/articles`              | Create article               |
+| GET    | `/api/v1/articles/all`          | List all articles for admins |
+| GET    | `/api/v1/articles/:id`          | Get a specific article       |
+| PUT    | `/api/v1/articles/:id`          | Update or create article     |
+| PATCH  | `/api/v1/articles/:id`          | Partially update article     |
+| DELETE | `/api/v1/articles/:id`          | Delete article               |
+| GET    | `/api/v1/articles/:id/author`   | Get article author           |
+| GET    | `/api/v1/articles/:id/comments` | List comments on article     |
+| POST   | `/api/v1/articles/:id/comments` | Add comment to article       |
 
 ### Comments
 
-| Method | Endpoint | Description | Access |
-|--------|----------|-------------|--------|
-| GET | `/api/v1/comments` | List all comments (admin panel) | Admin |
-| POST | `/api/v1/comments` | Create a comment (admin) | Admin |
-| PATCH | `/api/v1/comments/:id` | Update a comment | Owner, Admin |
-| DELETE | `/api/v1/comments/:id` | Delete a comment | Owner, Admin |
+| Method | Endpoint               | Description                 |
+| ------ | ---------------------- | --------------------------- |
+| GET    | `/api/v1/comments`     | List comments (admin only)  |
+| POST   | `/api/v1/comments`     | Create comment (admin only) |
+| PATCH  | `/api/v1/comments/:id` | Update comment              |
+| DELETE | `/api/v1/comments/:id` | Delete comment              |
 
 ### Users
 
-| Method | Endpoint | Description | Access |
-|--------|----------|-------------|--------|
-| GET | `/api/v1/users` | List all users | Admin |
-| POST | `/api/v1/users` | Create a user (auto-approved) | Admin |
-| GET | `/api/v1/users/:id` | Get a single user | Owner, Admin |
-| PATCH | `/api/v1/users/:id` | Update user (name, role, status) | Admin |
-| DELETE | `/api/v1/users/:id` | Delete user and related data | Admin |
-| PATCH | `/api/v1/users/:id/change-password` | Change user password | Owner, Admin |
+| Method | Endpoint                            | Description              |
+| ------ | ----------------------------------- | ------------------------ |
+| GET    | `/api/v1/users`                     | List users (admin only)  |
+| POST   | `/api/v1/users`                     | Create user (admin only) |
+| GET    | `/api/v1/users/:id`                 | Get single user          |
+| PATCH  | `/api/v1/users/:id`                 | Update user (admin only) |
+| DELETE | `/api/v1/users/:id`                 | Delete user (admin only) |
+| PATCH  | `/api/v1/users/:id/change-password` | Change password          |
+
+## Testing
+
+Run unit tests:
+
+```bash
+cd server
+yarn test
+```
+
+Run integration tests:
+
+```bash
+cd server
+yarn test:integration
+```
+
+## Notes
+
+- The root project orchestrates the full stack through Docker Compose.
+- The backend server itself lives under the `server/` folder.
+- The app uses MongoDB replica sets in Docker for multi-node local database setup.
+- Elastic and Kibana are included for centralized log monitoring but are optional depending on the environment.
+
+## Repository Status
+
+This project is currently a backend-first blog management service, with the API server and supporting infrastructure in place for local development and deployment.
+
+### Comments
+
+| Method | Endpoint               | Description                     | Access       |
+| ------ | ---------------------- | ------------------------------- | ------------ |
+| GET    | `/api/v1/comments`     | List all comments (admin panel) | Admin        |
+| POST   | `/api/v1/comments`     | Create a comment (admin)        | Admin        |
+| PATCH  | `/api/v1/comments/:id` | Update a comment                | Owner, Admin |
+| DELETE | `/api/v1/comments/:id` | Delete a comment                | Owner, Admin |
+
+### Users
+
+| Method | Endpoint                            | Description                      | Access       |
+| ------ | ----------------------------------- | -------------------------------- | ------------ |
+| GET    | `/api/v1/users`                     | List all users                   | Admin        |
+| POST   | `/api/v1/users`                     | Create a user (auto-approved)    | Admin        |
+| GET    | `/api/v1/users/:id`                 | Get a single user                | Owner, Admin |
+| PATCH  | `/api/v1/users/:id`                 | Update user (name, role, status) | Admin        |
+| DELETE | `/api/v1/users/:id`                 | Delete user and related data     | Admin        |
+| PATCH  | `/api/v1/users/:id/change-password` | Change user password             | Owner, Admin |
 
 ## Authentication
 
@@ -288,20 +344,17 @@ New users start with `pending` status until they verify their email.
 
 ## User Roles
 
-| Role | Permissions |
-|------|-------------|
-| **user** | Create/edit/delete own articles and comments |
+| Role      | Permissions                                            |
+| --------- | ------------------------------------------------------ |
+| **user**  | Create/edit/delete own articles and comments           |
 | **admin** | Full access — manage all users, articles, and comments |
 
 ## Roadmap
 
 The following features are **planned** and will be implemented incrementally:
 
-- [ ] Automated testing (unit & integration)
-- [ ] CI/CD pipeline (GitHub Actions)
 - [ ] Response caching (Redis)
 - [ ] Load balancing
-- [ ] MongoDB replication
 - [ ] Security hardening (`helmet`, stricter CORS)
 
 > Swagger descriptions may reference some of these planned capabilities. The README and this roadmap reflect the **current** state of the project honestly.

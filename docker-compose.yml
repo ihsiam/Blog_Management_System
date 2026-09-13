@@ -1,8 +1,6 @@
 services:
   server:
-    build:
-      context: ./server
-      dockerfile: dockerfile
+    image: mdismilehosensiam/blog_management_system:latest
     container_name: blog-management-server
     ports:
       - "4000:4000"
