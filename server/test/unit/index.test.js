@@ -21,6 +21,11 @@
 const mockConnectDB = jest.fn();
 jest.doMock("../../src/db", () => ({ connectDB: mockConnectDB }));
 
+const mockConnectRedis = jest.fn();
+jest.doMock("../../src/config/redis", () => ({
+  connectRedis: mockConnectRedis,
+}));
+
 const mockApp = jest.fn();
 jest.doMock("../../src/app", () => mockApp);
 
@@ -67,6 +72,7 @@ describe("Application bootstrap (src/index.js)", () => {
     delete process.env.APP_URL;
 
     mockConnectDB.mockReset().mockResolvedValue(undefined);
+    mockConnectRedis.mockReset().mockResolvedValue(undefined);
 
     mockServer = {
       listen: jest.fn((_port, cb) => {
@@ -109,6 +115,19 @@ describe("Application bootstrap (src/index.js)", () => {
       await flushPromises();
 
       expect(mockConnectDB).toHaveBeenCalledTimes(1);
+    });
+
+    it("connects to Redis after the database and before starting the server", async () => {
+      loadIndex();
+      await flushPromises();
+
+      expect(mockConnectRedis).toHaveBeenCalledTimes(1);
+      expect(mockConnectDB.mock.invocationCallOrder[0]).toBeLessThan(
+        mockConnectRedis.mock.invocationCallOrder[0],
+      );
+      expect(mockConnectRedis.mock.invocationCallOrder[0]).toBeLessThan(
+        mockServer.listen.mock.invocationCallOrder[0],
+      );
     });
 
     it("starts listening on the configured PORT", async () => {
@@ -192,6 +211,21 @@ describe("Application bootstrap (src/index.js)", () => {
 
       expect(logSpy).toHaveBeenCalledWith("DB Connection failed");
       expect(logSpy).toHaveBeenCalledWith(dbError.message);
+      expect(exitSpy).toHaveBeenCalledWith(1);
+    });
+  });
+
+  describe("Redis connection failure", () => {
+    it("does not start the HTTP server when Redis connection fails", async () => {
+      const redisError = new Error("REDIS_UNAVAILABLE");
+      mockConnectRedis.mockReset().mockRejectedValue(redisError);
+
+      loadIndex();
+      await flushPromises();
+
+      expect(mockServer.listen).not.toHaveBeenCalled();
+      expect(logSpy).toHaveBeenCalledWith("DB Connection failed");
+      expect(logSpy).toHaveBeenCalledWith(redisError.message);
       expect(exitSpy).toHaveBeenCalledWith(1);
     });
   });
