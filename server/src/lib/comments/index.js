@@ -1,6 +1,25 @@
 const defaults = require("../../config/defaults");
 const Comment = require("../../model/Comment");
 const { notFound } = require("../../utils/error");
+const { getCache, setCache, deleteCachePattern } = require("../../utils/cache");
+
+const ARTICLE_COMMENTS_TTL_SECONDS = 60;
+
+/**
+ * Drops public comment lists and article payloads that embed comments.
+ *
+ * @param {string} articleId - Article ID
+ * @returns {Promise<void>}
+ */
+const invalidateArticleCommentCaches = async (articleId) => {
+  if (!articleId) {
+    return;
+  }
+
+  const id = articleId.toString();
+  await deleteCachePattern(`article:${id}:comments:*`);
+  await deleteCachePattern(`article:${id}:expand:*`);
+};
 
 /**
  * Fetch comments for a specific article.
@@ -23,6 +42,15 @@ const getCommentsByArticle = async ({
   limit = defaults.limit,
   status,
 }) => {
+  const commentsCacheKey = `article:${articleID}:comments:${page}:${limit}`;
+
+  if (status === "public") {
+    const cached = await getCache(commentsCacheKey);
+    if (cached !== null) {
+      return cached;
+    }
+  }
+
   // build filter
   const filter = { article: articleID };
 
@@ -36,7 +64,13 @@ const getCommentsByArticle = async ({
     .skip(page * limit - limit)
     .limit(limit);
 
-  return comments.map((comment) => comment.toObject());
+  const result = comments.map((comment) => comment.toObject());
+
+  if (status === "public") {
+    await setCache(commentsCacheKey, result, ARTICLE_COMMENTS_TTL_SECONDS);
+  }
+
+  return result;
 };
 
 /**
@@ -91,6 +125,15 @@ const getAllComments = async ({
  * @returns {Promise<number>} Total count
  */
 const count = async ({ article, status }) => {
+  const countCacheKey = `article:${article}:comments:count`;
+
+  if (article && status === "public") {
+    const cached = await getCache(countCacheKey);
+    if (cached !== null) {
+      return cached;
+    }
+  }
+
   // build filter
   const filter = {};
 
@@ -102,7 +145,13 @@ const count = async ({ article, status }) => {
     filter.status = status;
   }
 
-  return await Comment.countDocuments(filter);
+  const total = await Comment.countDocuments(filter);
+
+  if (article && status === "public") {
+    await setCache(countCacheKey, total, ARTICLE_COMMENTS_TTL_SECONDS);
+  }
+
+  return total;
 };
 
 /**
@@ -130,6 +179,8 @@ const create = async ({
   });
 
   await comment.save();
+
+  await invalidateArticleCommentCaches(articleID);
 
   return comment.toObject();
 };
@@ -159,6 +210,8 @@ const updateComment = async ({ id, body, status }) => {
 
   await comment.save();
 
+  await invalidateArticleCommentCaches(comment.article);
+
   return comment.toObject();
 };
 
@@ -176,6 +229,8 @@ const deleteItem = async (id) => {
   if (!comment) {
     throw notFound();
   }
+
+  await invalidateArticleCommentCaches(comment.article);
 
   return !!comment;
 };

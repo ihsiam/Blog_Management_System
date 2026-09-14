@@ -1,6 +1,36 @@
 const Article = require("../../model/Article");
 const defaults = require("../../config/defaults");
 const { notFound, badRequest } = require("../../utils/error");
+const {
+  getCache,
+  setCache,
+  deleteCache,
+  deleteCachePattern,
+} = require("../../utils/cache");
+
+const ARTICLE_LIST_TTL_SECONDS = 60;
+const ARTICLE_TTL_SECONDS = 300;
+
+/**
+ * Drops public article list and count keys.
+ *
+ * @returns {Promise<void>}
+ */
+const invalidatePublishedArticleLists = async () => {
+  await deleteCachePattern("article:list:*");
+  await deleteCachePattern("article:count:*");
+};
+
+/**
+ * Drops single-article keys (exact author key + expand variants).
+ *
+ * @param {string} id - Article ID
+ * @returns {Promise<void>}
+ */
+const invalidateArticleResource = async (id) => {
+  await deleteCache(`article:${id}:author`);
+  await deleteCachePattern(`article:${id}:expand:*`);
+};
 
 /**
  * Retrieves paginated articles with optional filtering.
@@ -23,6 +53,15 @@ const findAll = async ({
   searchTerm = defaults.searchTerm,
   status,
 }) => {
+  const listCacheKey = `article:list:${page}:${limit}:${sortBy}:${sortType}:${searchTerm}`;
+
+  if (status === "published") {
+    const cached = await getCache(listCacheKey);
+    if (cached !== null) {
+      return cached;
+    }
+  }
+
   const sortKey = `${sortType === "desc" ? "-" : ""}${sortBy}`;
 
   // build query filter
@@ -41,7 +80,13 @@ const findAll = async ({
     .skip(page * limit - limit)
     .limit(limit);
 
-  return articles.map((article) => article.toObject());
+  const result = articles.map((article) => article.toObject());
+
+  if (status === "published") {
+    await setCache(listCacheKey, result, ARTICLE_LIST_TTL_SECONDS);
+  }
+
+  return result;
 };
 
 /**
@@ -54,6 +99,15 @@ const findAll = async ({
  * @returns {Promise<number>}
  */
 const count = async ({ searchTerm = "", status }) => {
+  const countCacheKey = `article:count:${searchTerm}`;
+
+  if (status === "published") {
+    const cached = await getCache(countCacheKey);
+    if (cached !== null) {
+      return cached;
+    }
+  }
+
   // build query filter
   const filter = {
     title: { $regex: searchTerm, $options: "i" },
@@ -64,7 +118,13 @@ const count = async ({ searchTerm = "", status }) => {
   }
 
   // count and return
-  return Article.countDocuments(filter);
+  const total = await Article.countDocuments(filter);
+
+  if (status === "published") {
+    await setCache(countCacheKey, total, ARTICLE_LIST_TTL_SECONDS);
+  }
+
+  return total;
 };
 
 /**
@@ -90,6 +150,8 @@ const create = async ({
 
   await article.save();
 
+  await invalidatePublishedArticleLists();
+
   return article.toObject();
 };
 
@@ -107,6 +169,13 @@ const findSingleItem = async ({ id, expand = "" }) => {
     .split(",")
     .map((item) => item.trim())
     .filter(Boolean);
+  const expandKey = [...trimmedExpand].sort().join(",");
+  const cacheKey = `article:${id}:expand:${expandKey}`;
+
+  const cached = await getCache(cacheKey);
+  if (cached !== null) {
+    return cached;
+  }
 
   const article = await Article.findById(id);
 
@@ -145,6 +214,9 @@ const findSingleItem = async ({ id, expand = "" }) => {
       return rest;
     });
   }
+
+  await setCache(cacheKey, obj, ARTICLE_TTL_SECONDS);
+
   return obj;
 };
 
@@ -184,6 +256,9 @@ const updateOrCreate = async (
 
   await article.save();
 
+  await invalidateArticleResource(id);
+  await invalidatePublishedArticleLists();
+
   return { article: article.toObject(), statusCode: 200 };
 };
 
@@ -211,6 +286,9 @@ const updateItemPatch = async (id, { title, body, cover, status }) => {
   // save into DB
   await article.save();
 
+  await invalidateArticleResource(id);
+  await invalidatePublishedArticleLists();
+
   return article.toObject();
 };
 
@@ -220,7 +298,16 @@ const updateItemPatch = async (id, { title, body, cover, status }) => {
  * @param {string} id
  * @returns {Promise<Object>}
  */
-const deleteItem = (id) => Article.findByIdAndDelete(id);
+const deleteItem = async (id) => {
+  const deleted = await Article.findByIdAndDelete(id);
+
+  if (deleted) {
+    await invalidateArticleResource(id);
+    await invalidatePublishedArticleLists();
+  }
+
+  return deleted;
+};
 
 /**
  * Deletes multiple articles based on filter.
@@ -230,6 +317,11 @@ const deleteItem = (id) => Article.findByIdAndDelete(id);
  */
 const deleteMany = async (filter) => {
   const result = await Article.deleteMany(filter);
+
+  if (result) {
+    await invalidatePublishedArticleLists();
+  }
+
   return !!result;
 };
 

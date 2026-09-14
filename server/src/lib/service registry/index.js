@@ -3,6 +3,14 @@ const articleServices = require("../articles");
 const UserServices = require("../user");
 const { notFound, badRequest } = require("../../utils/error");
 const defaults = require("../../config/defaults");
+const {
+  getCache,
+  setCache,
+  deleteCache,
+  deleteCachePattern,
+} = require("../../utils/cache");
+
+const ARTICLE_AUTHOR_TTL_SECONDS = 300;
 
 /**
  * Delete an article and all related data (comments)
@@ -23,7 +31,15 @@ const deleteArticle = async (id) => {
   await commentServices.deleteMany({ article: article.id });
 
   // delete article itself
-  return articleServices.deleteItem(id);
+  const deleted = await articleServices.deleteItem(id);
+
+  await deleteCache(`article:${id}:author`);
+  await deleteCachePattern(`article:${id}:expand:*`);
+  await deleteCachePattern(`article:${id}:comments:*`);
+  await deleteCachePattern("article:list:*");
+  await deleteCachePattern("article:count:*");
+
+  return deleted;
 };
 
 /**
@@ -134,11 +150,21 @@ const createComment = async ({
  * @param {string} articleID
  */
 const getArticleAuthor = async (articleID) => {
+  const cacheKey = `article:${articleID}:author`;
+  const cached = await getCache(cacheKey);
+  if (cached !== null) {
+    return cached;
+  }
+
   // find article
   const article = await articleServices.findSingleItem({ id: articleID });
 
   // find author
   const user = await UserServices.findUserById(article.author);
+
+  if (user) {
+    await setCache(cacheKey, user, ARTICLE_AUTHOR_TTL_SECONDS);
+  }
 
   return user;
 };
@@ -170,6 +196,12 @@ const deleteUser = async (id) => {
 
   // delete user
   await UserServices.deleteItem(id);
+
+  await deleteCachePattern("article:list:*");
+  await deleteCachePattern("article:count:*");
+  await deleteCachePattern("article:*:author");
+  await deleteCachePattern("article:*:expand:*");
+  await deleteCachePattern("article:*:comments:*");
 
   return true;
 };

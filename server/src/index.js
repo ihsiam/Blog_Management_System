@@ -2,7 +2,7 @@
  * Application entry point.
  *
  * - Loading environment variables
- * - Connecting to database
+ * - Connecting to database and Redis
  * - Starting HTTP server
  * - Handling global process-level errors
  */
@@ -11,6 +11,7 @@ require("dotenv").config();
 
 const http = require("http");
 const { connectDB } = require("./db");
+const { connectRedis } = require("./config/redis");
 const app = require("./app");
 
 // create HTTP server instance from express app
@@ -43,6 +44,9 @@ const main = async () => {
     // connect to database
     await connectDB();
 
+    // connect to Redis (cache-aside store)
+    await connectRedis();
+
     /**
      * Handle server-level errors (port already in use, permission issues, etc).
      */
@@ -57,7 +61,7 @@ const main = async () => {
       console.log(`API documentation: ${process.env.APP_URL}/docs`);
     });
   } catch (e) {
-    // database connection failure handling
+    // database / Redis connection failure handling
     console.log("DB Connection failed");
     console.log(e.message);
     process.exit(1);

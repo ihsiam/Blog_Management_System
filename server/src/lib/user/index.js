@@ -2,6 +2,7 @@ const User = require("../../model/User");
 const { badRequest, notFound } = require("../../utils/error");
 const { hashing } = require("../../utils");
 const defaults = require("../../config/defaults");
+const { deleteCachePattern } = require("../../utils/cache");
 
 /**
  * Find user by email
@@ -275,6 +276,13 @@ const updateUser = async ({ id, name, role, status }) => {
 
   // if user not found
   if (!user) throw notFound();
+
+  if (name !== undefined) {
+    await deleteCachePattern("article:list:*");
+    await deleteCachePattern("article:*:author");
+    await deleteCachePattern("article:*:expand:*");
+    await deleteCachePattern("article:*:comments:*");
+  }
 
   return user.toObject();
 };
