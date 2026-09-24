@@ -1,5 +1,8 @@
 services:
   server:
+    build:
+      context: ./server
+      dockerfile: dockerfile
     image: mdismilehosensiam/blog_management_system:latest
     container_name: blog-management-server
     ports:
@@ -11,7 +14,7 @@ services:
       APP_URL: http://localhost:4000
       DB_URL: mongodb://mongo1:27017,mongo2:27017,mongo3:27017/Blog_Management_System?replicaSet=rs0
       ELASTIC_URL: http://elasticsearch:9200
-      REDIS_URL: redis://:${REDIS_PASSWORD}@redis:6379
+      REDIS_URL: redis://redis:6379
     depends_on:
       mongo1:
         condition: service_started
@@ -97,15 +100,13 @@ services:
   redis:
     image: redis:7-alpine
     container_name: blog-management-redis
-    env_file:
-      - ./server/.env
-    command: ["sh", "-c", "redis-server --requirepass \"$$REDIS_PASSWORD\""]
+    command: ["redis-server"]
     ports:
       - "6379:6379"
     volumes:
       - redis_data:/data
     healthcheck:
-      test: ["CMD-SHELL", "redis-cli -a \"$$REDIS_PASSWORD\" ping"]
+      test: ["CMD", "redis-cli", "ping"]
       interval: 10s
       timeout: 5s
       retries: 5
