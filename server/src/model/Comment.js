@@ -9,19 +9,30 @@ const CommentSchema = new Schema(
       enum: ["public", "hidden"],
       default: "public",
     },
-    article: {
+    article_id: {
       type: Schema.Types.ObjectId,
       ref: "Article",
       required: true,
     },
-    author: {
+    author_id: {
       type: Schema.Types.ObjectId,
       ref: "User",
       required: true,
     },
+    parent_comment_id: {
+      type: Schema.Types.ObjectId,
+      ref: "Comment",
+      default: null,
+    },
   },
   schemaOptions,
 );
+
+// Indexes
+CommentSchema.index({ article_id: 1 });
+CommentSchema.index({ author_id: 1 });
+CommentSchema.index({ parent_comment_id: 1 });
+CommentSchema.index({ status: 1 });
 
 const Comment = model("Comment", CommentSchema);
 
