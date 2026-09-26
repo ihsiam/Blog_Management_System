@@ -27,7 +27,7 @@ process.env.JWT_ACCESS_EXPIRES = process.env.JWT_ACCESS_EXPIRES || "15m";
 process.env.JWT_REFRESH_EXPIRES = process.env.JWT_REFRESH_EXPIRES || "7d";
 process.env.JWT_ACTIVE_RESET_EXPIRES =
   process.env.JWT_ACTIVE_RESET_EXPIRES || "5m";
-process.env.APP_URL = process.env.APP_URL || "http://localhost:4000";
+process.env.APP_URL = process.env.APP_URL || "http://localhost:3000";
 // Low cost factor keeps bcrypt-heavy Auth flows fast in CI/local runs.
 process.env.SALT_ROUNDS = process.env.SALT_ROUNDS || "4";
 

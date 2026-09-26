@@ -156,9 +156,9 @@ docker compose up --build
 
 5. Access the running services:
 
-- API: http://localhost:4000
-- Health check: http://localhost:4000/health
-- Swagger docs: http://localhost:4000/docs
+- API: http://localhost:3000
+- Health check: http://localhost:3000/health
+- Swagger docs: http://localhost:3000/docs
 - MongoDB: localhost:27017, 27018, 27019
 - Elasticsearch: http://localhost:9200
 - Kibana: http://localhost:5601

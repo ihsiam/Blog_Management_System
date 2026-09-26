@@ -6,12 +6,12 @@ services:
     image: mdismilehosensiam/blog_management_system:latest
     container_name: blog-management-server
     ports:
-      - "4000:4000"
+      - "3000:3000"
     env_file:
       - ./server/.env
     environment:
-      PORT: 4000
-      APP_URL: http://localhost:4000
+      PORT: 3000
+      APP_URL: http://localhost:3000
       DB_URL: mongodb://mongo1:27017,mongo2:27017,mongo3:27017/Blog_Management_System?replicaSet=rs0
       ELASTIC_URL: http://elasticsearch:9200
       REDIS_URL: redis://redis:6379

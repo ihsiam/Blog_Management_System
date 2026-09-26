@@ -18,7 +18,7 @@ const app = require("./app");
 const server = http.createServer(app);
 
 // server port configuration
-const PORT = Number(process.env.PORT) || 4000;
+const PORT = Number(process.env.PORT) || 3000;
 
 /**
  * Handle unhandled promise rejections

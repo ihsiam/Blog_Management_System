@@ -6,33 +6,33 @@
  */
 
 const express = require("express");
+
 const applyMiddleware = require("./middleware");
 const routes = require("./routes");
 const { notFound } = require("./utils/error");
 const { requestLogger, errorLogger } = require("./middleware/expressWinston");
 const setCorrelationID = require("./middleware/setCorrelationID");
 
-// create express app instance
+// Create Express app instance.
 const app = express();
 
 /**
- * Global middlewares
+ * Global middleware.
  */
 applyMiddleware(app);
 
 /**
- * set correlation id into header
+ * Set correlation ID in the request header.
  */
-
 app.use(setCorrelationID);
 
 /**
- * Request logging (must be before routes)
+ * Request logging.
  */
 app.use(requestLogger);
 
 /**
- * Health check
+ * Health check.
  */
 app.get("/health", (req, res) => {
   res.status(200).json({
@@ -42,38 +42,46 @@ app.get("/health", (req, res) => {
 });
 
 /**
- * Routes
+ * Application routes.
  */
 app.use(routes);
 
 /**
- * 404 handler (before error logger)
+ * 404 handler.
  */
-app.use((_req, _res, next) => next(notFound("Requested resource not found")));
+app.use((_req, _res, next) => {
+  next(notFound("Requested resource not found"));
+});
 
 /**
- * Error logger (must be before global handler)
+ * Error logging.
  */
 app.use(errorLogger);
 
 /**
- * Global error handler
+ * Global error handler.
  */
 app.use((err, req, res, _next) => {
-  const statusCode = err.statusCode || 500;
+  const statusCode = err.statusCode ?? 500;
 
   res.status(statusCode).json({
     code: statusCode,
+
     error:
       statusCode >= 500
         ? "Internal server error"
         : err.error || "Request failed",
+
     correlationId: req.headers["x-correlation-id"],
+
     message:
       statusCode >= 500
         ? "We are sorry for the inconvenience. Please try again later."
         : err.message,
-    ...(err.data && { data: err.data }),
+
+    ...(err.data !== undefined && {
+      data: err.data,
+    }),
   });
 });
 

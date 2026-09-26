@@ -33,7 +33,7 @@ describe("register controller", () => {
     mockSendMail.mockReset();
     res = createMockResponse();
     next = jest.fn();
-    process.env.APP_URL = "http://localhost:4000";
+    process.env.APP_URL = "http://localhost:3000";
   });
 
   const validBody = {
@@ -120,7 +120,7 @@ describe("register controller", () => {
           email: validBody.email,
           subject: "Activate your account",
           text: expect.stringContaining(
-            "http://localhost:4000/api/v1/auth/verify-email/activation-token",
+            "http://localhost:3000/api/v1/auth/verify-email/activation-token",
           ),
         }),
       );

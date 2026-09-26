@@ -142,25 +142,25 @@ describe("Application bootstrap (src/index.js)", () => {
       );
     });
 
-    it("falls back to port 4000 when PORT is not configured", async () => {
+    it("falls back to port 3000 when PORT is not configured", async () => {
       loadIndex();
       await flushPromises();
 
       expect(mockServer.listen).toHaveBeenCalledWith(
-        4000,
+        3000,
         expect.any(Function),
       );
     });
 
     it("logs a startup message once the server is listening", async () => {
-      process.env.APP_URL = "http://localhost:4000";
+      process.env.APP_URL = "http://localhost:3000";
 
       loadIndex();
       await flushPromises();
 
       expect(logSpy).toHaveBeenCalledWith("Server is running");
       expect(logSpy).toHaveBeenCalledWith(
-        "API documentation: http://localhost:4000/docs",
+        "API documentation: http://localhost:3000/docs",
       );
     });
 

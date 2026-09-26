@@ -36,7 +36,7 @@ describe("forgotPassword controller", () => {
     mockSendMail.mockReset();
     res = createMockResponse();
     next = jest.fn();
-    process.env.APP_URL = "http://localhost:4000";
+    process.env.APP_URL = "http://localhost:3000";
   });
 
   describe("input validation", () => {
@@ -121,7 +121,7 @@ describe("forgotPassword controller", () => {
         email: user.email,
         subject: "Reset your password",
         text: expect.stringContaining(
-          "http://localhost:4000/api/v1/auth/reset-password/reset-token",
+          "http://localhost:3000/api/v1/auth/reset-password/reset-token",
         ),
       }),
     );
