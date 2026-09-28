@@ -11,10 +11,7 @@
  */
 const schemaOptions = {
   // automatically manage createdAt and updatedAt fields
-  timestamps: {
-    createdAt: "created_at",
-    updatedAt: "updated_at",
-  },
+  timestamps: true,
 
   // remove __v field from documents
   versionKey: false,

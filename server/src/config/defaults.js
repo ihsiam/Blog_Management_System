@@ -3,7 +3,7 @@ const config = {
   limit: 10,
   totalItems: 0,
   sortType: "desc",
-  sortBy: "updatedAt",
+  sortBy: "createdAt",
   searchTerm: "",
   body: "",
   cover: "",

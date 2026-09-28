@@ -22,7 +22,7 @@ const SessionSchema = new Schema(
     },
 
     // Valid for 30 days
-    expires_at: {
+    expiresAt: {
       type: Date,
       required: true,
     },

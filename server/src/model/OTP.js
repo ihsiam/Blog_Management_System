@@ -22,7 +22,7 @@ const OtpSchema = new Schema(
       default: false,
     },
     // Valid for 5 minutes
-    expires_at: {
+    expiresAt: {
       type: Date,
       required: true,
     },

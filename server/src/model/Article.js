@@ -29,7 +29,7 @@ const ArticleSchema = new Schema(
 ArticleSchema.index({ category_id: 1 });
 ArticleSchema.index({ author_id: 1 });
 ArticleSchema.index({ status: 1 });
-ArticleSchema.index({ created_at: 1 });
+ArticleSchema.index({ createdAt: 1 });
 ArticleSchema.index({ title: 1 });
 
 // Virtual populate
