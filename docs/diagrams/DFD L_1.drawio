@@ -1,6 +1,6 @@
 <mxfile host="app.diagrams.net" agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/146.0.0.0 Safari/537.36">
   <diagram name="Page-1" id="2NHEYBK4rXwKy8gav2PT">
-    <mxGraphModel dx="584" dy="703" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="827" pageHeight="1169" math="0" shadow="0">
+    <mxGraphModel dx="231" dy="527" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="827" pageHeight="1169" math="0" shadow="0">
       <root>
         <mxCell id="0" />
         <mxCell id="1" parent="0" />
@@ -257,9 +257,12 @@
         <mxCell id="S2Nycf6YrPoq5kYM6wa2-29" parent="1" style="html=1;dashed=0;whiteSpace=wrap;shape=partialRectangle;right=0;left=0;fontSize=13;" value="PasswordResetToken" vertex="1">
           <mxGeometry height="40" width="140" x="1950" y="420" as="geometry" />
         </mxCell>
-        <mxCell id="S2Nycf6YrPoq5kYM6wa2-32" edge="1" parent="1" source="S2Nycf6YrPoq5kYM6wa2-15" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;entryX=0.5;entryY=0;entryDx=0;entryDy=0;fontSize=13;" target="TsERvt7cCtlf9IZt2QHN-4">
+        <mxCell id="S2Nycf6YrPoq5kYM6wa2-32" edge="1" parent="1" source="S2Nycf6YrPoq5kYM6wa2-15" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;fontSize=13;entryX=0.271;entryY=0.031;entryDx=0;entryDy=0;entryPerimeter=0;" target="TsERvt7cCtlf9IZt2QHN-4">
           <mxGeometry relative="1" as="geometry">
-            <mxPoint x="1655" y="260" as="targetPoint" />
+            <Array as="points">
+              <mxPoint x="1630" y="210" />
+            </Array>
+            <mxPoint x="1630" y="265" as="targetPoint" />
           </mxGeometry>
         </mxCell>
         <mxCell id="S2Nycf6YrPoq5kYM6wa2-37" connectable="0" parent="S2Nycf6YrPoq5kYM6wa2-32" style="edgeLabel;html=1;align=center;verticalAlign=middle;resizable=0;points=[];fontSize=13;" value="Registration details&lt;div&gt;email + OTP&lt;/div&gt;&lt;div&gt;resend-OTP request&lt;/div&gt;&lt;div&gt;login credentials&lt;/div&gt;&lt;div&gt;forgot-password email&lt;/div&gt;&lt;div&gt;reset OTP&lt;/div&gt;&lt;div&gt;new password&lt;/div&gt;" vertex="1">
@@ -494,6 +497,17 @@
           <mxGeometry relative="1" x="-0.3935" y="-1" as="geometry">
             <mxPoint x="-6" y="-19" as="offset" />
           </mxGeometry>
+        </mxCell>
+        <mxCell id="SZmLlJx8iXLOJmQrjRoW-2" edge="1" parent="1" source="SZmLlJx8iXLOJmQrjRoW-1" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;entryX=0.5;entryY=0;entryDx=0;entryDy=0;startArrow=classic;startFill=1;" target="TsERvt7cCtlf9IZt2QHN-4">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="SZmLlJx8iXLOJmQrjRoW-3" connectable="0" parent="SZmLlJx8iXLOJmQrjRoW-2" style="edgeLabel;html=1;align=center;verticalAlign=middle;resizable=0;points=[];" value="Read adminSetup flag&lt;div&gt;Set adminSetup to true&lt;/div&gt;" vertex="1">
+          <mxGeometry relative="1" x="-0.1911" y="3" as="geometry">
+            <mxPoint x="-4" y="-15" as="offset" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="SZmLlJx8iXLOJmQrjRoW-1" parent="1" style="html=1;dashed=0;whiteSpace=wrap;shape=partialRectangle;right=0;left=0;fontSize=13;" value="SystemInfo" vertex="1">
+          <mxGeometry height="40" width="140" x="1585" y="90" as="geometry" />
         </mxCell>
       </root>
     </mxGraphModel>
