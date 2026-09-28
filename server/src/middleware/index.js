@@ -4,8 +4,9 @@ const cookieParser = require("cookie-parser");
 const swaggerUI = require("swagger-ui-express");
 const YAML = require("yamljs");
 const morgan = require("morgan");
+const path = require("path");
 
-const swaggerDocs = YAML.load("./swagger.yaml");
+const swaggerDocs = YAML.load(path.join(__dirname, "../../swagger.yaml"));
 
 /**
  * Applies global Express middlewares to the application.

@@ -127,6 +127,7 @@ Before starting the service, make sure you have:
 - Yarn 4+
 - Docker and Docker Compose
 - MongoDB (if running outside Docker)
+- Redis (if running outside Docker)
 - SMTP credentials for email-based flows
 
 ## Getting Started
@@ -160,6 +161,7 @@ docker compose up --build
 - Health check: http://localhost:3000/health
 - Swagger docs: http://localhost:3000/docs
 - MongoDB: localhost:27017, 27018, 27019
+- Redis: localhost:6379
 - Elasticsearch: http://localhost:9200
 - Kibana: http://localhost:5601
 
@@ -195,6 +197,9 @@ The project ships with a template in `server/default.env`. Copy it into a `.env`
 ```env
 PORT=
 APP_URL=
+DB_URL=
+REDIS_URL=
+ELASTIC_URL=
 
 SALT_ROUNDS=
 
@@ -214,6 +219,7 @@ EMAIL_PASSWORD=
 Additional runtime settings used by Docker:
 
 - `DB_URL` used by the app when running in compose
+- `REDIS_URL` used by the app when running in compose
 - `ELASTIC_URL` set to `http://elasticsearch:9200` in Docker
 
 > Never commit real secrets to version control. Use secure values for JWT secrets and email credentials in production.
@@ -353,7 +359,6 @@ New users start with `pending` status until they verify their email.
 
 The following features are **planned** and will be implemented incrementally:
 
-- [ ] Response caching (Redis)
 - [ ] Load balancing
 - [ ] Security hardening (`helmet`, stricter CORS)
 
