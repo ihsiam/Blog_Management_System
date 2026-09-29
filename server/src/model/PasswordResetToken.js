@@ -26,8 +26,7 @@ const PasswordResetTokenSchema = new Schema(
   schemaOptions,
 );
 
-// Index
-PasswordResetTokenSchema.index({ user_id: 1 });
+PasswordResetTokenSchema.index({ user_id: 1 }, { unique: true });
 
 const PasswordResetToken = model(
   "PasswordResetToken",

@@ -1,27 +1,23 @@
 const { badRequest } = require("../../../../utils/error");
-const userServices = require("../../../../lib/user");
-const tokenServices = require("../../../../lib/token");
+const authServices = require("../../../../lib/authentication");
 const emailService = require("../../../../lib/email");
 
 /**
- * Sends a password reset email to a registered user.
+ * Requests a password reset email for a registered user.
  *
- * @param {import("express").Request} req - Express request object
- * @param {Object} req.body - Request payload
- * @param {string} req.body.email - User email address
+ * @param {import("express").Request} req - Express request object.
+ * @param {Object} req.body - Request payload.
+ * @param {string} req.body.email - User email address.
  *
- * @param {import("express").Response} res - Express response object
- * @param {Function} next - Express error handler middleware
+ * @param {import("express").Response} res - Express response object.
+ * @param {Function} next - Express error-handling middleware.
  *
- * @returns {Promise<void>} Sends confirmation response
+ * @returns {Promise<void>} Sends a generic confirmation response.
  */
 const forgotPassword = async (req, res, next) => {
   try {
     const { email } = req.body;
 
-    /**
-     * Validate email presence and format
-     */
     if (!email) {
       throw badRequest([
         {
@@ -44,59 +40,22 @@ const forgotPassword = async (req, res, next) => {
       ]);
     }
 
-    /**
-     * Fetch user by email
-     */
-    const user = await userServices.findUserByEmail(email);
+    const { user, code } = await authServices.createPasswordResetOtp(
+      email.trim(),
+    );
 
-    /**
-     * Always return a generic response to prevent user enumeration
-     */
+    // Keep the response generic to prevent user enumeration.
     const responseMessage =
-      "If this email is registered, you will receive a password reset link.";
+      "If an account with that email exists, a password reset code has been sent.";
 
-    if (user) {
-      /**
-       * Restrict password reset for declined accounts
-       */
-      if (user.status === "declined") {
-        return res.status(200).json({
-          code: 200,
-          message: responseMessage,
-        });
-      }
-
-      /**
-       * Build JWT payload for reset token
-       */
-      const payload = {
-        id: user.id,
-        role: user.role,
-        email: user.email,
-      };
-
-      /**
-       * Generate password reset token
-       */
-      const resetToken = tokenServices.generateActiveResetToken(payload);
-
-      /**
-       * Construct password reset URL
-       */
-      const resetUrl = `${process.env.APP_URL}/api/v1/auth/reset-password/${resetToken}`;
-
-      /**
-       * Send password reset email
-       */
+    if (user && user.account_status !== "blocked") {
       await emailService.sendMail({
         email: user.email,
         subject: "Reset your password",
-        text: `Hello ${user.name},\n\nPlease reset your password using the link below:\n${resetUrl}`,
+        text: `Hello ${user.name},\n\nYour password reset code is: ${code}`,
       });
     }
 
-    /**
-     * Response     */
     return res.status(200).json({
       code: 200,
       message: responseMessage,

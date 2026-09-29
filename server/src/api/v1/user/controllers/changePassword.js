@@ -71,7 +71,7 @@ const changePassword = async (req, res, next) => {
     }
 
     // verify old password
-    const isMatch = await hashing.compareHash(oldPassword, user.password);
+    const isMatch = await hashing.compareHash(oldPassword, user.password_hash);
 
     if (!isMatch) {
       throw unauthorized("Old password is incorrect");

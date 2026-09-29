@@ -7,6 +7,10 @@ const verifyEmail = require("./verifyEmail");
 const resendVerificationMail = require("./resendVerificationMail");
 const forgotPassword = require("./forgotPassword");
 const resetPassword = require("./resetPassword");
+const verifyResetOtp = require("./verifyResetOtp");
+const logoutAll = require("./logoutAll");
+const listSessions = require("./listSessions");
+const deleteSession = require("./deleteSession");
 
 module.exports = {
   register,
@@ -18,4 +22,8 @@ module.exports = {
   resendVerificationMail,
   forgotPassword,
   resetPassword,
+  verifyResetOtp,
+  logoutAll,
+  listSessions,
+  deleteSession,
 };

@@ -13,7 +13,7 @@ const userServices = require("../../../../lib/user");
  * @param {Object} req.body - Request payload
  * @param {string} [req.body.name] - User full name
  * @param {string} [req.body.role] - User role (user | admin)
- * @param {string} [req.body.status] - User status (pending | approved | block | declined)
+ * @param {string} [req.body.status] - User status (pending | active | blocked)
  *
  * @param {import("express").Response} res - Express response object
  * @param {Function} next - Express error handler middleware
@@ -52,7 +52,7 @@ const updateUser = async (req, res, next) => {
 
     // status validation
     if (status !== undefined) {
-      const allowedStatus = ["pending", "approved", "blocked", "declined"];
+      const allowedStatus = ["pending", "active", "blocked"];
 
       if (
         typeof status !== "string" ||

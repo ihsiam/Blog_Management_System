@@ -17,8 +17,8 @@ const ownership = require("../middleware/ownership");
  * against brute-force and credential-stuffing attacks.
  */
 const authLimit = rateLimit({
-  windowMs: 15 * 60 * 1000,
-  max: 20,
+  windowMs: 60 * 1000,
+  max: 5,
   message: {
     code: 429,
     error: "too many requests",
@@ -42,18 +42,33 @@ router.post("/api/v1/auth/setup-admin", authLimit, authController.setupAdmin);
  * User registration and email verification flow.
  */
 router.post("/api/v1/auth/sign-up", authLimit, authController.register);
-router.get("/api/v1/auth/verify-email/:token", authController.verifyEmail);
 router.post(
-  "/api/v1/auth/resend-verification",
+  "/api/v1/auth/verify-email-otp",
+  authLimit,
+  authController.verifyEmail,
+);
+router.post(
+  "/api/v1/auth/resend-verification-otp",
+  authLimit,
   authController.resendVerificationMail,
 );
 
 /**
  * Password recovery flow.
  */
-router.post("/api/v1/auth/forgot-password", authController.forgotPassword);
+router.post(
+  "/api/v1/auth/forgot-password",
+  authLimit,
+  authController.forgotPassword,
+);
+router.post(
+  "/api/v1/auth/verify-reset-otp",
+  authLimit,
+  authController.verifyResetOtp,
+);
 router.patch(
-  "/api/v1/auth/reset-password/:token",
+  "/api/v1/auth/reset-password",
+  authLimit,
   authController.resetPassword,
 );
 
@@ -63,6 +78,13 @@ router.patch(
 router.post("/api/v1/auth/sign-in", authLimit, authController.login);
 router.post("/api/v1/auth/refresh", authController.refresh);
 router.post("/api/v1/auth/logout", authenticate, authController.logout);
+router.post("/api/v1/auth/logout-all", authenticate, authController.logoutAll);
+router.get("/api/v1/auth/sessions", authenticate, authController.listSessions);
+router.delete(
+  "/api/v1/auth/sessions/:sessionId",
+  authenticate,
+  authController.deleteSession,
+);
 
 /**
  * ==================================================

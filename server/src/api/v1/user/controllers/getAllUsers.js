@@ -19,7 +19,7 @@ const { query } = require("../../../../utils");
  * @param {string} [req.query.sortBy] - Field to sort by
  * @param {string} [req.query.name] - Filter by user name
  * @param {string} [req.query.email] - Filter by user email
- * @param {string} [req.query.status] - Filter by user status
+ * @param {string} [req.query.status] - Filter by account status
  *
  * @param {import("express").Response} res - Express response object
  * @param {Function} next - Express error handler middleware
@@ -68,10 +68,7 @@ const getAllUsers = async (req, res, next) => {
     }
 
     // status validation (optional filter)
-    if (
-      status &&
-      !["pending", "approved", "blocked", "declined"].includes(status)
-    ) {
+    if (status && !["pending", "active", "blocked"].includes(status)) {
       errors.push({
         field: "status",
         message: "invalid input",

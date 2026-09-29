@@ -4,21 +4,21 @@ const userServices = require("../../../../lib/user");
 const { badRequest } = require("../../../../utils/error");
 
 /**
- * Creates the initial system administrator account.
+ * Creates the initial system administrator account and session.
  *
  * This endpoint is intended for one-time system bootstrap and should
  * be disabled or protected after initial setup.
  *
- * @param {import("express").Request} req - Express request object
- * @param {Object} req.body - Request payload
- * @param {string} req.body.name - Administrator name
- * @param {string} req.body.email - Administrator email address
- * @param {string} req.body.password - Administrator password
+ * @param {import("express").Request} req - Express request object.
+ * @param {Object} req.body - Request payload.
+ * @param {string} req.body.name - Administrator name.
+ * @param {string} req.body.email - Administrator email address.
+ * @param {string} req.body.password - Administrator password.
  *
- * @param {import("express").Response} res - Express response object
- * @param {Function} next - Express error-handling middleware
+ * @param {import("express").Response} res - Express response object.
+ * @param {Function} next - Express error-handling middleware.
  *
- * @returns {Promise<void>} Sends authentication response
+ * @returns {Promise<void>} Sends an authentication response.
  *
  * @throws {Error} BadRequest if validation fails
  */
@@ -26,12 +26,8 @@ const setupAdmin = async (req, res, next) => {
   try {
     const { name, email, password } = req.body;
 
-    // Collect validation errors (batch validation improves UX)
     const errors = [];
 
-    /**
-     * Validate name
-     */
     if (!name || typeof name !== "string" || !name.trim()) {
       errors.push({
         field: "name",
@@ -40,9 +36,6 @@ const setupAdmin = async (req, res, next) => {
       });
     }
 
-    /**
-     * Validate email format
-     */
     if (!email) {
       errors.push({
         field: "email",
@@ -61,9 +54,6 @@ const setupAdmin = async (req, res, next) => {
       }
     }
 
-    /**
-     * Validate password strength
-     */
     if (!password || typeof password !== "string") {
       errors.push({
         field: "password",
@@ -78,44 +68,31 @@ const setupAdmin = async (req, res, next) => {
       });
     }
 
-    /**
-     * Stop execution if validation fails
-     */
     if (errors.length > 0) {
       throw badRequest(errors, "Validation failed");
     }
 
-    /**
-     * Create system administrator account
-     */
     const user = await authServices.systemAdmin({ name, email, password });
 
-    /**
-     * Build JWT payload
-     */
     const payload = {
       id: user.id,
       role: user.role,
       email: user.email,
     };
 
-    /**
-     * Generate token pair
-     */
     const accessToken = tokenServices.generateAccessToken(payload);
     const refreshToken = tokenServices.generateRefreshToken(payload);
 
-    /**
-     * Persist refresh token for session tracking
-     */
-    await userServices.saveRefreshToken(user.id, refreshToken);
+    await userServices.saveRefreshToken(
+      user.id,
+      refreshToken,
+      req.get("user-agent") || "unknown",
+    );
 
-    /**
-     * Set refresh token in secure HTTP-only cookie
-     */
     res.cookie("refreshToken", refreshToken, {
       httpOnly: true,
       secure: true,
+      sameSite: "strict",
     });
 
     return res.status(201).json({

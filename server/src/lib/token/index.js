@@ -1,13 +1,11 @@
 const jwt = require("jsonwebtoken");
 const { badRequest, unauthorized } = require("../../utils/error");
 
-// Centralized JWT configuration
+// Keep JWT secrets and lifetimes in one configuration object.
 const CONFIG = {
-  ACTIVE_RESET_EXPIRES: process.env.JWT_ACTIVE_RESET_EXPIRES || "5m",
-  REFRESH_EXPIRES: process.env.JWT_REFRESH_EXPIRES || "7d",
+  REFRESH_EXPIRES: process.env.JWT_REFRESH_EXPIRES || "30d",
   ACCESS_EXPIRES: process.env.JWT_ACCESS_EXPIRES || "15m",
 
-  ACTIVE_RESET_SECRET: process.env.JWT_ACTIVE_RESET_SECRET,
   REFRESH_SECRET: process.env.JWT_REFRESH_SECRET,
   ACCESS_SECRET: process.env.JWT_ACCESS_SECRET,
 };
@@ -15,14 +13,14 @@ const CONFIG = {
 /**
  * Signs a JWT token.
  *
- * @param {Object} payload - Data stored inside the token
- * @param {string} secret - Secret key used to sign the token
- * @param {string|number} expiresIn - Expiration time (e.g. "15m", "7d")
- * @param {string} label - Token type label used for logging/debugging
+ * @param {Object} payload - Data stored inside the token.
+ * @param {string} secret - Secret key used to sign the token.
+ * @param {string|number} expiresIn - Expiration time, such as "15m" or "7d".
+ * @param {string} label - Token type label used for logging and debugging.
  *
- * @returns {string} Signed JWT token
+ * @returns {string} Signed JWT token.
  *
- * @throws {Error} If token generation fails due to JWT internal error
+ * @throws {Error} If token generation fails due to a JWT error.
  */
 const signToken = (payload, secret, expiresIn, label) => {
   try {
@@ -41,13 +39,13 @@ const signToken = (payload, secret, expiresIn, label) => {
  *
  * Converts JWT errors into standardized authentication errors.
  *
- * @param {string} token - JWT token to verify
- * @param {string} secret - Secret key used for verification
- * @param {string} label - Token type label for logging/error context
+ * @param {string} token - JWT token to verify.
+ * @param {string} secret - Secret key used for verification.
+ * @param {string} label - Token type label for logging and error context.
  *
- * @returns {Object} Decoded JWT payload
+ * @returns {Object} Decoded JWT payload.
  *
- * @throws {Error} Unauthorized if token is missing, invalid, expired, or not active
+ * @throws {Error} Unauthorized if the token is missing, invalid, expired, or not active.
  */
 const verifyToken = (token, secret, label) => {
   try {
@@ -78,24 +76,10 @@ const verifyToken = (token, secret, label) => {
 };
 
 /**
- * Generates token for account activation and password reset flows.
- *
- * @param {Object} payload - User identity data
- * @returns {string} Signed JWT token
- */
-const generateActiveResetToken = (payload) =>
-  signToken(
-    payload,
-    CONFIG.ACTIVE_RESET_SECRET,
-    CONFIG.ACTIVE_RESET_EXPIRES,
-    "ACTIVE_RESET",
-  );
-
-/**
  * Generates short-lived access token for API authentication.
  *
- * @param {Object} payload - User identity and claims
- * @returns {string} Signed JWT access token
+ * @param {Object} payload - User identity and claims.
+ * @returns {string} Signed JWT access token.
  */
 const generateAccessToken = (payload) =>
   signToken(payload, CONFIG.ACCESS_SECRET, CONFIG.ACCESS_EXPIRES, "ACCESS");
@@ -103,26 +87,17 @@ const generateAccessToken = (payload) =>
 /**
  * Generates long-lived refresh token for session management.
  *
- * @param {Object} payload - User identity and session data
- * @returns {string} Signed JWT refresh token
+ * @param {Object} payload - User identity and session data.
+ * @returns {string} Signed JWT refresh token.
  */
 const generateRefreshToken = (payload) =>
   signToken(payload, CONFIG.REFRESH_SECRET, CONFIG.REFRESH_EXPIRES, "REFRESH");
 
 /**
- * Verifies token used for account activation or password reset.
- *
- * @param {string} token - JWT token
- * @returns {Object} Decoded payload
- */
-const verifyActiveResetToken = (token) =>
-  verifyToken(token, CONFIG.ACTIVE_RESET_SECRET, "Active/Reset");
-
-/**
  * Verifies access token used for API authentication.
  *
- * @param {string} token - JWT access token
- * @returns {Object} Decoded payload
+ * @param {string} token - JWT access token.
+ * @returns {Object} Decoded payload.
  */
 const verifyAccessToken = (token) =>
   verifyToken(token, CONFIG.ACCESS_SECRET, "Access");
@@ -130,8 +105,8 @@ const verifyAccessToken = (token) =>
 /**
  * Verifies refresh token used for session continuation.
  *
- * @param {string} token - JWT refresh token
- * @returns {Object} Decoded payload
+ * @param {string} token - JWT refresh token.
+ * @returns {Object} Decoded payload.
  */
 const verifyRefreshToken = (token) =>
   verifyToken(token, CONFIG.REFRESH_SECRET, "Refresh");
@@ -139,10 +114,10 @@ const verifyRefreshToken = (token) =>
 /**
  * Decodes JWT payload without verifying signature.
  *
- * @param {string} token - JWT token
- * @returns {Object} Decoded payload
+ * @param {string} token - JWT token.
+ * @returns {Object} Decoded payload.
  *
- * @throws {Error} If token format is invalid
+ * @throws {Error} If the token format is invalid.
  */
 const decodeToken = (token) => {
   const decoded = jwt.decode(token);
@@ -155,10 +130,8 @@ const decodeToken = (token) => {
 };
 
 module.exports = {
-  generateActiveResetToken,
   generateAccessToken,
   generateRefreshToken,
-  verifyActiveResetToken,
   verifyAccessToken,
   verifyRefreshToken,
   decodeToken,

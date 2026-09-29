@@ -1,4 +1,7 @@
 const User = require("../../model/User");
+const Session = require("../../model/Session");
+const OTP = require("../../model/OTP");
+const PasswordResetToken = require("../../model/PasswordResetToken");
 const { badRequest, notFound } = require("../../utils/error");
 const { hashing } = require("../../utils");
 const defaults = require("../../config/defaults");
@@ -8,10 +11,14 @@ const { deleteCachePattern } = require("../../utils/cache");
  * Find user by email
  *
  * @param {string} email - User email address
+ * @param {ClientSession} [session] - Optional MongoDB session
  * @returns {Promise<Object|null>} User object or null
  */
-const findUserByEmail = async (email) => {
-  const user = await User.findOne({ email });
+const findUserByEmail = async (email, session) => {
+  const query = User.findOne({ email });
+  if (session) query.session(session);
+
+  const user = await query;
   return user ? user.toObject() : null;
 };
 
@@ -19,7 +26,7 @@ const findUserByEmail = async (email) => {
  * Find authenticated user by ID
  *
  * @param {string} id - User ID
- * @returns {Promise<Object|null>} Mongoose user document
+ * @returns {Promise<Object|null>} Mongoose user document with password hash
  */
 const findAuthUserById = async (id) => await User.findById(id);
 
@@ -27,10 +34,14 @@ const findAuthUserById = async (id) => await User.findById(id);
  * Find user by ID (safe output without sensitive fields)
  *
  * @param {string} id - User ID
+ * @param {ClientSession} [session] - Optional MongoDB session
  * @returns {Promise<Object|null>} Sanitized user object
  */
-const findUserById = async (id) => {
-  const user = await User.findById(id).select("-password -refreshToken");
+const findUserById = async (id, session) => {
+  const query = User.findById(id).select("-password_hash");
+  if (session) query.session(session);
+
+  const user = await query;
   return user ? user.toObject() : null;
 };
 
@@ -40,8 +51,8 @@ const findUserById = async (id) => {
  * @param {string} email - User email
  * @returns {Promise<boolean>}
  */
-const userExist = async (email) => {
-  const user = await findUserByEmail(email);
+const userExist = async (email, session) => {
+  const user = await findUserByEmail(email, session);
   return !!user;
 };
 
@@ -50,8 +61,11 @@ const userExist = async (email) => {
  *
  * @returns {Promise<boolean>}
  */
-const adminExist = async () => {
-  const admin = await User.find({ role: "admin" });
+const adminExist = async (session) => {
+  const query = User.find({ role: "admin" });
+  if (session) query.session(session);
+
+  const admin = await query;
   return !!admin.length;
 };
 
@@ -62,18 +76,19 @@ const adminExist = async () => {
  * @param {string} params.name
  * @param {string} params.email
  * @param {string} params.password
+ * @param {ClientSession} [session] - Optional MongoDB session
  * @returns {Promise<Object>} Created admin user
  */
-const createAdmin = async ({ name, email, password }) => {
+const createAdmin = async ({ name, email, password }, session) => {
   const user = new User({
     name,
     email,
-    password,
+    password_hash: password,
     role: "admin",
-    status: "approved",
+    account_status: "active",
   });
 
-  await user.save();
+  await user.save({ session });
   return user.toObject();
 };
 
@@ -86,10 +101,10 @@ const createAdmin = async ({ name, email, password }) => {
  * @param {string} params.password
  * @returns {Promise<Object>} Created user
  */
-const createUser = async ({ name, email, password }) => {
-  const user = new User({ name, email, password });
+const createUser = async ({ name, email, password }, session) => {
+  const user = new User({ name, email, password_hash: password });
 
-  await user.save();
+  await user.save({ session });
   return user.toObject();
 };
 
@@ -119,16 +134,15 @@ const createUserByAdmin = async ({ name, email, password }) => {
   const user = new User({
     name,
     email,
-    password: hashPassword,
-    status: "approved",
+    password_hash: hashPassword,
+    account_status: "active",
   });
 
   await user.save();
 
   const userData = user.toObject();
 
-  delete userData.password;
-  delete userData.refreshToken;
+  delete userData.password_hash;
 
   return userData;
 };
@@ -137,21 +151,198 @@ const createUserByAdmin = async ({ name, email, password }) => {
  * Save refresh token
  *
  * @param {string} id - User ID
- * @param {string} refreshToken
+ * @param {string} refreshToken - Raw refresh token
+ * @param {string} [deviceInfo] - Client device information
+ * @param {ClientSession} [session] - Optional MongoDB session
  * @returns {Promise<void>}
  */
-const saveRefreshToken = async (id, refreshToken) => {
-  await User.findByIdAndUpdate(id, { $set: { refreshToken } });
+const saveRefreshToken = async (id, refreshToken, deviceInfo, session) => {
+  const refreshTokenHash = await hashing.generateHash(refreshToken);
+
+  const expiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
+
+  const sessionData = new Session({
+    user_id: id,
+    refresh_token_hash: refreshTokenHash,
+    device_info: deviceInfo || "unknown",
+    expiresAt,
+  });
+
+  await sessionData.save({ session });
 };
 
 /**
  * Clear refresh token
  *
  * @param {string} id - User ID
+ * @param {string} [refreshToken] - Raw refresh token to invalidate
+ * @param {ClientSession} [session] - Optional MongoDB session
  * @returns {Promise<void>}
  */
-const clearRefreshToken = async (id) => {
-  await User.findByIdAndUpdate(id, { $set: { refreshToken: null } });
+const clearRefreshToken = async (id, refreshToken, session) => {
+  if (!refreshToken) {
+    await Session.deleteMany(
+      { user_id: id },
+      session ? { session } : undefined,
+    );
+    return;
+  }
+
+  const query = Session.find({ user_id: id });
+  if (session) query.session(session);
+  const sessions = await query;
+
+  const matches = await Promise.all(
+    sessions.map((item) =>
+      hashing.compareHash(refreshToken, item.refresh_token_hash),
+    ),
+  );
+  const matchingSession = sessions[matches.indexOf(true)];
+
+  if (matchingSession) {
+    await Session.deleteOne(
+      { _id: matchingSession._id },
+      session ? { session } : undefined,
+    );
+  }
+};
+
+/**
+ * Find a user's active session by raw refresh token.
+ *
+ * @param {string} id - User ID
+ * @param {string} refreshToken - Raw refresh token
+ * @param {ClientSession} [session] - Optional MongoDB session
+ * @returns {Promise<Object|null>} Matching session or null
+ */
+const findSessionByToken = async (id, refreshToken, session) => {
+  if (!refreshToken) return null;
+
+  const query = Session.find({ user_id: id });
+  if (session) query.session(session);
+  const sessions = await query;
+
+  const matches = await Promise.all(
+    sessions.map(
+      async (item) =>
+        item.expiresAt > new Date() &&
+        hashing.compareHash(refreshToken, item.refresh_token_hash),
+    ),
+  );
+
+  return sessions[matches.indexOf(true)] || null;
+};
+
+const getActiveSessions = async (id, refreshToken, session) => {
+  const query = Session.find({
+    user_id: id,
+    expiresAt: { $gt: new Date() },
+  }).sort({
+    createdAt: -1,
+  });
+  if (session) query.session(session);
+
+  const sessions = await query;
+  const current = refreshToken
+    ? await Promise.all(
+        sessions.map((item) =>
+          hashing.compareHash(refreshToken, item.refresh_token_hash),
+        ),
+      )
+    : [];
+
+  return sessions.map((item, index) => ({
+    id: item.id,
+    deviceInfo: item.device_info,
+    isCurrent: current[index] || false,
+    createdAt: item.createdAt,
+    expiresAt: item.expiresAt,
+  }));
+};
+
+const deleteSession = async (userId, sessionId, session) => {
+  const query = Session.deleteOne({ _id: sessionId, user_id: userId });
+  if (session) query.session(session);
+
+  const result = await query;
+  return result.deletedCount > 0;
+};
+
+const createOtp = async (userId, purpose, codeHash, session) => {
+  await OTP.findOneAndUpdate(
+    { user_id: userId, purpose },
+    {
+      $set: {
+        code_hash: codeHash,
+        is_used: false,
+        expiresAt: new Date(Date.now() + 5 * 60 * 1000),
+      },
+    },
+    { upsert: true, new: true, session },
+  );
+};
+
+const findValidOtp = async (userId, purpose, session) => {
+  const query = OTP.findOne({
+    user_id: userId,
+    purpose,
+    is_used: false,
+    expiresAt: { $gt: new Date() },
+  }).sort({ createdAt: -1 });
+  if (session) query.session(session);
+
+  return query;
+};
+
+const markOtpUsed = async (id, session) => {
+  const query = OTP.updateOne(
+    { _id: id, is_used: false },
+    { $set: { is_used: true } },
+  );
+  if (session) query.session(session);
+
+  const result = await query;
+  return result.modifiedCount > 0;
+};
+
+const savePasswordResetToken = async (userId, tokenHash, session) => {
+  await PasswordResetToken.findOneAndUpdate(
+    { user_id: userId },
+    {
+      $set: {
+        token_hash: tokenHash,
+        is_used: false,
+        expiresAt: new Date(Date.now() + 5 * 60 * 1000),
+      },
+    },
+    { upsert: true, new: true, session },
+  );
+};
+
+const findPasswordResetToken = async (token, session) => {
+  const query = PasswordResetToken.find({
+    is_used: false,
+    expiresAt: { $gt: new Date() },
+  });
+  if (session) query.session(session);
+
+  const tokens = await query;
+  const matches = await Promise.all(
+    tokens.map((item) => hashing.compareHash(token, item.token_hash)),
+  );
+
+  return tokens[matches.indexOf(true)] || null;
+};
+
+const markPasswordResetTokenUsed = async (id, session) => {
+  const query = PasswordResetToken.updateOne(
+    { _id: id, is_used: false },
+    { $set: { is_used: true } },
+  );
+  if (session) query.session(session);
+
+  const result = await query;
+  return result.modifiedCount > 0;
 };
 
 /**
@@ -184,7 +375,7 @@ const getAllUsers = async ({
 
   if (email) filter.email = { $regex: email, $options: "i" };
   if (name) filter.name = { $regex: name, $options: "i" };
-  if (status) filter.status = status;
+  if (status) filter.account_status = status;
 
   const users = await User.find(filter)
     .sort(sortKey)
@@ -208,7 +399,7 @@ const countTotal = async ({ name, email, status }) => {
 
   if (email) filter.email = { $regex: email, $options: "i" };
   if (name) filter.name = { $regex: name, $options: "i" };
-  if (status) filter.status = status;
+  if (status) filter.account_status = status;
 
   return await User.countDocuments(filter);
 };
@@ -228,7 +419,7 @@ const getSingleUser = async ({ id, expand = "" }) => {
     .map((item) => item.trim())
     .filter(Boolean);
 
-  const user = await User.findById(id).select("-password -refreshToken");
+  const user = await User.findById(id).select("-password_hash");
 
   if (!user) {
     throw notFound();
@@ -260,19 +451,22 @@ const getSingleUser = async ({ id, expand = "" }) => {
  * @param {string} [params.status]
  * @returns {Promise<Object>}
  */
-const updateUser = async ({ id, name, role, status }) => {
+const updateUser = async ({ id, name, role, status }, session) => {
   const payload = {};
 
   if (name !== undefined) payload.name = name;
   if (role !== undefined) payload.role = role;
-  if (status !== undefined) payload.status = status;
+  if (status !== undefined) payload.account_status = status;
 
   // find user and update data
-  const user = await User.findByIdAndUpdate(
+  const query = User.findByIdAndUpdate(
     id,
     { $set: payload },
-    { new: true, runValidators: true },
-  ).select("-password -refreshToken");
+    { new: true, runValidators: true, ...(session && { session }) },
+  ).select("-password_hash");
+  if (session) query.session(session);
+
+  const user = await query;
 
   // if user not found
   if (!user) throw notFound();
@@ -295,21 +489,24 @@ const updateUser = async ({ id, name, role, status }) => {
  * @param {string} params.password
  * @returns {Promise<Object>}
  */
-const updatePassword = async ({ id, password }) => {
+const updatePassword = async ({ id, password }, session) => {
   const payload = {};
 
   // password hash
   if (password !== undefined) {
     const hashPassword = await hashing.generateHash(password);
-    payload.password = hashPassword;
+    payload.password_hash = hashPassword;
   }
 
   // update password
-  const user = await User.findByIdAndUpdate(
+  const query = User.findByIdAndUpdate(
     id,
     { $set: payload },
-    { new: true, runValidators: true },
-  ).select("-password");
+    { new: true, runValidators: true, ...(session && { session }) },
+  ).select("-password_hash");
+  if (session) query.session(session);
+
+  const user = await query;
 
   if (!user) throw notFound();
 
@@ -357,6 +554,15 @@ module.exports = {
   createUserByAdmin,
   saveRefreshToken,
   clearRefreshToken,
+  findSessionByToken,
+  getActiveSessions,
+  deleteSession,
+  createOtp,
+  findValidOtp,
+  markOtpUsed,
+  savePasswordResetToken,
+  findPasswordResetToken,
+  markPasswordResetTokenUsed,
   getAllUsers,
   countTotal,
   getSingleUser,
