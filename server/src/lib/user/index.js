@@ -117,7 +117,7 @@ const createUser = async ({ name, email, password }, session) => {
  * @param {string} params.password
  * @returns {Promise<Object>} Created user (sanitized)
  */
-const createUserByAdmin = async ({ name, email, password }) => {
+const createUserByAdmin = async ({ name, email, password, role = "user" }) => {
   const hasUser = await userExist(email);
 
   // if user exist with email
@@ -135,6 +135,7 @@ const createUserByAdmin = async ({ name, email, password }) => {
     name,
     email,
     password_hash: hashPassword,
+    role,
     account_status: "active",
   });
 

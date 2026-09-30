@@ -18,7 +18,7 @@ const userServices = require("../../../../lib/user");
 const createUser = async (req, res, next) => {
   try {
     // extract register data from request body
-    const { name, email, password } = req.body;
+    const { name, email, password, role } = req.body;
 
     // collect validation errors
     const errors = [];
@@ -59,6 +59,14 @@ const createUser = async (req, res, next) => {
       });
     }
 
+    if (
+      !role ||
+      typeof role !== "string" ||
+      !["user", "admin"].includes(role)
+    ) {
+      errors.push({ field: "role", message: "invalid input", in: "body" });
+    }
+
     // throw validation error if any
     if (errors.length) {
       throw badRequest(errors, "invalid input");
@@ -69,6 +77,7 @@ const createUser = async (req, res, next) => {
       name,
       email,
       password,
+      role,
     });
 
     // response
