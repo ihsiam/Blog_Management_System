@@ -3,7 +3,7 @@
  *
  * Dependencies mocked:
  * - src/lib/service registry (getCommentByArticle orchestration)
- * - src/lib/comments        (count)
+ * - src/lib/comments (count)
  */
 
 const mockGetCommentByArticle = jest.fn();
@@ -87,6 +87,7 @@ describe("article getArticleComments controller", () => {
       expect(mockCommentCount).toHaveBeenCalledWith({
         article: validId,
         status: "public",
+        topLevel: true,
       });
     });
 
@@ -113,7 +114,9 @@ describe("article getArticleComments controller", () => {
           body: "Nice post",
           author: "user-1",
           createdAt: "2024-01-01",
+          status: "public",
           updatedAt: "2024-01-01",
+          replies: [],
         },
       ]);
       expect(payload.links.article).toBe(`/api/v1/articles/${validId}`);

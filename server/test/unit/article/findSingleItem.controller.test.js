@@ -6,14 +6,14 @@
  */
 
 const mockFindSingleItem = jest.fn();
-jest.doMock("../../../src/lib/articles", () => ({
+jest.doMock('../../../src/lib/articles', () => ({
   findSingleItem: mockFindSingleItem,
 }));
 
-const findSingleItemController = require("../../../src/api/v1/article/controllers/findSingleItem");
-const { createMockResponse } = require("../helpers/mockExpress");
+const findSingleItemController = require('../../../src/api/v1/article/controllers/findSingleItem');
+const { createMockResponse } = require('../helpers/mockExpress');
 
-describe("article findSingleItem controller", () => {
+describe('article findSingleItem controller', () => {
   let res;
   let next;
 
@@ -23,11 +23,26 @@ describe("article findSingleItem controller", () => {
     next = jest.fn();
   });
 
-  const validId = "507f1f77bcf86cd799439011";
+  const validId = '507f1f77bcf86cd799439011';
 
-  describe("input validation", () => {
-    it("should reject an invalid article id", async () => {
-      const req = { params: { id: "not-an-id" }, query: {} };
+  describe('input validation', () => {
+    it('should reject an invalid article id', async () => {
+      const req = { params: { id: 'not-an-id' }, query: {} };
+
+      await findSingleItemController(req, res, next);
+
+      expect(mockFindSingleItem).not.toHaveBeenCalled();
+      expect(next).toHaveBeenCalledWith(
+        expect.objectContaining({ statusCode: 400 }),
+      );
+    });
+
+    it('should reject unsupported expand values', async () => {
+      const req = {
+        params: { id: validId },
+        query: { expand: 'author' },
+        user: { id: 'user-1' },
+      };
 
       await findSingleItemController(req, res, next);
 
@@ -38,22 +53,28 @@ describe("article findSingleItem controller", () => {
     });
   });
 
-  describe("successful retrieval", () => {
-    it("should return the article with navigation links", async () => {
-      const article = { id: validId, title: "Hello" };
+  describe('successful retrieval', () => {
+    it('should return the article with navigation links', async () => {
+      const article = { id: validId, title: 'Hello' };
       mockFindSingleItem.mockResolvedValue(article);
 
-      const req = { params: { id: validId }, query: {} };
+      const req = {
+        params: { id: validId },
+        query: {},
+        user: { id: 'user-1' },
+      };
+
       await findSingleItemController(req, res, next);
 
       expect(mockFindSingleItem).toHaveBeenCalledWith({
         id: validId,
-        expand: "",
+        expand: '',
+        user: req.user,
       });
       expect(res.status).toHaveBeenCalledWith(200);
       expect(res.json).toHaveBeenCalledWith({
         code: 200,
-        message: "Data retrieved",
+        message: 'Data retrieved',
         data: article,
         links: {
           self: `/api/v1/articles/${validId}`,
@@ -64,30 +85,32 @@ describe("article findSingleItem controller", () => {
       expect(next).not.toHaveBeenCalled();
     });
 
-    it("should forward the expand query parameter", async () => {
+    it('should forward the expand query parameter', async () => {
       mockFindSingleItem.mockResolvedValue({ id: validId });
 
       const req = {
         params: { id: validId },
-        query: { expand: "author,comments" },
+        query: { expand: 'comments' },
+        user: { id: 'user-1' },
       };
       await findSingleItemController(req, res, next);
 
       expect(mockFindSingleItem).toHaveBeenCalledWith({
         id: validId,
-        expand: "author,comments",
+        expand: 'comments',
+        user: req.user,
       });
     });
   });
 
-  describe("dependency failures", () => {
-    it("should propagate the error when the article does not exist", async () => {
-      const notFoundError = Object.assign(new Error("Article not found"), {
+  describe('dependency failures', () => {
+    it('should propagate the error when the article does not exist', async () => {
+      const notFoundError = Object.assign(new Error('Article not found'), {
         statusCode: 404,
       });
       mockFindSingleItem.mockRejectedValue(notFoundError);
 
-      const req = { params: { id: validId }, query: {} };
+      const req = { params: { id: validId }, query: {}, user: { id: 'user-1' } };
       await findSingleItemController(req, res, next);
 
       expect(next).toHaveBeenCalledWith(notFoundError);
