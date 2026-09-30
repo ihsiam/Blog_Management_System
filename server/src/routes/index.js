@@ -4,6 +4,7 @@ const rateLimit = require("express-rate-limit");
 const { articleController } = require("../api/v1/article");
 const { authController } = require("../api/v1/authentication");
 const { commentsController } = require("../api/v1/comments");
+const { categoryController } = require("../api/v1/category");
 const { userController } = require("../api/v1/user");
 
 const authenticate = require("../middleware/authenticate");
@@ -150,6 +151,42 @@ router
     authorize(["user", "admin"]),
     articleController.postCommentOnArticle,
   );
+
+/**
+ * ==================================================
+ * Category Routes
+ * ==================================================
+ */
+
+/**
+ * Public category endpoints.
+ */
+router
+  .route("/api/v1/categories")
+  .get(categoryController.findAll)
+  .post(authenticate, authorize(["admin"]), categoryController.create);
+
+/**
+ * Single category operations.
+ */
+router
+  .route("/api/v1/categories/:id")
+  .get(categoryController.findSingleItem)
+  .patch(
+    authenticate,
+    authorize(["admin"]),
+    categoryController.updateItemPatch,
+  );
+
+/**
+ * Category status management.
+ */
+router.patch(
+  "/api/v1/categories/:id/status",
+  authenticate,
+  authorize(["admin"]),
+  categoryController.updateStatus,
+);
 
 /**
  * ==================================================

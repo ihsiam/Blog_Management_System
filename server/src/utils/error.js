@@ -83,6 +83,22 @@ const forbidden = (message = "Permission denied") =>
   });
 
 /**
+ * Creates a 409 Conflict error.
+ *
+ * Used when a resource conflicts with an existing resource.
+ *
+ * @param {string} [message="Resource already exists"] - Error message.
+ *
+ * @returns {Error} Error with HTTP status code 409.
+ */
+const conflict = (message = "Resource already exists") =>
+  createError({
+    statusCode: 409,
+    error: "Conflict",
+    message,
+  });
+
+/**
  * Creates a 404 Not Found error.
  *
  * Used when a requested resource does not exist.
@@ -118,6 +134,7 @@ module.exports = {
   badRequest,
   unauthorized,
   forbidden,
+  conflict,
   notFound,
   serverError,
 };
