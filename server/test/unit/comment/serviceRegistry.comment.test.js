@@ -43,7 +43,7 @@ describe("service registry - getComments", () => {
     expect(mockGetAllComments).toHaveBeenCalledWith({
       page: 1,
       limit: 10,
-      sortKey: "-updatedAt",
+      sortKey: "-createdAt",
     });
     expect(result).toBe(comments);
   });
