@@ -2,13 +2,15 @@
  * Unit tests for src/lib/email/index.js
  *
  * Dependencies mocked:
- * - nodemailer (real SMTP delivery is an external service and must
- *   never run during unit tests)
+ * - src/utils/nodemailer (real SMTP delivery is an external service and
+ *   must never run during unit tests)
  */
 
 const mockSendMail = jest.fn();
 const mockCreateTransport = jest.fn(() => ({ sendMail: mockSendMail }));
-jest.doMock("nodemailer", () => ({ createTransport: mockCreateTransport }));
+jest.doMock("../../../src/utils/nodemailer", () => ({
+  createTransporter: mockCreateTransport,
+}));
 
 const { sendMail } = require("../../../src/lib/email");
 
