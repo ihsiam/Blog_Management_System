@@ -35,9 +35,9 @@ describe("authenticate middleware", () => {
       id: "1",
       email: "jane@test.com",
       role: "user",
-      status: "approved",
+      account_status: "active",
       refreshToken: "some-refresh-token",
-      password: "should-not-leak",
+      password_hash: "should-not-leak",
     });
 
     const req = buildRequest("Bearer valid-token");
@@ -48,9 +48,9 @@ describe("authenticate middleware", () => {
       id: "1",
       email: "jane@test.com",
       role: "user",
-      status: "approved",
+      status: "active",
     });
-    expect(req.user.password).toBeUndefined();
+    expect(req.user.password_hash).toBeUndefined();
     expect(next).toHaveBeenCalledWith();
   });
 
@@ -108,30 +108,11 @@ describe("authenticate middleware", () => {
     );
   });
 
-  it("should reject the request when the user has no active session", async () => {
+  it("should reject the request when the account is not active", async () => {
     mockVerifyAccessToken.mockReturnValue({ id: "1" });
     mockFindAuthUserById.mockResolvedValue({
       id: "1",
-      status: "approved",
-      refreshToken: null,
-    });
-
-    const req = buildRequest("Bearer valid-token");
-    await authenticate(req, {}, next);
-
-    expect(next).toHaveBeenCalledWith(
-      expect.objectContaining({
-        statusCode: 401,
-        message: "Session expired",
-      }),
-    );
-  });
-
-  it("should reject the request when the account is not approved", async () => {
-    mockVerifyAccessToken.mockReturnValue({ id: "1" });
-    mockFindAuthUserById.mockResolvedValue({
-      id: "1",
-      status: "pending",
+      account_status: "pending",
       refreshToken: "some-refresh-token",
     });
 

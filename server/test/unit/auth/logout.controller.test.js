@@ -7,9 +7,11 @@
  */
 
 const mockFindAuthUserById = jest.fn();
+const mockFindSessionByToken = jest.fn();
 const mockClearRefreshToken = jest.fn();
 jest.doMock("../../../src/lib/user", () => ({
   findAuthUserById: mockFindAuthUserById,
+  findSessionByToken: mockFindSessionByToken,
   clearRefreshToken: mockClearRefreshToken,
 }));
 
@@ -27,6 +29,7 @@ describe("logout controller", () => {
 
   beforeEach(() => {
     mockFindAuthUserById.mockReset();
+    mockFindSessionByToken.mockReset();
     mockClearRefreshToken.mockReset();
     mockVerifyRefreshToken.mockReset();
     res = createMockResponse();
@@ -74,16 +77,14 @@ describe("logout controller", () => {
 
   it("should invalidate the session and reject when the token no longer matches", async () => {
     mockVerifyRefreshToken.mockReturnValue({ id: "1" });
-    mockFindAuthUserById.mockResolvedValue({
-      id: "1",
-      refreshToken: "a-newer-token",
-    });
+    mockFindAuthUserById.mockResolvedValue({ id: "1" });
+    mockFindSessionByToken.mockResolvedValue(null);
     mockClearRefreshToken.mockResolvedValue(undefined);
 
     const req = { cookies: { refreshToken: "stale-token" } };
     await logoutController(req, res, next);
 
-    expect(mockClearRefreshToken).toHaveBeenCalledWith("1");
+    expect(mockClearRefreshToken).toHaveBeenCalledWith("1", "stale-token");
     expect(next).toHaveBeenCalledWith(
       expect.objectContaining({
         statusCode: 401,
@@ -95,17 +96,14 @@ describe("logout controller", () => {
 
   it("should clear the session and cookie on successful logout", async () => {
     mockVerifyRefreshToken.mockReturnValue({ id: "1" });
-    mockFindAuthUserById.mockResolvedValue({
-      id: "1",
-      refreshToken: "current-token",
-    });
+    mockFindAuthUserById.mockResolvedValue({ id: "1" });
+    mockFindSessionByToken.mockResolvedValue({ id: "session-1" });
     mockClearRefreshToken.mockResolvedValue(undefined);
 
     const req = { cookies: { refreshToken: "current-token" } };
     await logoutController(req, res, next);
 
-    expect(mockClearRefreshToken).toHaveBeenCalledTimes(1);
-    expect(mockClearRefreshToken).toHaveBeenCalledWith("1");
+    expect(mockClearRefreshToken).toHaveBeenCalledWith("1", "current-token");
     expect(res.clearCookie).toHaveBeenCalledWith("refreshToken", {
       httpOnly: true,
       secure: true,
@@ -121,10 +119,8 @@ describe("logout controller", () => {
 
   it("should propagate the error when clearing the session fails", async () => {
     mockVerifyRefreshToken.mockReturnValue({ id: "1" });
-    mockFindAuthUserById.mockResolvedValue({
-      id: "1",
-      refreshToken: "current-token",
-    });
+    mockFindAuthUserById.mockResolvedValue({ id: "1" });
+    mockFindSessionByToken.mockResolvedValue({ id: "session-1" });
     const dbError = new Error("database unavailable");
     mockClearRefreshToken.mockRejectedValue(dbError);
 

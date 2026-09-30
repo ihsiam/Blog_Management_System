@@ -2,19 +2,13 @@
  * Unit tests for src/api/v1/authentication/controllers/resendVerificationMail.js
  *
  * Dependencies mocked:
- * - src/lib/user  (user lookup)
- * - src/lib/token (activation token generation)
- * - src/lib/email (SMTP email sending)
+ * - src/lib/authentication (verification OTP creation)
+ * - src/lib/email          (SMTP email sending)
  */
 
-const mockFindUserByEmail = jest.fn();
-jest.doMock("../../../src/lib/user", () => ({
-  findUserByEmail: mockFindUserByEmail,
-}));
-
-const mockGenerateActiveResetToken = jest.fn();
-jest.doMock("../../../src/lib/token", () => ({
-  generateActiveResetToken: mockGenerateActiveResetToken,
+const mockCreateVerificationOtp = jest.fn();
+jest.doMock("../../../src/lib/authentication", () => ({
+  createVerificationOtp: mockCreateVerificationOtp,
 }));
 
 const mockSendMail = jest.fn();
@@ -28,12 +22,10 @@ describe("resendVerificationMail controller", () => {
   let next;
 
   beforeEach(() => {
-    mockFindUserByEmail.mockReset();
-    mockGenerateActiveResetToken.mockReset();
+    mockCreateVerificationOtp.mockReset();
     mockSendMail.mockReset();
     res = createMockResponse();
     next = jest.fn();
-    process.env.APP_URL = "http://localhost:3000";
   });
 
   describe("input validation", () => {
@@ -42,7 +34,7 @@ describe("resendVerificationMail controller", () => {
 
       await resendVerificationMailController(req, res, next);
 
-      expect(mockFindUserByEmail).not.toHaveBeenCalled();
+      expect(mockCreateVerificationOtp).not.toHaveBeenCalled();
       expect(next).toHaveBeenCalledWith(
         expect.objectContaining({ statusCode: 400 }),
       );
@@ -53,84 +45,86 @@ describe("resendVerificationMail controller", () => {
 
       await resendVerificationMailController(req, res, next);
 
-      expect(mockFindUserByEmail).not.toHaveBeenCalled();
+      expect(mockCreateVerificationOtp).not.toHaveBeenCalled();
       expect(next).toHaveBeenCalledWith(
         expect.objectContaining({ statusCode: 400 }),
       );
     });
   });
 
-  it("should reject when the user does not exist", async () => {
-    mockFindUserByEmail.mockResolvedValue(null);
+  it("should return a generic success message when the user does not exist", async () => {
+    mockCreateVerificationOtp.mockResolvedValue({ user: null, code: "123456" });
 
     const req = { body: { email: "missing@test.com" } };
     await resendVerificationMailController(req, res, next);
 
-    expect(next).toHaveBeenCalledWith(
-      expect.objectContaining({ statusCode: 404, message: "User not found" }),
-    );
+    expect(mockCreateVerificationOtp).toHaveBeenCalledWith("missing@test.com");
+    expect(mockSendMail).not.toHaveBeenCalled();
+    expect(res.status).toHaveBeenCalledWith(200);
+    expect(res.json).toHaveBeenCalledWith({
+      code: 200,
+      message:
+        "If an account with that email exists, a verification code has been sent.",
+    });
+    expect(next).not.toHaveBeenCalled();
   });
 
-  it("should reject when the account is already active", async () => {
-    mockFindUserByEmail.mockResolvedValue({ id: "1", status: "approved" });
+  it("should return a generic success message when the account is already active", async () => {
+    mockCreateVerificationOtp.mockResolvedValue({
+      user: { id: "1", email: "jane@test.com", account_status: "active" },
+      code: "123456",
+    });
 
     const req = { body: { email: "jane@test.com" } };
     await resendVerificationMailController(req, res, next);
 
-    expect(next).toHaveBeenCalledWith(
-      expect.objectContaining({
-        statusCode: 403,
-        message: "Account is already active",
-      }),
-    );
+    expect(mockSendMail).not.toHaveBeenCalled();
+    expect(res.status).toHaveBeenCalledWith(200);
+    expect(res.json).toHaveBeenCalledWith({
+      code: 200,
+      message:
+        "If an account with that email exists, a verification code has been sent.",
+    });
   });
 
   it("should resend the verification email for a pending account", async () => {
     const user = {
       id: "1",
       name: "Jane",
-      role: "user",
       email: "jane@test.com",
-      status: "pending",
+      account_status: "pending",
     };
-    mockFindUserByEmail.mockResolvedValue(user);
-    mockGenerateActiveResetToken.mockReturnValue("activation-token");
+    mockCreateVerificationOtp.mockResolvedValue({ user, code: "123456" });
     mockSendMail.mockResolvedValue({ messageId: "abc" });
 
     const req = { body: { email: user.email } };
     await resendVerificationMailController(req, res, next);
 
-    expect(mockGenerateActiveResetToken).toHaveBeenCalledWith({
-      id: user.id,
-      role: user.role,
+    expect(mockCreateVerificationOtp).toHaveBeenCalledWith(user.email);
+    expect(mockSendMail).toHaveBeenCalledWith({
       email: user.email,
+      subject: "Verify your account",
+      text: expect.stringContaining("123456"),
     });
-    expect(mockSendMail).toHaveBeenCalledWith(
-      expect.objectContaining({
-        email: user.email,
-        subject: "Activate your account",
-        text: expect.stringContaining(
-          "http://localhost:3000/api/v1/auth/verify-email/activation-token",
-        ),
-      }),
-    );
     expect(res.status).toHaveBeenCalledWith(200);
     expect(res.json).toHaveBeenCalledWith({
       code: 200,
-      message: "Verification email sent",
+      message:
+        "If an account with that email exists, a verification code has been sent.",
     });
     expect(next).not.toHaveBeenCalled();
   });
 
   it("should propagate the error when sending the email fails", async () => {
-    mockFindUserByEmail.mockResolvedValue({
-      id: "1",
-      name: "Jane",
-      role: "user",
-      email: "jane@test.com",
-      status: "pending",
+    mockCreateVerificationOtp.mockResolvedValue({
+      user: {
+        id: "1",
+        name: "Jane",
+        email: "jane@test.com",
+        account_status: "pending",
+      },
+      code: "123456",
     });
-    mockGenerateActiveResetToken.mockReturnValue("activation-token");
     const smtpError = new Error("Email sending failed: SMTP down");
     mockSendMail.mockRejectedValue(smtpError);
 

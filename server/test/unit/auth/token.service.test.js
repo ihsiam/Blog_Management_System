@@ -4,19 +4,12 @@
  * jsonwebtoken itself is NOT mocked: it is a pure, local, deterministic
  * library (no network/db/filesystem I/O), so exercising real sign/verify
  * round-trips is the most meaningful way to test this wrapper's logic.
- * `jwt.sign` is spied on for exactly one test to force the internal
- * error-handling branch of `signToken`.
- *
- * Secrets are set on `process.env` before the module is first required,
- * since the module reads them into a config object at import time.
  */
 
 process.env.JWT_ACCESS_SECRET = "test-access-secret";
 process.env.JWT_REFRESH_SECRET = "test-refresh-secret";
-process.env.JWT_ACTIVE_RESET_SECRET = "test-active-reset-secret";
 process.env.JWT_ACCESS_EXPIRES = "15m";
 process.env.JWT_REFRESH_EXPIRES = "7d";
-process.env.JWT_ACTIVE_RESET_EXPIRES = "5m";
 
 const jwt = require("jsonwebtoken");
 const tokenService = require("../../../src/lib/token");
@@ -25,10 +18,8 @@ describe("token service (src/lib/token)", () => {
   afterAll(() => {
     delete process.env.JWT_ACCESS_SECRET;
     delete process.env.JWT_REFRESH_SECRET;
-    delete process.env.JWT_ACTIVE_RESET_SECRET;
     delete process.env.JWT_ACCESS_EXPIRES;
     delete process.env.JWT_REFRESH_EXPIRES;
-    delete process.env.JWT_ACTIVE_RESET_EXPIRES;
   });
 
   afterEach(() => {
@@ -48,13 +39,6 @@ describe("token service (src/lib/token)", () => {
     it("should generate a valid refresh token that verifies with the refresh secret", () => {
       const token = tokenService.generateRefreshToken(payload);
       const decoded = jwt.verify(token, process.env.JWT_REFRESH_SECRET);
-
-      expect(decoded).toMatchObject(payload);
-    });
-
-    it("should generate a valid active/reset token that verifies with the active/reset secret", () => {
-      const token = tokenService.generateActiveResetToken(payload);
-      const decoded = jwt.verify(token, process.env.JWT_ACTIVE_RESET_SECRET);
 
       expect(decoded).toMatchObject(payload);
     });
@@ -126,10 +110,6 @@ describe("token service (src/lib/token)", () => {
     });
 
     it("should reject verification when the token is missing", () => {
-      // NOTE: see "Bugs discovered" in the final report — the specific
-      // "<label> token missing" message is never surfaced to the caller
-      // because of how the catch block is structured. This test documents
-      // the current, actual behavior.
       expect(() => tokenService.verifyAccessToken(undefined)).toThrow(
         expect.objectContaining({
           statusCode: 401,

@@ -2,19 +2,13 @@
  * Unit tests for src/api/v1/authentication/controllers/forgotPassword.js
  *
  * Dependencies mocked:
- * - src/lib/user  (user lookup)
- * - src/lib/token (reset token generation)
- * - src/lib/email (SMTP email sending)
+ * - src/lib/authentication (password-reset OTP creation)
+ * - src/lib/email          (SMTP email sending)
  */
 
-const mockFindUserByEmail = jest.fn();
-jest.doMock("../../../src/lib/user", () => ({
-  findUserByEmail: mockFindUserByEmail,
-}));
-
-const mockGenerateActiveResetToken = jest.fn();
-jest.doMock("../../../src/lib/token", () => ({
-  generateActiveResetToken: mockGenerateActiveResetToken,
+const mockCreatePasswordResetOtp = jest.fn();
+jest.doMock("../../../src/lib/authentication", () => ({
+  createPasswordResetOtp: mockCreatePasswordResetOtp,
 }));
 
 const mockSendMail = jest.fn();
@@ -28,15 +22,13 @@ describe("forgotPassword controller", () => {
   let next;
 
   const GENERIC_MESSAGE =
-    "If this email is registered, you will receive a password reset link.";
+    "If an account with that email exists, a password reset code has been sent.";
 
   beforeEach(() => {
-    mockFindUserByEmail.mockReset();
-    mockGenerateActiveResetToken.mockReset();
+    mockCreatePasswordResetOtp.mockReset();
     mockSendMail.mockReset();
     res = createMockResponse();
     next = jest.fn();
-    process.env.APP_URL = "http://localhost:3000";
   });
 
   describe("input validation", () => {
@@ -45,7 +37,7 @@ describe("forgotPassword controller", () => {
 
       await forgotPasswordController(req, res, next);
 
-      expect(mockFindUserByEmail).not.toHaveBeenCalled();
+      expect(mockCreatePasswordResetOtp).not.toHaveBeenCalled();
       expect(next).toHaveBeenCalledWith(
         expect.objectContaining({ statusCode: 400 }),
       );
@@ -56,7 +48,7 @@ describe("forgotPassword controller", () => {
 
       await forgotPasswordController(req, res, next);
 
-      expect(mockFindUserByEmail).not.toHaveBeenCalled();
+      expect(mockCreatePasswordResetOtp).not.toHaveBeenCalled();
       expect(next).toHaveBeenCalledWith(
         expect.objectContaining({ statusCode: 400 }),
       );
@@ -64,12 +56,15 @@ describe("forgotPassword controller", () => {
   });
 
   it("should return the generic message without sending an email when the user does not exist", async () => {
-    mockFindUserByEmail.mockResolvedValue(null);
+    mockCreatePasswordResetOtp.mockResolvedValue({
+      user: null,
+      code: "123456",
+    });
 
     const req = { body: { email: "missing@test.com" } };
     await forgotPasswordController(req, res, next);
 
-    expect(mockGenerateActiveResetToken).not.toHaveBeenCalled();
+    expect(mockCreatePasswordResetOtp).toHaveBeenCalledWith("missing@test.com");
     expect(mockSendMail).not.toHaveBeenCalled();
     expect(res.status).toHaveBeenCalledWith(200);
     expect(res.json).toHaveBeenCalledWith({
@@ -78,11 +73,10 @@ describe("forgotPassword controller", () => {
     });
   });
 
-  it("should return the generic message without sending an email for a declined account", async () => {
-    mockFindUserByEmail.mockResolvedValue({
-      id: "1",
-      email: "jane@test.com",
-      status: "declined",
+  it("should return the generic message without sending an email for a blocked account", async () => {
+    mockCreatePasswordResetOtp.mockResolvedValue({
+      user: { id: "1", email: "jane@test.com", account_status: "blocked" },
+      code: "123456",
     });
 
     const req = { body: { email: "jane@test.com" } };
@@ -100,31 +94,21 @@ describe("forgotPassword controller", () => {
     const user = {
       id: "1",
       name: "Jane",
-      role: "user",
       email: "jane@test.com",
-      status: "approved",
+      account_status: "active",
     };
-    mockFindUserByEmail.mockResolvedValue(user);
-    mockGenerateActiveResetToken.mockReturnValue("reset-token");
+    mockCreatePasswordResetOtp.mockResolvedValue({ user, code: "123456" });
     mockSendMail.mockResolvedValue({ messageId: "abc" });
 
     const req = { body: { email: user.email } };
     await forgotPasswordController(req, res, next);
 
-    expect(mockGenerateActiveResetToken).toHaveBeenCalledWith({
-      id: user.id,
-      role: user.role,
+    expect(mockCreatePasswordResetOtp).toHaveBeenCalledWith(user.email);
+    expect(mockSendMail).toHaveBeenCalledWith({
       email: user.email,
+      subject: "Reset your password",
+      text: expect.stringContaining("123456"),
     });
-    expect(mockSendMail).toHaveBeenCalledWith(
-      expect.objectContaining({
-        email: user.email,
-        subject: "Reset your password",
-        text: expect.stringContaining(
-          "http://localhost:3000/api/v1/auth/reset-password/reset-token",
-        ),
-      }),
-    );
     expect(res.status).toHaveBeenCalledWith(200);
     expect(res.json).toHaveBeenCalledWith({
       code: 200,
@@ -133,14 +117,15 @@ describe("forgotPassword controller", () => {
   });
 
   it("should propagate the error when sending the reset email fails", async () => {
-    mockFindUserByEmail.mockResolvedValue({
-      id: "1",
-      name: "Jane",
-      role: "user",
-      email: "jane@test.com",
-      status: "approved",
+    mockCreatePasswordResetOtp.mockResolvedValue({
+      user: {
+        id: "1",
+        name: "Jane",
+        email: "jane@test.com",
+        account_status: "active",
+      },
+      code: "123456",
     });
-    mockGenerateActiveResetToken.mockReturnValue("reset-token");
     const smtpError = new Error("Email sending failed: SMTP down");
     mockSendMail.mockRejectedValue(smtpError);
 

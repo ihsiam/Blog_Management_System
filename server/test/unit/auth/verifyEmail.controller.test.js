@@ -2,26 +2,12 @@
  * Unit tests for src/api/v1/authentication/controllers/verifyEmail.js
  *
  * Dependencies mocked:
- * - src/lib/token (activation token verification/generation)
- * - src/lib/user  (user lookup/update, refresh token persistence)
+ * - src/lib/authentication (OTP verification business logic)
  */
 
-const mockVerifyActiveResetToken = jest.fn();
-const mockGenerateRefreshToken = jest.fn();
-const mockGenerateAccessToken = jest.fn();
-jest.doMock("../../../src/lib/token", () => ({
-  verifyActiveResetToken: mockVerifyActiveResetToken,
-  generateRefreshToken: mockGenerateRefreshToken,
-  generateAccessToken: mockGenerateAccessToken,
-}));
-
-const mockFindUserById = jest.fn();
-const mockUpdateUser = jest.fn();
-const mockSaveRefreshToken = jest.fn();
-jest.doMock("../../../src/lib/user", () => ({
-  findUserById: mockFindUserById,
-  updateUser: mockUpdateUser,
-  saveRefreshToken: mockSaveRefreshToken,
+const mockVerifyEmailOtp = jest.fn();
+jest.doMock("../../../src/lib/authentication", () => ({
+  verifyEmailOtp: mockVerifyEmailOtp,
 }));
 
 const verifyEmailController = require("../../../src/api/v1/authentication/controllers/verifyEmail");
@@ -32,101 +18,68 @@ describe("verifyEmail controller", () => {
   let next;
 
   beforeEach(() => {
-    mockVerifyActiveResetToken.mockReset();
-    mockGenerateRefreshToken.mockReset();
-    mockGenerateAccessToken.mockReset();
-    mockFindUserById.mockReset();
-    mockUpdateUser.mockReset();
-    mockSaveRefreshToken.mockReset();
+    mockVerifyEmailOtp.mockReset();
     res = createMockResponse();
     next = jest.fn();
   });
 
-  const buildRequest = (token) => ({ params: { token } });
-
-  it("should propagate the error when the activation token is invalid", async () => {
-    const tokenError = new Error("Invalid Active/Reset token");
-    mockVerifyActiveResetToken.mockImplementation(() => {
-      throw tokenError;
-    });
-
-    await verifyEmailController(buildRequest("bad-token"), res, next);
-
-    expect(next).toHaveBeenCalledWith(tokenError);
-    expect(mockFindUserById).not.toHaveBeenCalled();
+  const buildRequest = (email, otp) => ({
+    body: { email, otp },
   });
 
-  it("should reject when the user no longer exists", async () => {
-    mockVerifyActiveResetToken.mockReturnValue({ id: "1" });
-    mockFindUserById.mockResolvedValue(null);
+  it("should reject when the email or code is missing", async () => {
+    await verifyEmailController(buildRequest(undefined, "123456"), res, next);
 
-    await verifyEmailController(buildRequest("valid-token"), res, next);
-
-    expect(next).toHaveBeenCalledWith(
-      expect.objectContaining({ statusCode: 404, message: "User not found" }),
-    );
-  });
-
-  it("should reject when the account has already been verified", async () => {
-    mockVerifyActiveResetToken.mockReturnValue({ id: "1" });
-    mockFindUserById.mockResolvedValue({ id: "1", status: "approved" });
-
-    await verifyEmailController(buildRequest("valid-token"), res, next);
-
+    expect(mockVerifyEmailOtp).not.toHaveBeenCalled();
     expect(next).toHaveBeenCalledWith(
       expect.objectContaining({
         statusCode: 400,
-        message: "Account already verified",
+        message: "Invalid or expired OTP",
       }),
     );
-    expect(mockUpdateUser).not.toHaveBeenCalled();
   });
 
-  it("should activate a pending account and return an access token", async () => {
-    mockVerifyActiveResetToken.mockReturnValue({ id: "1" });
-    mockFindUserById.mockResolvedValue({ id: "1", status: "pending" });
-    const updatedUser = {
-      id: "1",
-      role: "user",
-      email: "jane@test.com",
-      status: "approved",
-    };
-    mockUpdateUser.mockResolvedValue(updatedUser);
-    mockGenerateRefreshToken.mockReturnValue("refresh-token");
-    mockGenerateAccessToken.mockReturnValue("access-token");
-    mockSaveRefreshToken.mockResolvedValue(undefined);
-
-    await verifyEmailController(buildRequest("valid-token"), res, next);
-
-    expect(mockUpdateUser).toHaveBeenCalledWith({
-      id: "1",
-      status: "approved",
+  it("should propagate the error when the OTP verification fails", async () => {
+    const otpError = Object.assign(new Error("Invalid or expired OTP"), {
+      statusCode: 400,
     });
-    expect(mockSaveRefreshToken).toHaveBeenCalledWith("1", "refresh-token");
-    expect(res.cookie).toHaveBeenCalledWith("refreshToken", "refresh-token", {
-      httpOnly: true,
-      secure: true,
-      sameSite: "strict",
+    mockVerifyEmailOtp.mockRejectedValue(otpError);
+
+    await verifyEmailController(
+      buildRequest("jane@test.com", "123456"),
+      res,
+      next,
+    );
+
+    expect(mockVerifyEmailOtp).toHaveBeenCalledWith({
+      email: "jane@test.com",
+      code: "123456",
+    });
+    expect(next).toHaveBeenCalledWith(otpError);
+    expect(res.status).not.toHaveBeenCalled();
+  });
+
+  it("should verify the OTP and return a success response", async () => {
+    mockVerifyEmailOtp.mockResolvedValue(undefined);
+
+    await verifyEmailController(
+      buildRequest("jane@test.com", "123456"),
+      res,
+      next,
+    );
+
+    expect(mockVerifyEmailOtp).toHaveBeenCalledWith({
+      email: "jane@test.com",
+      code: "123456",
     });
     expect(res.status).toHaveBeenCalledWith(200);
-    expect(res.json).toHaveBeenCalledWith(
-      expect.objectContaining({
-        code: 200,
-        data: { accessToken: "access-token" },
-      }),
-    );
+    expect(res.json).toHaveBeenCalledWith({
+      code: 200,
+      message: "Email verified successfully.",
+      links: {
+        "sign-in": "/api/v1/auth/sign-in",
+      },
+    });
     expect(next).not.toHaveBeenCalled();
-  });
-
-  it("should propagate the error when activating the account fails", async () => {
-    mockVerifyActiveResetToken.mockReturnValue({ id: "1" });
-    mockFindUserById.mockResolvedValue({ id: "1", status: "pending" });
-    const dbError = new Error("database unavailable");
-    mockUpdateUser.mockRejectedValue(dbError);
-
-    await verifyEmailController(buildRequest("valid-token"), res, next);
-
-    expect(next).toHaveBeenCalledWith(dbError);
-    expect(res.status).not.toHaveBeenCalled();
   });
 });

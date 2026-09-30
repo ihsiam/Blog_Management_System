@@ -3,18 +3,12 @@
  *
  * Dependencies mocked:
  * - src/lib/authentication (register business logic)
- * - src/lib/token           (activation token generation)
- * - src/lib/email           (SMTP email sending)
+ * - src/lib/email          (SMTP email sending)
  */
 
 const mockRegister = jest.fn();
 jest.doMock("../../../src/lib/authentication", () => ({
   register: mockRegister,
-}));
-
-const mockGenerateActiveResetToken = jest.fn();
-jest.doMock("../../../src/lib/token", () => ({
-  generateActiveResetToken: mockGenerateActiveResetToken,
 }));
 
 const mockSendMail = jest.fn();
@@ -29,11 +23,9 @@ describe("register controller", () => {
 
   beforeEach(() => {
     mockRegister.mockReset();
-    mockGenerateActiveResetToken.mockReset();
     mockSendMail.mockReset();
     res = createMockResponse();
     next = jest.fn();
-    process.env.APP_URL = "http://localhost:3000";
   });
 
   const validBody = {
@@ -92,48 +84,44 @@ describe("register controller", () => {
   });
 
   describe("successful registration", () => {
-    it("should create the account, send an activation email, and return sanitized user data", async () => {
+    it("should create the account, send a verification code email, and return a sanitized user payload", async () => {
       const createdUser = {
         id: "1",
         name: "Jane",
         email: "jane@test.com",
-        password: "hashed-password",
-        status: "pending",
+        account_status: "pending",
         createdAt: "2024-01-01T00:00:00.000Z",
         updatedAt: "2024-01-01T00:00:00.000Z",
+        verificationCode: "123456",
       };
       mockRegister.mockResolvedValue(createdUser);
-      mockGenerateActiveResetToken.mockReturnValue("activation-token");
       mockSendMail.mockResolvedValue({ messageId: "abc" });
 
       const req = { body: validBody };
       await registerController(req, res, next);
 
       expect(mockRegister).toHaveBeenCalledWith(validBody);
-      expect(mockGenerateActiveResetToken).toHaveBeenCalledWith({
-        id: createdUser.id,
-        role: createdUser.role,
-        email: createdUser.email,
+      expect(mockSendMail).toHaveBeenCalledWith({
+        email: validBody.email,
+        subject: "Activate your account",
+        text: expect.stringContaining("123456"),
       });
-      expect(mockSendMail).toHaveBeenCalledWith(
-        expect.objectContaining({
-          email: validBody.email,
-          subject: "Activate your account",
-          text: expect.stringContaining(
-            "http://localhost:3000/api/v1/auth/verify-email/activation-token",
-          ),
-        }),
-      );
 
       expect(res.status).toHaveBeenCalledWith(201);
       const jsonPayload = res.json.mock.calls[0][0];
-      expect(jsonPayload.data).toEqual({
-        id: createdUser.id,
-        name: createdUser.name,
-        email: createdUser.email,
-        status: createdUser.status,
-        createdAt: createdUser.createdAt,
-        updatedAt: createdUser.updatedAt,
+      expect(jsonPayload).toMatchObject({
+        code: 201,
+        message:
+          "Account created successfully. Please check your email to activate your account.",
+        data: {
+          id: createdUser.id,
+          name: createdUser.name,
+          email: createdUser.email,
+          status: createdUser.account_status,
+          createdAt: createdUser.createdAt,
+          updatedAt: createdUser.updatedAt,
+        },
+        links: { self: "/api/v1/auth/sign-up" },
       });
       expect(jsonPayload.data.password).toBeUndefined();
       expect(next).not.toHaveBeenCalled();
@@ -160,9 +148,9 @@ describe("register controller", () => {
         id: "1",
         name: "Jane",
         email: "jane@test.com",
-        role: "user",
+        account_status: "pending",
+        verificationCode: "123456",
       });
-      mockGenerateActiveResetToken.mockReturnValue("activation-token");
       const smtpError = new Error("Email sending failed: SMTP down");
       mockSendMail.mockRejectedValue(smtpError);
 

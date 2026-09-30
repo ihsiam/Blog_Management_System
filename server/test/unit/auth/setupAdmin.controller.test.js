@@ -94,7 +94,10 @@ describe("setupAdmin controller", () => {
       mockGenerateRefreshToken.mockReturnValue("refresh-token");
       mockSaveRefreshToken.mockResolvedValue(undefined);
 
-      const req = { body: validBody };
+      const req = {
+        body: validBody,
+        get: jest.fn().mockReturnValue("Mozilla/5.0"),
+      };
       await setupAdminController(req, res, next);
 
       expect(mockSystemAdmin).toHaveBeenCalledWith(validBody);
@@ -108,18 +111,20 @@ describe("setupAdmin controller", () => {
       expect(mockSaveRefreshToken).toHaveBeenCalledWith(
         createdAdmin.id,
         "refresh-token",
+        "Mozilla/5.0",
       );
       expect(res.cookie).toHaveBeenCalledWith("refreshToken", "refresh-token", {
         httpOnly: true,
         secure: true,
+        sameSite: "strict",
       });
       expect(res.status).toHaveBeenCalledWith(201);
-      expect(res.json).toHaveBeenCalledWith(
-        expect.objectContaining({
-          code: 201,
-          data: { accessToken: "access-token" },
-        }),
-      );
+      expect(res.json).toHaveBeenCalledWith({
+        code: 201,
+        message: "System administrator created successfully",
+        data: { accessToken: "access-token" },
+        links: { "sign-in": "/api/v1/auth/sign-in" },
+      });
       expect(next).not.toHaveBeenCalled();
     });
   });

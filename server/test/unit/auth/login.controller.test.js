@@ -21,9 +21,19 @@ describe("login controller", () => {
     next = jest.fn();
   });
 
+  const buildRequest = (overrides = {}) => ({
+    body: {
+      email: "jane@test.com",
+      password: "correct-password",
+      ...overrides.body,
+    },
+    get: jest.fn().mockReturnValue("Mozilla/5.0"),
+    ...overrides,
+  });
+
   describe("input validation", () => {
     it("should reject when email is missing", async () => {
-      const req = { body: { password: "some-password" } };
+      const req = buildRequest({ body: { password: "some-password" } });
 
       await loginController(req, res, next);
 
@@ -36,7 +46,9 @@ describe("login controller", () => {
     });
 
     it("should reject an invalid email format", async () => {
-      const req = { body: { email: "invalid", password: "some-password" } };
+      const req = buildRequest({
+        body: { email: "invalid", password: "some-password" },
+      });
 
       await loginController(req, res, next);
 
@@ -48,7 +60,8 @@ describe("login controller", () => {
     });
 
     it("should reject when password is missing", async () => {
-      const req = { body: { email: "jane@test.com" } };
+      const req = buildRequest({ body: { email: "jane@test.com" } });
+      delete req.body.password;
 
       await loginController(req, res, next);
 
@@ -67,14 +80,13 @@ describe("login controller", () => {
         refreshToken: "refresh-token",
       });
 
-      const req = {
-        body: { email: "jane@test.com", password: "correct-password" },
-      };
+      const req = buildRequest();
       await loginController(req, res, next);
 
       expect(mockLogin).toHaveBeenCalledWith({
         email: "jane@test.com",
         password: "correct-password",
+        deviceInfo: "Mozilla/5.0",
       });
       expect(res.cookie).toHaveBeenCalledWith("refreshToken", "refresh-token", {
         httpOnly: true,
@@ -82,9 +94,12 @@ describe("login controller", () => {
         sameSite: "strict",
       });
       expect(res.status).toHaveBeenCalledWith(200);
-      const jsonPayload = res.json.mock.calls[0][0];
-      expect(jsonPayload.data).toEqual({ accessToken: "access-token" });
-      expect(jsonPayload.data.refreshToken).toBeUndefined();
+      expect(res.json).toHaveBeenCalledWith({
+        code: 200,
+        message: "Login successful",
+        data: { accessToken: "access-token" },
+        links: { self: "/api/v1/auth/sign-in" },
+      });
       expect(next).not.toHaveBeenCalled();
     });
   });
@@ -96,9 +111,7 @@ describe("login controller", () => {
       });
       mockLogin.mockRejectedValue(authError);
 
-      const req = {
-        body: { email: "jane@test.com", password: "wrong-password" },
-      };
+      const req = buildRequest();
       await loginController(req, res, next);
 
       expect(next).toHaveBeenCalledWith(authError);
