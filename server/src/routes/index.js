@@ -218,8 +218,7 @@ router.patch(
  */
 router
   .route("/api/v1/comments")
-  .get(authenticate, authorize(["admin"]), commentsController.getComments)
-  .post(authenticate, authorize(["admin"]), commentsController.postComment);
+  .get(authenticate, authorize(["admin"]), commentsController.getComments);
 
 /**
  * Single comment operations.
@@ -238,6 +237,14 @@ router
     ownership("comment"),
     commentsController.deleteComment,
   );
+
+router.patch(
+  "/api/v1/comments/:id/status",
+  authenticate,
+  authorize(["admin"]),
+  ownership("comment"),
+  commentsController.updateCommentStatus,
+);
 
 /**
  * ==================================================

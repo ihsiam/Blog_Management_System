@@ -75,6 +75,14 @@ const getComments = async (req, res, next) => {
       });
     }
 
+    if (status && !["public", "hidden"].includes(status)) {
+      errors.push({
+        field: "status",
+        message: "invalid input",
+        in: "query",
+      });
+    }
+
     // id validation
     if (postId && !mongoose.Types.ObjectId.isValid(postId)) {
       errors.push({

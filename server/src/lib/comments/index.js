@@ -64,13 +64,20 @@ const getCommentsByArticle = async ({
 
   const nodes = comments.map((comment) => {
     const object = comment.toObject();
-    const { author_id, article_id, status, parent_comment_id, ...rest } =
-      object;
+    const {
+      author_id: authorId,
+      article_id: articleId,
+      status: commentStatus,
+      parent_comment_id: parentCommentId,
+      ...rest
+    } = object;
 
     return {
       ...rest,
-      parentCommentId: parent_comment_id || null,
-      author: author_id ? { id: author_id.id, name: author_id.name } : null,
+      parentCommentId: parentCommentId || null,
+      author: authorId ? { id: authorId.id, name: authorId.name } : null,
+      status: commentStatus,
+      article: articleId,
       replies: [],
     };
   });
@@ -87,7 +94,9 @@ const getCommentsByArticle = async ({
   });
 
   const stripInternalFields = (comment) => {
-    const { parentCommentId, parent_comment_id, ...rest } = comment;
+    const rest = { ...comment };
+    delete rest.parentCommentId;
+
     return {
       ...rest,
       replies: Array.isArray(comment.replies)
@@ -232,13 +241,18 @@ const create = async ({
   await invalidateArticleCommentCaches(articleID);
 
   const object = comment.toObject();
-  const { author_id, article_id, parent_comment_id, ...rest } = object;
+  const {
+    author_id: authorId,
+    article_id: articleId,
+    parent_comment_id: parentCommentDbId,
+    ...rest
+  } = object;
 
   return {
     ...rest,
-    article: article_id,
-    author: author_id ? { id: author_id.id, name: author_id.name } : null,
-    parentCommentId: parent_comment_id || null,
+    article: articleId,
+    author: authorId ? { id: authorId.id, name: authorId.name } : null,
+    parentCommentId: parentCommentDbId || null,
   };
 };
 
@@ -273,23 +287,74 @@ const updateComment = async ({ id, body, status }) => {
 };
 
 /**
- * Deletes a comment by ID.
+ * Updates a comment visibility status.
+ *
+ * @param {Object} params
+ * @param {string} params.id - Comment ID
+ * @param {string} params.status - Comment visibility status
+ * @returns {Promise<Object>} Updated comment
+ */
+const updateStatus = async ({ id, status }) => {
+  const comment = await Comment.findById(id);
+
+  if (!comment) {
+    throw notFound();
+  }
+
+  comment.status = status;
+  await comment.save();
+
+  await invalidateArticleCommentCaches(comment.article_id);
+
+  return comment.toObject();
+};
+
+/**
+ * Deletes a comment and all of its nested replies.
  *
  * @param {string} id - Comment ID
  * @returns {Promise<boolean>} Deletion success flag
  * @throws {Error} NotFound if comment does not exist
  */
 const deleteItem = async (id) => {
-  // find and delete
-  const comment = await Comment.findByIdAndDelete(id);
+  const comment = await Comment.findById(id);
 
   if (!comment) {
     throw notFound();
   }
 
+  const collectNestedCommentIds = async (parentId, visited = new Set()) => {
+    const children = await Comment.find(
+      { parent_comment_id: parentId },
+      { _id: 1 },
+    );
+
+    const childIds = children
+      .map((child) => child._id.toString())
+      .filter((childId) => !visited.has(childId));
+
+    childIds.forEach((childId) => visited.add(childId));
+
+    if (!childIds.length) {
+      return [];
+    }
+
+    const nestedChildIds = await Promise.all(
+      childIds.map((childId) => collectNestedCommentIds(childId, visited)),
+    );
+
+    return [...childIds, ...nestedChildIds.flat()];
+  };
+
+  const idsToDelete = new Set([id.toString()]);
+  const nestedIds = await collectNestedCommentIds(id.toString(), idsToDelete);
+
+  nestedIds.forEach((nestedId) => idsToDelete.add(nestedId));
+
+  await Comment.deleteMany({ _id: { $in: [...idsToDelete] } });
   await invalidateArticleCommentCaches(comment.article_id);
 
-  return !!comment;
+  return true;
 };
 
 /**
@@ -343,6 +408,7 @@ module.exports = {
   create,
   count,
   updateComment,
+  updateStatus,
   checkOwner,
   deleteItem,
   deleteMany,

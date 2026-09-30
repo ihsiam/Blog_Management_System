@@ -3,58 +3,41 @@ const { badRequest } = require("../../../../utils/error");
 const commentServices = require("../../../../lib/comments");
 
 /**
- * Updates an existing comment.
- *
- * - If `req.adminOverride` is true → only comment status can be updated
- * - If normal user → can update comment body (and admin may optionally update status)
+ * Updates a comment visibility status.
  *
  * @param {import("express").Request} req - Express request object
  * @param {Object} req.params - Route parameters
  * @param {string} req.params.id - Comment ID
- *
  * @param {Object} req.body - Request payload
- * @param {string} [req.body.body] - Comment text content
- * @param {string} [req.body.status] - Comment status (public | hidden)
- *
+ * @param {string} req.body.status - Comment visibility status
  * @param {import("express").Response} res - Express response object
  * @param {Function} next - Express error handler middleware
  *
- * @returns {Promise<void>} Returns updated comment response
+ * @returns {Promise<void>} Sends the updated comment response
  */
-const updateComment = async (req, res, next) => {
+const updateCommentStatus = async (req, res, next) => {
   try {
     const { id } = req.params;
-    const { body } = req.body;
+    const { status } = req.body;
     const errors = [];
 
     if (!id || !mongoose.Types.ObjectId.isValid(id)) {
-      errors.push({
-        field: "id",
-        message: "invalid input",
-        in: "params",
-      });
+      errors.push({ field: "id", message: "invalid input", in: "params" });
     }
 
-    if (body === undefined || typeof body !== "string" || !body.trim()) {
-      errors.push({
-        field: "body",
-        message: "invalid input",
-        in: "body",
-      });
+    if (!status || !["public", "hidden"].includes(status)) {
+      errors.push({ field: "status", message: "invalid input", in: "body" });
     }
 
     if (errors.length) {
       throw badRequest(errors, "invalid input");
     }
 
-    const comment = await commentServices.updateComment({
-      id,
-      body,
-    });
+    const comment = await commentServices.updateStatus({ id, status });
 
     return res.status(200).json({
       code: 200,
-      message: "comment updated",
+      message: "comment status updated",
       data: comment,
       links: {
         self: `/api/v1/comments/${comment.id}`,
@@ -65,4 +48,4 @@ const updateComment = async (req, res, next) => {
   }
 };
 
-module.exports = updateComment;
+module.exports = updateCommentStatus;
