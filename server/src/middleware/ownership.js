@@ -10,7 +10,6 @@ const { forbidden, unauthorized, badRequest } = require("../utils/error");
  *
  * @param {string} model - Resource type (e.g., "article", "comment")
  * @param {Object} [options={}] - Middleware configuration options
- * @param {boolean} [options.allowMissing=false] - If true, allows missing resource handling in service layer
  *
  * @returns {import("express").RequestHandler} Express middleware function
  */
@@ -46,17 +45,13 @@ const ownership =
         const isOwner = await articleServices.checkOwner({
           resourceId: req.params.id,
           userId: req.user.id,
-          allowMissing: options.allowMissing,
         });
 
-        // Allow access if owner or service allows missing resource
-        if (isOwner === null || isOwner === true) {
+        if (isOwner) {
           return next();
         }
 
-        // Admin override
-        if (req.user.role === "admin" && !options.allowMissing) {
-          req.adminOverride = true;
+        if (options.allowAdmin && req.user.role === "admin") {
           return next();
         }
 

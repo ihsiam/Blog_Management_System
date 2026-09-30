@@ -26,6 +26,9 @@ const applyMiddleware = (app) => {
   // Parse incoming JSON requests
   app.use(express.json());
 
+  // Serve locally stored article cover uploads during development.
+  app.use("/uploads", express.static(path.join(__dirname, "../../uploads")));
+
   // Enable CORS with credentials support (cookies, auth headers)
   app.use(
     cors({

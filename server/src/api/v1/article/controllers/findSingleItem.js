@@ -27,6 +27,10 @@ const findSingleItem = async (req, res, next) => {
   try {
     const { id } = req.params;
     const expand = req.query.expand || "";
+    const expandValues = expand
+      .split(",")
+      .map((item) => item.trim())
+      .filter(Boolean);
 
     /**
      * Collect validation errors
@@ -55,6 +59,17 @@ const findSingleItem = async (req, res, next) => {
       });
     }
 
+    if (
+      expandValues.length &&
+      expandValues.some((item) => !["comments"].includes(item))
+    ) {
+      errors.push({
+        field: "expand",
+        message: "invalid input",
+        in: "query",
+      });
+    }
+
     /**
      * Throw validation error if any exist
      */
@@ -68,6 +83,7 @@ const findSingleItem = async (req, res, next) => {
     const article = await articleServices.findSingleItem({
       id,
       expand,
+      user: req.user,
     });
 
     /**

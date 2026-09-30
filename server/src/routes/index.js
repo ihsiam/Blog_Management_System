@@ -8,8 +8,11 @@ const { categoryController } = require("../api/v1/category");
 const { userController } = require("../api/v1/user");
 
 const authenticate = require("../middleware/authenticate");
+const authenticateOptional = require("../middleware/authenticateOptional");
 const authorize = require("../middleware/authorize");
 const ownership = require("../middleware/ownership");
+const articleUpload = require("../middleware/articleUpload");
+const upload = require("../utils/multer");
 
 /**
  * Authentication rate limiter.
@@ -99,13 +102,19 @@ router.delete(
 router
   .route("/api/v1/articles")
   .get(articleController.findAll)
-  .post(authenticate, authorize(["user", "admin"]), articleController.create);
+  .post(
+    authenticate,
+    authorize(["user", "admin"]),
+    upload.single("cover"),
+    articleUpload,
+    articleController.create,
+  );
 
 /**
  * Admin article listing.
  */
 router
-  .route("/api/v1/articles/all")
+  .route("/api/v1/articles/admin/all")
   .get(authenticate, authorize(["admin"]), articleController.getAllByAdmin);
 
 /**
@@ -113,25 +122,28 @@ router
  */
 router
   .route("/api/v1/articles/:id")
-  .get(articleController.findSingleItem)
-  .put(
-    authenticate,
-    authorize(["user", "admin"]),
-    ownership("article", { allowMissing: true }),
-    articleController.updateOrCreateItem,
-  )
+  .get(authenticateOptional, articleController.findSingleItem)
   .patch(
     authenticate,
     authorize(["user", "admin"]),
     ownership("article"),
+    upload.single("cover"),
+    articleUpload,
     articleController.updateItemPatch,
   )
   .delete(
     authenticate,
     authorize(["user", "admin"]),
-    ownership("article"),
+    ownership("article", { allowAdmin: true }),
     articleController.deleteItem,
   );
+
+router.patch(
+  "/api/v1/articles/:id/status",
+  authenticate,
+  authorize(["admin"]),
+  articleController.updateStatus,
+);
 
 /**
  * Article author resource.
@@ -151,6 +163,13 @@ router
     authorize(["user", "admin"]),
     articleController.postCommentOnArticle,
   );
+
+router.post(
+  "/api/v1/articles/:articleId/comments/:commentId/replies",
+  authenticate,
+  authorize(["user", "admin"]),
+  articleController.postCommentReply,
+);
 
 /**
  * ==================================================

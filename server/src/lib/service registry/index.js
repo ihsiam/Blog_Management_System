@@ -1,3 +1,4 @@
+const mongoose = require("mongoose");
 const commentServices = require("../comments");
 const articleServices = require("../articles");
 const UserServices = require("../user");
@@ -19,19 +20,21 @@ const ARTICLE_AUTHOR_TTL_SECONDS = 300;
  * @returns {Promise<boolean>}
  */
 const deleteArticle = async (id) => {
-  // find article
-  const article = await articleServices.findArticleById(id);
+  const session = await mongoose.startSession();
+  let deleted;
 
-  // if not found
-  if (!article) {
-    throw notFound();
+  try {
+    await session.withTransaction(async () => {
+      const article = await articleServices.findArticleById(id, session);
+
+      if (!article) throw notFound();
+
+      await commentServices.deleteMany({ article: article.id }, session);
+      deleted = await articleServices.deleteItem(id, session);
+    });
+  } finally {
+    await session.endSession();
   }
-
-  // delete all comments of this article
-  await commentServices.deleteMany({ article: article.id });
-
-  // delete article itself
-  const deleted = await articleServices.deleteItem(id);
 
   await deleteCache(`article:${id}:author`);
   await deleteCachePattern(`article:${id}:expand:*`);
@@ -124,6 +127,7 @@ const createComment = async ({
   body,
   status = defaults.commentStatus,
   author,
+  parentCommentId,
 }) => {
   // validate article exists
   const article = await articleServices.findSingleItem({ id: articleID });
@@ -141,6 +145,7 @@ const createComment = async ({
     body,
     status,
     author,
+    parentCommentId,
   });
 };
 
@@ -156,17 +161,23 @@ const getArticleAuthor = async (articleID) => {
     return cached;
   }
 
-  // find article
-  const article = await articleServices.findSingleItem({ id: articleID });
+  const article = await articleServices.findArticleById(articleID);
 
-  // find author
-  const user = await UserServices.findUserById(article.author);
-
-  if (user) {
-    await setCache(cacheKey, user, ARTICLE_AUTHOR_TTL_SECONDS);
+  if (!article) {
+    throw notFound("Article not found");
   }
 
-  return user;
+  const user = await UserServices.findUserById(article.author_id);
+
+  if (!user) {
+    throw notFound("Author not found");
+  }
+
+  const publicAuthor = { id: user.id, name: user.name };
+
+  await setCache(cacheKey, publicAuthor, ARTICLE_AUTHOR_TTL_SECONDS);
+
+  return publicAuthor;
 };
 
 /**
@@ -186,13 +197,13 @@ const deleteUser = async (id) => {
   const articleIds = await articleServices.findArticlesByUser(id);
 
   // delete comments on user's articles
-  await commentServices.deleteMany({ article: { $in: articleIds } });
+  await commentServices.deleteMany({ article_id: { $in: articleIds } });
 
   // delete user's own comments
-  await commentServices.deleteMany({ author: id });
+  await commentServices.deleteMany({ author_id: id });
 
   // delete user's articles
-  await articleServices.deleteMany({ author: id });
+  await articleServices.deleteMany({ author_id: id });
 
   // delete user
   await UserServices.deleteItem(id);

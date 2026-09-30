@@ -67,16 +67,17 @@ const getArticleComments = async (req, res, next) => {
       status: "public",
     });
 
-    // transform response data
-    const data = query.transformData({
-      items: comments,
-      selection: ["id", "body", "author", "createdAt", "updatedAt"],
-    });
+    // transform response data while preserving nested replies
+    const data = comments.map((comment) => ({
+      ...comment,
+      replies: Array.isArray(comment.replies) ? comment.replies : [],
+    }));
 
     // count total public comments
     const totalItems = await commentServices.count({
       article: articleID,
       status: "public",
+      topLevel: true,
     });
 
     // generate pagination metadata

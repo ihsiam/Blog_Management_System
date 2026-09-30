@@ -32,21 +32,10 @@ const getArticleAuthor = async (req, res, next) => {
     // fetch author
     const user = await serviceRegistry.getArticleAuthor(articleID);
 
-    // handle missing user safely
-    if (!user) {
-      return next(
-        badRequest(
-          [{ field: "id", message: "author not found", in: "params" }],
-          "author not found",
-        ),
-      );
-    }
-
     // transform response data
     const data = {
       id: user.id,
       name: user.name,
-      email: user.email,
     };
 
     // response

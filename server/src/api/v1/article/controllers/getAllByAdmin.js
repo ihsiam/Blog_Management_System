@@ -1,3 +1,4 @@
+const mongoose = require("mongoose");
 const articleServices = require("../../../../lib/articles");
 const { query } = require("../../../../utils");
 const defaults = require("../../../../config/defaults");
@@ -19,6 +20,7 @@ const { badRequest } = require("../../../../utils/error");
  * @param {string} [req.query.sortBy] - Field to sort by
  * @param {string} [req.query.search] - Search keyword
  * @param {string} [req.query.status] - Article status filter (optional)
+ * @param {string} [req.query.category] - Category ID filter (optional)
  *
  * @param {import("express").Response} res
  * @param {Function} next
@@ -41,6 +43,7 @@ const getAllByAdmin = async (req, res, next) => {
      * If not provided → allow all statuses
      */
     const status = req.query.status || null;
+    const category = req.query.category || null;
 
     /**
      * Collect validation errors
@@ -75,13 +78,17 @@ const getAllByAdmin = async (req, res, next) => {
     /**
      * Validate sort field
      */
-    if (!["id", "title", "createdAt", "updatedAt"].includes(sortBy)) {
+    if (!["title", "createdAt", "updatedAt"].includes(sortBy)) {
       errors.push({ field: "sort_by", message: "invalid input", in: "query" });
     }
 
     // validate status
     if (status && !["published", "draft"].includes(status)) {
       errors.push({ field: "status", message: "invalid input", in: "query" });
+    }
+
+    if (category && !mongoose.Types.ObjectId.isValid(category)) {
+      errors.push({ field: "category", message: "invalid input", in: "query" });
     }
 
     /**
@@ -101,6 +108,7 @@ const getAllByAdmin = async (req, res, next) => {
       sortType,
       searchTerm,
       status,
+      category,
     });
 
     /**
@@ -109,6 +117,7 @@ const getAllByAdmin = async (req, res, next) => {
     const totalItems = await articleServices.count({
       searchTerm,
       status,
+      category,
     });
 
     /**

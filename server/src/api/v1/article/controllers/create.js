@@ -1,4 +1,3 @@
-const defaults = require("../../../../config/defaults");
 const articleServices = require("../../../../lib/articles");
 const { badRequest } = require("../../../../utils/error");
 
@@ -8,8 +7,9 @@ const { badRequest } = require("../../../../utils/error");
  * @param {import("express").Request} req - Express request object
  * @param {Object} req.body - Request payload
  * @param {string} req.body.title - Article title
- * @param {string} [req.body.body] - Article content
- * @param {string} [req.body.cover] - Article cover image URL
+ * @param {string} req.body.body - Article content
+ * @param {string} req.body.category - Category ID
+ * @param {Object} req.file - Uploaded cover image
  *
  * @param {Object} req.user - Authenticated user (from auth middleware)
  * @param {string} req.user.id - User ID of the author
@@ -26,32 +26,44 @@ const create = async (req, res, next) => {
     /**
      * Extract and validate title
      */
-    const { title } = req.body;
+    const { title, body, category } = req.body;
+
+    const errors = [];
 
     if (!title || typeof title !== "string" || !title.trim()) {
-      throw badRequest(
-        [{ field: "title", message: "invalid input", in: "body" }],
-        "invalid input",
-      );
+      errors.push({ field: "title", message: "invalid input", in: "body" });
     }
 
     /**
      * Prepare article payload with defaults
      */
-    const body = req.body.body || defaults.body;
-    const cover = req.body.cover || defaults.cover;
-    const status = defaults.articleStatus;
+    const status = "published";
     const author = req.user?.id;
 
+    if (!body || typeof body !== "string" || !body.trim()) {
+      errors.push({ field: "body", message: "invalid input", in: "body" });
+    }
+    if (!category || typeof category !== "string") {
+      errors.push({
+        field: "category",
+        message: "invalid input",
+        in: "body",
+      });
+    }
+    if (!req.file) {
+      errors.push({ field: "cover", message: "invalid input", in: "file" });
+    }
+    if (errors.length) throw badRequest(errors, "invalid input");
     /**
      * Create article in database
      */
     const article = await articleServices.create({
       title,
       body,
-      cover,
       status,
       author,
+      category,
+      file: req.file,
     });
 
     /**

@@ -1,4 +1,7 @@
+const mongoose = require("mongoose");
 const Article = require("../../model/Article");
+const categoryServices = require("../categories");
+const storageService = require("../storage");
 const defaults = require("../../config/defaults");
 const { notFound, badRequest } = require("../../utils/error");
 const {
@@ -10,6 +13,53 @@ const {
 
 const ARTICLE_LIST_TTL_SECONDS = 60;
 const ARTICLE_TTL_SECONDS = 300;
+
+/**
+ * Converts an Article document to the public response shape.
+ *
+ * @param {Object} article - Article document or object
+ * @returns {Object} Normalized article object
+ */
+const articleObject = (article) => {
+  const object = article.toObject ? article.toObject() : article;
+  const {
+    cover_image_url: cover,
+    author_id: author,
+    category_id: category,
+    ...rest
+  } = object;
+
+  return {
+    ...rest,
+    cover,
+    author,
+    category,
+  };
+};
+
+/**
+ * Ensures an article references an active category.
+ *
+ * @param {string} category - Category ID
+ * @returns {Promise<void>}
+ */
+const validateCategory = async (category) => {
+  if (!category || !mongoose.Types.ObjectId.isValid(category)) {
+    throw badRequest(
+      [{ field: "category", message: "invalid input", in: "body" }],
+      "invalid input",
+    );
+  }
+
+  try {
+    await categoryServices.findSingleItem({ id: category });
+  } catch (_error) {
+    throw badRequest(
+      [{ field: "category", message: "invalid input", in: "body" }],
+      "invalid input",
+    );
+  }
+};
 
 /**
  * Drops public article list and count keys.
@@ -52,8 +102,9 @@ const findAll = async ({
   sortType = defaults.sortType,
   searchTerm = defaults.searchTerm,
   status,
+  category,
 }) => {
-  const listCacheKey = `article:list:${page}:${limit}:${sortBy}:${sortType}:${searchTerm}`;
+  const listCacheKey = `article:list:${page}:${limit}:${sortBy}:${sortType}:${searchTerm}:${category || ""}`;
 
   if (status === "published") {
     const cached = await getCache(listCacheKey);
@@ -73,14 +124,19 @@ const findAll = async ({
     filter.status = status;
   }
 
+  if (category) {
+    filter.category_id = category;
+  }
+
   // retrieve articles
   const articles = await Article.find(filter)
-    .populate({ path: "author", select: "name" })
+    .populate({ path: "author_id", select: "name" })
+    .populate({ path: "category_id", select: "name" })
     .sort(sortKey)
     .skip(page * limit - limit)
     .limit(limit);
 
-  const result = articles.map((article) => article.toObject());
+  const result = articles.map(articleObject);
 
   if (status === "published") {
     await setCache(listCacheKey, result, ARTICLE_LIST_TTL_SECONDS);
@@ -98,8 +154,8 @@ const findAll = async ({
  *
  * @returns {Promise<number>}
  */
-const count = async ({ searchTerm = "", status }) => {
-  const countCacheKey = `article:count:${searchTerm}`;
+const count = async ({ searchTerm = "", status, category }) => {
+  const countCacheKey = `article:count:${searchTerm}:${category || ""}`;
 
   if (status === "published") {
     const cached = await getCache(countCacheKey);
@@ -115,6 +171,10 @@ const count = async ({ searchTerm = "", status }) => {
 
   if (status) {
     filter.status = status;
+  }
+
+  if (category) {
+    filter.category_id = category;
   }
 
   // count and return
@@ -133,26 +193,42 @@ const count = async ({ searchTerm = "", status }) => {
  * @param {Object} params
  * @param {string} params.title
  * @param {string} [params.body]
- * @param {string} [params.cover]
  * @param {string} params.status
  * @param {string} params.author
+ * @param {Object} params.file - Validated cover image file
  *
  * @returns {Promise<Object>}
  */
 const create = async ({
   title,
   body = defaults.body,
-  cover = defaults.cover,
   status = defaults.articleStatus,
   author,
+  category,
+  file,
 }) => {
-  const article = new Article({ title, body, cover, status, author });
+  await validateCategory(category);
+  const cover = await storageService.uploadArticleCover(file);
+
+  const article = new Article({
+    title,
+    body,
+    cover_image_url: cover,
+    status,
+    author_id: author,
+    category_id: category,
+  });
 
   await article.save();
 
   await invalidatePublishedArticleLists();
 
-  return article.toObject();
+  await article.populate([
+    { path: "author_id", select: "name" },
+    { path: "category_id", select: "name" },
+  ]);
+
+  return articleObject(article);
 };
 
 /**
@@ -164,17 +240,20 @@ const create = async ({
  *
  * @returns {Promise<Object>}
  */
-const findSingleItem = async ({ id, expand = "" }) => {
+const findSingleItem = async ({ id, expand = "", user }) => {
   const trimmedExpand = expand
     .split(",")
     .map((item) => item.trim())
     .filter(Boolean);
   const expandKey = [...trimmedExpand].sort().join(",");
   const cacheKey = `article:${id}:expand:${expandKey}`;
+  const useCache = !user;
 
-  const cached = await getCache(cacheKey);
-  if (cached !== null) {
-    return cached;
+  if (useCache) {
+    const cached = await getCache(cacheKey);
+    if (cached !== null) {
+      return cached;
+    }
   }
 
   const article = await Article.findById(id);
@@ -184,24 +263,28 @@ const findSingleItem = async ({ id, expand = "" }) => {
   }
 
   // only published article can be retrieved
-  if (article.status !== "published") {
+  const isOwner = user && article.author_id.toString() === user.id.toString();
+  const isAdmin = user && user.role === "admin";
+
+  if (article.status !== "published" && !isOwner && !isAdmin) {
     throw notFound("Article not found");
   }
 
-  // populate author if requested
-  if (trimmedExpand.includes("author")) {
-    await article.populate({ path: "author", select: "name" });
-  }
+  await article.populate([
+    { path: "author_id", select: "name" },
+    { path: "category_id", select: "name" },
+  ]);
 
   // populate comments if requested
   if (trimmedExpand.includes("comments")) {
     await article.populate({
       path: "comments",
       match: { status: "public" },
+      populate: { path: "author_id", select: "name" },
     });
   }
 
-  const obj = article.toObject();
+  const obj = articleObject(article);
 
   // hide status from article
   delete obj.status;
@@ -209,57 +292,19 @@ const findSingleItem = async ({ id, expand = "" }) => {
   // hide status from comments if exists
   if (obj.comments && Array.isArray(obj.comments)) {
     obj.comments = obj.comments.map((comment) => {
-      // eslint-disable-next-line no-unused-vars, no-shadow
-      const { article, status, ...rest } = comment; // both removed
-      return rest;
+      const normalizedComment = { ...comment };
+      normalizedComment.author = normalizedComment.author_id;
+      delete normalizedComment.author_id;
+      delete normalizedComment.article_id;
+      delete normalizedComment.parent_comment_id;
+      delete normalizedComment.status;
+      return normalizedComment;
     });
   }
 
-  await setCache(cacheKey, obj, ARTICLE_TTL_SECONDS);
+  if (useCache) await setCache(cacheKey, obj, ARTICLE_TTL_SECONDS);
 
   return obj;
-};
-
-/**
- * Creates or updates an article
- *
- * @param {string} id
- * @param {Object} data
- * @returns {Promise<{article: Object, statusCode: number}>}
- */
-const updateOrCreate = async (
-  id,
-  { title, body, cover, status = defaults.articleStatus, author },
-) => {
-  const article = await Article.findById(id);
-
-  // create flow
-  if (!article) {
-    if (!title || typeof title !== "string" || !title.trim()) {
-      throw badRequest(
-        [{ field: "title", message: "invalid input", in: "body" }],
-        "invalid input",
-      );
-    }
-
-    const newArticle = await create({ title, body, cover, status, author });
-
-    return { article: newArticle, statusCode: 201 };
-  }
-
-  // update flow
-  const payload = { title, body, cover, status, author };
-
-  Object.keys(payload).forEach((key) => {
-    article[key] = payload[key] ?? article[key];
-  });
-
-  await article.save();
-
-  await invalidateArticleResource(id);
-  await invalidatePublishedArticleLists();
-
-  return { article: article.toObject(), statusCode: 200 };
 };
 
 /**
@@ -269,27 +314,69 @@ const updateOrCreate = async (
  * @param {Object} data
  * @returns {Promise<Object>}
  */
-const updateItemPatch = async (id, { title, body, cover, status }) => {
+const updateItemPatch = async (id, { title, body, category, file }) => {
   const article = await Article.findById(id);
 
   if (!article) {
     throw notFound();
   }
 
-  // updated payload
-  const payload = { title, body, cover, status };
+  if (category !== undefined) await validateCategory(category);
+
+  const cover = file
+    ? await storageService.uploadArticleCover(file)
+    : undefined;
+
+  const payload = {
+    title,
+    body,
+    cover_image_url: cover,
+    category_id: category,
+  };
 
   Object.keys(payload).forEach((key) => {
     article[key] = payload[key] ?? article[key];
   });
 
-  // save into DB
   await article.save();
 
   await invalidateArticleResource(id);
   await invalidatePublishedArticleLists();
 
-  return article.toObject();
+  await article.populate([
+    { path: "author_id", select: "name" },
+    { path: "category_id", select: "name" },
+  ]);
+
+  return articleObject(article);
+};
+
+/**
+ * Updates only the article status.
+ *
+ * @param {string} id - Article ID
+ * @param {string} status - New article status
+ * @returns {Promise<Object>}
+ */
+const updateStatus = async (id, status) => {
+  const article = await Article.findById(id);
+
+  if (!article) {
+    throw notFound();
+  }
+
+  article.status = status;
+  await article.save();
+
+  await invalidateArticleResource(id);
+  await invalidatePublishedArticleLists();
+
+  await article.populate([
+    { path: "author_id", select: "name" },
+    { path: "category_id", select: "name" },
+  ]);
+
+  return articleObject(article);
 };
 
 /**
@@ -298,8 +385,10 @@ const updateItemPatch = async (id, { title, body, cover, status }) => {
  * @param {string} id
  * @returns {Promise<Object>}
  */
-const deleteItem = async (id) => {
-  const deleted = await Article.findByIdAndDelete(id);
+const deleteItem = async (id, session) => {
+  const query = Article.findByIdAndDelete(id);
+  if (session) query.session(session);
+  const deleted = await query;
 
   if (deleted) {
     await invalidateArticleResource(id);
@@ -315,8 +404,11 @@ const deleteItem = async (id) => {
  * @param {Object} filter
  * @returns {Promise<boolean>}
  */
-const deleteMany = async (filter) => {
-  const result = await Article.deleteMany(filter);
+const deleteMany = async (filter, session) => {
+  const result = await Article.deleteMany(
+    filter,
+    session ? { session } : undefined,
+  );
 
   if (result) {
     await invalidatePublishedArticleLists();
@@ -331,7 +423,11 @@ const deleteMany = async (filter) => {
  * @param {string} id
  * @returns {Promise<Object|null>}
  */
-const findArticleById = async (id) => Article.findById(id);
+const findArticleById = async (id, session) => {
+  const query = Article.findById(id);
+  if (session) query.session(session);
+  return query;
+};
 
 /**
  * Finds all article IDs by a user.
@@ -340,7 +436,7 @@ const findArticleById = async (id) => Article.findById(id);
  * @returns {Promise<Array<string>>}
  */
 const findArticlesByUser = async (id) => {
-  const articles = await Article.find({ author: id }).select("_id");
+  const articles = await Article.find({ author_id: id }).select("_id");
   return articles.map((article) => article._id);
 };
 
@@ -350,19 +446,17 @@ const findArticlesByUser = async (id) => {
  * @param {Object} params
  * @param {string} params.resourceId
  * @param {string} params.userId
- * @param {boolean} [params.allowMissing=false]
  *
- * @returns {Promise<boolean|null>}
+ * @returns {Promise<boolean>}
  */
-const checkOwner = async ({ resourceId, userId, allowMissing = false }) => {
+const checkOwner = async ({ resourceId, userId }) => {
   const article = await findArticleById(resourceId);
 
   if (!article) {
-    if (allowMissing) return null;
     throw notFound();
   }
 
-  return article.author.toString() === userId.toString();
+  return article.author_id.toString() === userId.toString();
 };
 
 module.exports = {
@@ -370,8 +464,8 @@ module.exports = {
   count,
   create,
   findSingleItem,
-  updateOrCreate,
   updateItemPatch,
+  updateStatus,
   deleteItem,
   checkOwner,
   findArticleById,

@@ -1,3 +1,4 @@
+const mongoose = require("mongoose");
 const articleServices = require("../../../../lib/articles");
 const { query } = require("../../../../utils");
 const defaults = require("../../../../config/defaults");
@@ -18,6 +19,7 @@ const { badRequest } = require("../../../../utils/error");
  * @param {string} [req.query.sortType] - Sort order ("asc" | "desc")
  * @param {string} [req.query.sortBy] - Field to sort by
  * @param {string} [req.query.search] - Search keyword
+ * @param {string} [req.query.category] - Category ID filter
  *
  * @param {import("express").Response} res - Express response object
  * @param {Function} next - Express error handler middleware
@@ -34,6 +36,7 @@ const findAll = async (req, res, next) => {
     const sortType = req.query.sortType || defaults.sortType;
     const sortBy = req.query.sortBy || defaults.sortBy;
     const searchTerm = req.query.search || defaults.searchTerm;
+    const { category } = req.query;
 
     /**
      * Collect validation errors
@@ -54,6 +57,10 @@ const findAll = async (req, res, next) => {
       errors.push({ field: "limit", message: "invalid input", in: "query" });
     }
 
+    if (category && !mongoose.Types.ObjectId.isValid(category)) {
+      errors.push({ field: "category", message: "invalid input", in: "query" });
+    }
+
     /**
      * Validate sort type
      */
@@ -68,7 +75,7 @@ const findAll = async (req, res, next) => {
     /**
      * Validate sort field
      */
-    if (!["id", "title", "createdAt", "updatedAt"].includes(sortBy)) {
+    if (!["title", "createdAt", "updatedAt"].includes(sortBy)) {
       errors.push({ field: "sort_by", message: "invalid input", in: "query" });
     }
 
@@ -89,6 +96,7 @@ const findAll = async (req, res, next) => {
       sortType,
       searchTerm,
       status: "published",
+      category,
     });
 
     /**
@@ -97,6 +105,7 @@ const findAll = async (req, res, next) => {
     const totalItems = await articleServices.count({
       searchTerm,
       status: "published",
+      category,
     });
 
     /**
