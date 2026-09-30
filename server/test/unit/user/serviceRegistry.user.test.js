@@ -53,10 +53,10 @@ describe("service registry - deleteUser", () => {
 
     expect(mockFindArticlesByUser).toHaveBeenCalledWith("user-1");
     expect(mockCommentDeleteMany).toHaveBeenCalledWith({
-      article: { $in: ["article-1", "article-2"] },
+      article_id: { $in: ["article-1", "article-2"] },
     });
-    expect(mockCommentDeleteMany).toHaveBeenCalledWith({ author: "user-1" });
-    expect(mockArticleDeleteMany).toHaveBeenCalledWith({ author: "user-1" });
+    expect(mockCommentDeleteMany).toHaveBeenCalledWith({ author_id: "user-1" });
+    expect(mockArticleDeleteMany).toHaveBeenCalledWith({ author_id: "user-1" });
     expect(mockDeleteItem).toHaveBeenCalledWith("user-1");
     expect(result).toBe(true);
   });

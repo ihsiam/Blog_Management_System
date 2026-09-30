@@ -88,7 +88,7 @@ describe("user getAllUsers controller", () => {
       const req = buildRequest({
         name: "jane",
         email: "jane@test.com",
-        status: "approved",
+        status: "active",
       });
       await getAllUsersController(req, res, next);
 
@@ -96,13 +96,13 @@ describe("user getAllUsers controller", () => {
         expect.objectContaining({
           name: "jane",
           email: "jane@test.com",
-          status: "approved",
+          status: "active",
         }),
       );
       expect(mockCountTotal).toHaveBeenCalledWith({
         name: "jane",
         email: "jane@test.com",
-        status: "approved",
+        status: "active",
       });
     });
 
@@ -113,7 +113,7 @@ describe("user getAllUsers controller", () => {
           name: "Jane",
           email: "jane@test.com",
           role: "user",
-          status: "approved",
+          status: "active",
           password: "should-not-leak",
           createdAt: "2024-01-01",
           updatedAt: "2024-01-01",
@@ -131,7 +131,7 @@ describe("user getAllUsers controller", () => {
           name: "Jane",
           email: "jane@test.com",
           role: "user",
-          status: "approved",
+          status: "active",
           createdAt: "2024-01-01",
           updatedAt: "2024-01-01",
         },

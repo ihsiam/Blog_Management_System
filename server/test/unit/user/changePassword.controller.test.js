@@ -105,7 +105,7 @@ describe("user changePassword controller", () => {
     it("should reject when the old password is incorrect", async () => {
       mockFindAuthUserById.mockResolvedValue({
         id: validId,
-        password: "hashed",
+        password_hash: "hashed",
       });
       mockCompareHash.mockResolvedValue(false);
 
@@ -128,7 +128,7 @@ describe("user changePassword controller", () => {
     it("should update the password when the old password matches", async () => {
       mockFindAuthUserById.mockResolvedValue({
         id: validId,
-        password: "hashed",
+        password_hash: "hashed",
       });
       mockCompareHash.mockResolvedValue(true);
       mockUpdatePassword.mockResolvedValue({ id: validId });
@@ -156,7 +156,7 @@ describe("user changePassword controller", () => {
     it("should propagate the error when persisting the new password fails", async () => {
       mockFindAuthUserById.mockResolvedValue({
         id: validId,
-        password: "hashed",
+        password_hash: "hashed",
       });
       mockCompareHash.mockResolvedValue(true);
       const dbError = new Error("db down");

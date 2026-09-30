@@ -41,11 +41,39 @@ MockUserModel.findByIdAndUpdate = jest.fn();
 MockUserModel.findByIdAndDelete = jest.fn();
 MockUserModel.countDocuments = jest.fn();
 
+const createFakeSessionDoc = (data) => ({
+  ...data,
+  id: data._id || data.id,
+  save: jest.fn().mockResolvedValue(undefined),
+});
+const MockSessionModel = jest.fn((data) => createFakeSessionDoc(data));
+MockSessionModel.find = jest.fn();
+MockSessionModel.deleteMany = jest.fn();
+MockSessionModel.deleteOne = jest.fn();
+
+const MockOtpModel = {
+  findOneAndUpdate: jest.fn(),
+  findOne: jest.fn(),
+  updateOne: jest.fn(),
+};
+const MockPasswordResetTokenModel = {
+  findOneAndUpdate: jest.fn(),
+  find: jest.fn(),
+  updateOne: jest.fn(),
+};
+
 jest.doMock("../../../src/model/User", () => MockUserModel);
+jest.doMock("../../../src/model/Session", () => MockSessionModel);
+jest.doMock("../../../src/model/OTP", () => MockOtpModel);
+jest.doMock(
+  "../../../src/model/PasswordResetToken",
+  () => MockPasswordResetTokenModel,
+);
 
 const mockGenerateHash = jest.fn();
+const mockCompareHash = jest.fn();
 jest.doMock("../../../src/utils", () => ({
-  hashing: { generateHash: mockGenerateHash },
+  hashing: { generateHash: mockGenerateHash, compareHash: mockCompareHash },
 }));
 
 const userService = require("../../../src/lib/user");
@@ -58,7 +86,17 @@ describe("user service (src/lib/user)", () => {
     MockUserModel.findByIdAndUpdate.mockReset();
     MockUserModel.findByIdAndDelete.mockReset();
     MockUserModel.countDocuments.mockReset();
+    MockSessionModel.find.mockReset();
+    MockSessionModel.deleteMany.mockReset();
+    MockSessionModel.deleteOne.mockReset();
+    MockOtpModel.findOneAndUpdate.mockReset();
+    MockOtpModel.findOne.mockReset();
+    MockOtpModel.updateOne.mockReset();
+    MockPasswordResetTokenModel.findOneAndUpdate.mockReset();
+    MockPasswordResetTokenModel.find.mockReset();
+    MockPasswordResetTokenModel.updateOne.mockReset();
     mockGenerateHash.mockReset();
+    mockCompareHash.mockReset();
   });
 
   describe("findUserByEmail", () => {
@@ -92,8 +130,8 @@ describe("user service (src/lib/user)", () => {
   });
 
   describe("findAuthUserById", () => {
-    it("should return the raw document (including password/refreshToken) for internal auth use", async () => {
-      const rawDoc = { id: "1", password: "hashed", refreshToken: "token" };
+    it("should return the raw document including the password hash for internal auth use", async () => {
+      const rawDoc = { id: "1", password_hash: "hashed" };
       MockUserModel.findById.mockResolvedValue(rawDoc);
 
       const result = await userService.findAuthUserById("1");
@@ -119,7 +157,7 @@ describe("user service (src/lib/user)", () => {
 
       const result = await userService.findUserById("1");
 
-      expect(chain.select).toHaveBeenCalledWith("-password -refreshToken");
+      expect(chain.select).toHaveBeenCalledWith("-password_hash");
       expect(result).toEqual({ id: "1", name: "Jane" });
     });
 
@@ -180,7 +218,7 @@ describe("user service (src/lib/user)", () => {
   });
 
   describe("createAdmin", () => {
-    it("should create an admin user with an approved status", async () => {
+    it("should create an active admin user with a password hash", async () => {
       const result = await userService.createAdmin({
         name: "Admin",
         email: "admin@test.com",
@@ -190,9 +228,9 @@ describe("user service (src/lib/user)", () => {
       expect(result).toMatchObject({
         name: "Admin",
         email: "admin@test.com",
-        password: "hashed-password",
+        password_hash: "hashed-password",
         role: "admin",
-        status: "approved",
+        account_status: "active",
       });
     });
 
@@ -222,7 +260,7 @@ describe("user service (src/lib/user)", () => {
       expect(result).toMatchObject({
         name: "Jane",
         email: "jane@test.com",
-        password: "hashed-password",
+        password_hash: "hashed-password",
       });
     });
 
@@ -242,7 +280,7 @@ describe("user service (src/lib/user)", () => {
   });
 
   describe("createUserByAdmin", () => {
-    it("should create an approved user with a hashed password and no sensitive fields returned", async () => {
+    it("should create an active user with a hashed password and no sensitive fields returned", async () => {
       MockUserModel.findOne.mockResolvedValue(null); // userExist -> false
       mockGenerateHash.mockResolvedValue("hashed-password");
 
@@ -256,10 +294,10 @@ describe("user service (src/lib/user)", () => {
       expect(result).toMatchObject({
         name: "Jane",
         email: "jane@test.com",
-        status: "approved",
+        account_status: "active",
       });
       expect(result.password).toBeUndefined();
-      expect(result.refreshToken).toBeUndefined();
+      expect(result.password_hash).toBeUndefined();
     });
 
     it("should reject when the email already exists", async () => {
@@ -311,30 +349,208 @@ describe("user service (src/lib/user)", () => {
 
   describe("saveRefreshToken / clearRefreshToken", () => {
     it("should persist the given refresh token", async () => {
-      MockUserModel.findByIdAndUpdate.mockResolvedValue(undefined);
+      mockGenerateHash.mockResolvedValue("hashed-token");
 
-      await userService.saveRefreshToken("1", "new-refresh-token");
+      await userService.saveRefreshToken(
+        "507f1f77bcf86cd799439011",
+        "new-refresh-token",
+      );
 
-      expect(MockUserModel.findByIdAndUpdate).toHaveBeenCalledWith("1", {
-        $set: { refreshToken: "new-refresh-token" },
-      });
+      expect(mockGenerateHash).toHaveBeenCalledWith("new-refresh-token");
+      expect(MockSessionModel).toHaveBeenCalledWith(
+        expect.objectContaining({
+          user_id: "507f1f77bcf86cd799439011",
+          refresh_token_hash: "hashed-token",
+          device_info: "unknown",
+        }),
+      );
     });
 
     it("should clear the refresh token", async () => {
-      MockUserModel.findByIdAndUpdate.mockResolvedValue(undefined);
+      MockSessionModel.deleteMany.mockResolvedValue({ deletedCount: 1 });
 
-      await userService.clearRefreshToken("1");
+      await userService.clearRefreshToken("507f1f77bcf86cd799439011");
 
-      expect(MockUserModel.findByIdAndUpdate).toHaveBeenCalledWith("1", {
-        $set: { refreshToken: null },
-      });
+      expect(MockSessionModel.deleteMany).toHaveBeenCalledWith(
+        { user_id: "507f1f77bcf86cd799439011" },
+        undefined,
+      );
     });
 
     it("should propagate the error when persisting the refresh token fails", async () => {
-      MockUserModel.findByIdAndUpdate.mockRejectedValue(new Error("db down"));
+      const failingDoc = createFakeSessionDoc({});
+      failingDoc.save.mockRejectedValue(new Error("db down"));
+      MockSessionModel.mockImplementationOnce(() => failingDoc);
+      mockGenerateHash.mockResolvedValue("hashed-token");
 
-      await expect(userService.saveRefreshToken("1", "token")).rejects.toThrow(
-        "db down",
+      await expect(
+        userService.saveRefreshToken("507f1f77bcf86cd799439011", "token"),
+      ).rejects.toThrow("db down");
+    });
+  });
+
+  describe("session operations", () => {
+    it("should return a matching non-expired session for a refresh token", async () => {
+      const sessionDoc = createFakeSessionDoc({
+        id: "session-1",
+        expiresAt: new Date(Date.now() + 60_000),
+        refresh_token_hash: "hashed-token",
+      });
+      MockSessionModel.find.mockReturnValue(createQueryChain([sessionDoc]));
+      mockCompareHash.mockResolvedValue(true);
+
+      const result = await userService.findSessionByToken(
+        "507f1f77bcf86cd799439011",
+        "refresh-token",
+      );
+
+      expect(MockSessionModel.find).toHaveBeenCalledWith({
+        user_id: "507f1f77bcf86cd799439011",
+      });
+      expect(mockCompareHash).toHaveBeenCalledWith(
+        "refresh-token",
+        "hashed-token",
+      );
+      expect(result).toBe(sessionDoc);
+    });
+
+    it("should return null when no refresh token is provided", async () => {
+      await expect(
+        userService.findSessionByToken("507f1f77bcf86cd799439011"),
+      ).resolves.toBeNull();
+      expect(MockSessionModel.find).not.toHaveBeenCalled();
+    });
+
+    it("should return active sessions with current-session flags", async () => {
+      const sessionDoc = createFakeSessionDoc({
+        id: "session-1",
+        device_info: "browser",
+        createdAt: "2024-01-01",
+        expiresAt: new Date(Date.now() + 60_000),
+        refresh_token_hash: "hashed-token",
+      });
+      const chain = createQueryChain([sessionDoc]);
+      MockSessionModel.find.mockReturnValue(chain);
+      mockCompareHash.mockResolvedValue(true);
+
+      await expect(
+        userService.getActiveSessions("507f1f77bcf86cd799439011", "token"),
+      ).resolves.toEqual([
+        expect.objectContaining({
+          id: "session-1",
+          deviceInfo: "browser",
+          isCurrent: true,
+        }),
+      ]);
+      expect(chain.sort).toHaveBeenCalledWith({ createdAt: -1 });
+    });
+
+    it("should return true when a session is deleted for the user", async () => {
+      MockSessionModel.deleteOne.mockReturnValue(
+        createQueryChain({ deletedCount: 1 }),
+      );
+
+      await expect(
+        userService.deleteSession("507f1f77bcf86cd799439011", "session-1"),
+      ).resolves.toBe(true);
+      expect(MockSessionModel.deleteOne).toHaveBeenCalledWith({
+        _id: "session-1",
+        user_id: "507f1f77bcf86cd799439011",
+      });
+    });
+  });
+
+  describe("OTP operations", () => {
+    it("should upsert an unused OTP with a five-minute expiry", async () => {
+      await userService.createOtp(
+        "user-1",
+        "email_verification",
+        "hashed-code",
+      );
+
+      expect(MockOtpModel.findOneAndUpdate).toHaveBeenCalledWith(
+        { user_id: "user-1", purpose: "email_verification" },
+        expect.objectContaining({
+          $set: expect.objectContaining({
+            code_hash: "hashed-code",
+            is_used: false,
+            expiresAt: expect.any(Date),
+          }),
+        }),
+        { upsert: true, new: true, session: undefined },
+      );
+    });
+
+    it("should find the latest valid OTP", async () => {
+      const chain = createQueryChain({ id: "otp-1" });
+      MockOtpModel.findOne.mockReturnValue(chain);
+
+      await expect(
+        userService.findValidOtp("user-1", "email_verification"),
+      ).resolves.toEqual({ id: "otp-1" });
+      expect(MockOtpModel.findOne).toHaveBeenCalledWith({
+        user_id: "user-1",
+        purpose: "email_verification",
+        is_used: false,
+        expiresAt: { $gt: expect.any(Date) },
+      });
+      expect(chain.sort).toHaveBeenCalledWith({ createdAt: -1 });
+    });
+
+    it("should report whether an OTP was marked as used", async () => {
+      MockOtpModel.updateOne.mockReturnValue(
+        createQueryChain({ modifiedCount: 1 }),
+      );
+
+      await expect(userService.markOtpUsed("otp-1")).resolves.toBe(true);
+      expect(MockOtpModel.updateOne).toHaveBeenCalledWith(
+        { _id: "otp-1", is_used: false },
+        { $set: { is_used: true } },
+      );
+    });
+  });
+
+  describe("password reset token operations", () => {
+    it("should upsert an unused password reset token", async () => {
+      await userService.savePasswordResetToken("user-1", "hashed-token");
+
+      expect(MockPasswordResetTokenModel.findOneAndUpdate).toHaveBeenCalledWith(
+        { user_id: "user-1" },
+        expect.objectContaining({
+          $set: expect.objectContaining({
+            token_hash: "hashed-token",
+            is_used: false,
+            expiresAt: expect.any(Date),
+          }),
+        }),
+        { upsert: true, new: true, session: undefined },
+      );
+    });
+
+    it("should return the password reset token matching the raw token", async () => {
+      const tokenDoc = { id: "reset-1", token_hash: "hashed-token" };
+      MockPasswordResetTokenModel.find.mockReturnValue(
+        createQueryChain([tokenDoc]),
+      );
+      mockCompareHash.mockResolvedValue(true);
+
+      await expect(
+        userService.findPasswordResetToken("raw-token"),
+      ).resolves.toBe(tokenDoc);
+      expect(mockCompareHash).toHaveBeenCalledWith("raw-token", "hashed-token");
+    });
+
+    it("should report whether a password reset token was marked as used", async () => {
+      MockPasswordResetTokenModel.updateOne.mockReturnValue(
+        createQueryChain({ modifiedCount: 1 }),
+      );
+
+      await expect(
+        userService.markPasswordResetTokenUsed("reset-1"),
+      ).resolves.toBe(true);
+      expect(MockPasswordResetTokenModel.updateOne).toHaveBeenCalledWith(
+        { _id: "reset-1", is_used: false },
+        { $set: { is_used: true } },
       );
     });
   });
@@ -352,13 +568,13 @@ describe("user service (src/lib/user)", () => {
         sortType: "asc",
         name: "jane",
         email: "jane@test.com",
-        status: "approved",
+        status: "active",
       });
 
       expect(MockUserModel.find).toHaveBeenCalledWith({
         email: { $regex: "jane@test.com", $options: "i" },
         name: { $regex: "jane", $options: "i" },
-        status: "approved",
+        account_status: "active",
       });
       expect(chain.sort).toHaveBeenCalledWith("email");
       expect(chain.skip).toHaveBeenCalledWith(5);
@@ -373,7 +589,7 @@ describe("user service (src/lib/user)", () => {
       await userService.getAllUsers({});
 
       expect(MockUserModel.find).toHaveBeenCalledWith({});
-      expect(chain.sort).toHaveBeenCalledWith("-updatedAt");
+      expect(chain.sort).toHaveBeenCalledWith("-createdAt");
     });
 
     it("should return an empty array when nothing matches", async () => {
@@ -402,13 +618,13 @@ describe("user service (src/lib/user)", () => {
       const result = await userService.countTotal({
         name: "jane",
         email: "jane@test.com",
-        status: "approved",
+        status: "active",
       });
 
       expect(MockUserModel.countDocuments).toHaveBeenCalledWith({
         email: { $regex: "jane@test.com", $options: "i" },
         name: { $regex: "jane", $options: "i" },
-        status: "approved",
+        account_status: "active",
       });
       expect(result).toBe(7);
     });
@@ -436,7 +652,7 @@ describe("user service (src/lib/user)", () => {
 
       const result = await userService.getSingleUser({ id: "1" });
 
-      expect(chain.select).toHaveBeenCalledWith("-password -refreshToken");
+      expect(chain.select).toHaveBeenCalledWith("-password_hash");
       expect(doc.populate).not.toHaveBeenCalled();
       expect(result).toEqual({ id: "1", name: "Jane" });
     });
@@ -517,7 +733,7 @@ describe("user service (src/lib/user)", () => {
         { $set: { name: "New name" } },
         { new: true, runValidators: true },
       );
-      expect(chain.select).toHaveBeenCalledWith("-password -refreshToken");
+      expect(chain.select).toHaveBeenCalledWith("-password_hash");
       expect(result).toEqual({ id: "1", name: "New name" });
     });
 
@@ -567,16 +783,16 @@ describe("user service (src/lib/user)", () => {
       expect(mockGenerateHash).toHaveBeenCalledWith("new-password");
       expect(MockUserModel.findByIdAndUpdate).toHaveBeenCalledWith(
         "1",
-        { $set: { password: "hashed-password" } },
+        { $set: { password_hash: "hashed-password" } },
         { new: true, runValidators: true },
       );
     });
 
-    it("OBSERVATION: only excludes password, not refreshToken, from the returned object", async () => {
+    it("should exclude the password hash from the returned object", async () => {
       mockGenerateHash.mockResolvedValue("hashed-password");
       const updatedDoc = createFakeUserDoc({
         id: "1",
-        refreshToken: "still-present",
+        password_hash: "still-present",
       });
       const chain = createQueryChain(updatedDoc);
       MockUserModel.findByIdAndUpdate.mockReturnValue(chain);
@@ -586,14 +802,8 @@ describe("user service (src/lib/user)", () => {
         password: "new-password",
       });
 
-      expect(chain.select).toHaveBeenCalledWith("-password");
-      // Unlike findUserById/getSingleUser/updateUser (which exclude both
-      // "-password -refreshToken"), this function's query only excludes
-      // "-password" - refreshToken passes through untouched. See "Bugs
-      // discovered" in the final report; no controller currently
-      // forwards this return value in an HTTP response, so it isn't
-      // exploitable today, but it is an inconsistent contract.
-      expect(result.refreshToken).toBe("still-present");
+      expect(chain.select).toHaveBeenCalledWith("-password_hash");
+      expect(result.password_hash).toBe("still-present");
     });
 
     it("should not hash or set a password field when password is omitted", async () => {
