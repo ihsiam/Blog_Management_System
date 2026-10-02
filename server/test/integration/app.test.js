@@ -33,6 +33,12 @@ beforeEach(() => {
   jest.spyOn(console, "warn").mockImplementation(() => {});
 });
 
+afterAll(async () => {
+  if (mongoose.connection.readyState !== 0) {
+    await mongoose.disconnect();
+  }
+});
+
 // ─── Health check endpoint ───────────────────────────────────────────────────
 describe("GET /health", () => {
   it("should respond with 200 and status:ok", async () => {
@@ -242,20 +248,27 @@ describe("Database bootstrap — connectDB", () => {
   let mongodRef = null; // tracks the MongoMemoryServer instance per test
 
   afterEach(async () => {
-    // Always disconnect Mongoose first, then stop the in-memory server.
-    if (mongoose.connection.readyState !== 0) {
-      await mongoose.disconnect();
+    try {
+      // Always disconnect Mongoose first, then stop the in-memory server.
+      if (mongoose.connection.readyState !== 0) {
+        await mongoose.disconnect();
+      }
+    } finally {
+      if (mongodRef) {
+        await mongodRef.stop();
+        mongodRef = null;
+      }
+      delete process.env.DB_URL;
     }
-    if (mongodRef) {
-      await mongodRef.stop();
-      mongodRef = null;
-    }
-    delete process.env.DB_URL;
   });
 
   it("should connect successfully to an in-memory MongoDB", async () => {
     const { MongoMemoryServer } = require("mongodb-memory-server");
-    mongodRef = await MongoMemoryServer.create();
+    mongodRef = await MongoMemoryServer.create({
+      instance: {
+        args: ["--wiredTigerCacheSizeGB", "0.25", "--nounixsocket"],
+      },
+    });
     process.env.DB_URL = mongodRef.getUri();
 
     await connectDB(1, 0);
@@ -265,7 +278,11 @@ describe("Database bootstrap — connectDB", () => {
 
   it("should log 'Database connected successfully' after a successful connection", async () => {
     const { MongoMemoryServer } = require("mongodb-memory-server");
-    mongodRef = await MongoMemoryServer.create();
+    mongodRef = await MongoMemoryServer.create({
+      instance: {
+        args: ["--wiredTigerCacheSizeGB", "0.25", "--nounixsocket"],
+      },
+    });
     process.env.DB_URL = mongodRef.getUri();
 
     // console.log is mocked in beforeEach; clearMocks:true ensures only

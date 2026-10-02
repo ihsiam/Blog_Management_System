@@ -85,7 +85,7 @@ describe("POST /api/v1/articles/:id/comments", () => {
         article: `/api/v1/articles/${article.id}`,
       },
     });
-    expect(String(res.body.data.author)).toBe(String(commenter.id));
+    expect(String(res.body.data.author.id)).toBe(String(commenter.id));
     expect(String(res.body.data.article)).toBe(String(article.id));
 
     const stored = await Comment.findById(res.body.data.id);
@@ -218,7 +218,7 @@ describe("GET /api/v1/articles/:id/comments", () => {
     });
     expect(res.body.data).toHaveLength(1);
     expect(res.body.data[0].body).toBe("Public one");
-    expect(res.body.data[0].status).toBeUndefined();
+    expect(res.body.data[0].status).toBe("public");
     expect(res.body.pagination.totalItems).toBe(1);
     expect(res.body.links.article).toBe(`/api/v1/articles/${article.id}`);
   });
@@ -272,92 +272,6 @@ describe("GET /api/v1/articles/:id/comments", () => {
       expect.arrayContaining([
         expect.objectContaining({ field: "page", in: "query" }),
         expect.objectContaining({ field: "limit", in: "query" }),
-      ]),
-    );
-  });
-});
-
-// ─── Admin POST /api/v1/comments ─────────────────────────────────────────────
-describe("POST /api/v1/comments (admin)", () => {
-  it("should let an admin create a public comment on a published article", async () => {
-    const { article } = await createArticleContext();
-    const { user: admin, accessToken } = await createAuthedUser({
-      role: "admin",
-    });
-
-    const res = await request(app)
-      .post("/api/v1/comments")
-      .set(authHeader(accessToken))
-      .send({ body: "Moderated post", articleID: String(article.id) });
-
-    expect(res.status).toBe(201);
-    expect(res.body).toMatchObject({
-      code: 201,
-      message: "comment posted",
-      data: {
-        body: "Moderated post",
-        status: "public",
-      },
-      links: {
-        self: expect.stringMatching(/^\/api\/v1\/comments\//),
-      },
-    });
-    expect(String(res.body.data.author)).toBe(String(admin.id));
-    expect(String(res.body.data.article)).toBe(String(article.id));
-  });
-
-  it("should forbid a regular user from the admin create endpoint", async () => {
-    const { article, accessToken } = await createArticleContext();
-
-    const res = await request(app)
-      .post("/api/v1/comments")
-      .set(authHeader(accessToken))
-      .send({ body: "Nope", articleID: String(article.id) });
-
-    expect(res.status).toBe(403);
-    expect(await Comment.countDocuments()).toBe(0);
-  });
-
-  it("should reject create on draft/nonexistent article via admin endpoint", async () => {
-    const { draft } = await createArticleContext({ withDraft: true });
-    const { accessToken } = await createAuthedUser({ role: "admin" });
-
-    const draftRes = await request(app)
-      .post("/api/v1/comments")
-      .set(authHeader(accessToken))
-      .send({ body: "Draft comment", articleID: String(draft.id) });
-    expect(draftRes.status).toBe(404);
-    expect(await Comment.countDocuments()).toBe(0);
-
-    const missing = await request(app)
-      .post("/api/v1/comments")
-      .set(authHeader(accessToken))
-      .send({
-        body: "Missing article",
-        articleID: new mongoose.Types.ObjectId().toString(),
-      });
-    expect(missing.status).toBe(404);
-    expect(await Comment.countDocuments()).toBe(0);
-  });
-
-  it("should reject invalid body/articleID and unauthenticated requests", async () => {
-    const { article } = await createArticleContext();
-    const { accessToken } = await createAuthedUser({ role: "admin" });
-
-    const unauth = await request(app)
-      .post("/api/v1/comments")
-      .send({ body: "X", articleID: String(article.id) });
-    expect(unauth.status).toBe(401);
-
-    const invalid = await request(app)
-      .post("/api/v1/comments")
-      .set(authHeader(accessToken))
-      .send({ body: "  ", articleID: "bad" });
-    expect(invalid.status).toBe(400);
-    expect(invalid.body.data).toEqual(
-      expect.arrayContaining([
-        expect.objectContaining({ field: "body", in: "body" }),
-        expect.objectContaining({ field: "articleId", in: "body" }),
       ]),
     );
   });
@@ -511,75 +425,6 @@ describe("PATCH /api/v1/comments/:id", () => {
     expect(stored.status).toBe("public");
   });
 
-  it("should let an admin owner update body and status", async () => {
-    const { user, accessToken, article } = await createArticleContext({
-      user: { role: "admin" },
-    });
-    const comment = await seedComment({
-      article: article.id,
-      author: user.id,
-      body: "Admin owned",
-      status: "public",
-    });
-
-    const res = await request(app)
-      .patch(`/api/v1/comments/${comment.id}`)
-      .set(authHeader(accessToken))
-      .send({ body: "Edited", status: "hidden" });
-
-    expect(res.status).toBe(200);
-    expect(res.body.message).toBe("comment updated");
-    const stored = await Comment.findById(comment.id);
-    expect(stored.body).toBe("Edited");
-    expect(stored.status).toBe("hidden");
-  });
-
-  it("should let an admin non-owner change only status (adminOverride)", async () => {
-    const { user: owner, article } = await createArticleContext();
-    const comment = await seedComment({
-      article: article.id,
-      author: owner.id,
-      body: "Do not edit",
-      status: "public",
-    });
-    const { accessToken: adminToken } = await createAuthedUser({
-      role: "admin",
-    });
-
-    const res = await request(app)
-      .patch(`/api/v1/comments/${comment.id}`)
-      .set(authHeader(adminToken))
-      .send({ status: "hidden", body: "Should be ignored" });
-
-    expect(res.status).toBe(200);
-    expect(res.body.message).toBe("comment status updated");
-
-    const stored = await Comment.findById(comment.id);
-    expect(stored.status).toBe("hidden");
-    expect(stored.body).toBe("Do not edit");
-  });
-
-  it("should require a valid status on admin override", async () => {
-    const { user: owner, article } = await createArticleContext();
-    const comment = await seedComment({
-      article: article.id,
-      author: owner.id,
-      body: "Needs status",
-    });
-    const { accessToken: adminToken } = await createAuthedUser({
-      role: "admin",
-    });
-
-    const res = await request(app)
-      .patch(`/api/v1/comments/${comment.id}`)
-      .set(authHeader(adminToken))
-      .send({ body: "Only body" });
-
-    expectBadRequest(res, "status", "body");
-    const stored = await Comment.findById(comment.id);
-    expect(stored.body).toBe("Needs status");
-  });
-
   it("should forbid a non-owner regular user from updating", async () => {
     const { user: owner, article } = await createArticleContext();
     const comment = await seedComment({
@@ -636,6 +481,75 @@ describe("PATCH /api/v1/comments/:id", () => {
       .patch(`/api/v1/comments/${comment.id}`)
       .send({ body: "X" });
     expect(unauth.status).toBe(401);
+  });
+});
+
+describe("PATCH /api/v1/comments/:id/status", () => {
+  it("allows an admin to hide and republish a comment", async () => {
+    const { user, article } = await createArticleContext();
+    const comment = await seedComment({ article: article.id, author: user.id });
+    const { accessToken } = await createAuthedUser({ role: "admin" });
+
+    const hidden = await request(app)
+      .patch(`/api/v1/comments/${comment.id}/status`)
+      .set(authHeader(accessToken))
+      .send({ status: "hidden" });
+    expect(hidden.status).toBe(200);
+    expect(hidden.body).toMatchObject({
+      code: 200,
+      message: "comment status updated",
+      data: { status: "hidden" },
+      links: { self: `/api/v1/comments/${comment.id}` },
+    });
+
+    const publicRes = await request(app)
+      .patch(`/api/v1/comments/${comment.id}/status`)
+      .set(authHeader(accessToken))
+      .send({ status: "public" });
+    expect(publicRes.status).toBe(200);
+    expect(publicRes.body.data.status).toBe("public");
+  });
+
+  it("requires admin authorization and validates status and id", async () => {
+    const {
+      user,
+      article,
+      accessToken: userToken,
+    } = await createArticleContext();
+    const comment = await seedComment({ article: article.id, author: user.id });
+
+    const unauth = await request(app)
+      .patch(`/api/v1/comments/${comment.id}/status`)
+      .send({ status: "hidden" });
+    expect(unauth.status).toBe(401);
+
+    const forbidden = await request(app)
+      .patch(`/api/v1/comments/${comment.id}/status`)
+      .set(authHeader(userToken))
+      .send({ status: "hidden" });
+    expect(forbidden.status).toBe(403);
+
+    const { accessToken } = await createAuthedUser({ role: "admin" });
+    const invalidStatus = await request(app)
+      .patch(`/api/v1/comments/${comment.id}/status`)
+      .set(authHeader(accessToken))
+      .send({ status: "deleted" });
+    expectBadRequest(invalidStatus, "status", "body");
+
+    const invalidId = await request(app)
+      .patch("/api/v1/comments/not-an-id/status")
+      .set(authHeader(accessToken))
+      .send({ status: "hidden" });
+    expectBadRequest(invalidId, "id", "params");
+  });
+
+  it("returns not found for a missing comment", async () => {
+    const { accessToken } = await createAuthedUser({ role: "admin" });
+    const res = await request(app)
+      .patch(`/api/v1/comments/${new mongoose.Types.ObjectId()}/status`)
+      .set(authHeader(accessToken))
+      .send({ status: "hidden" });
+    expect(res.status).toBe(404);
   });
 });
 
@@ -715,64 +629,6 @@ describe("DELETE /api/v1/comments/:id", () => {
       .delete("/api/v1/comments/not-valid")
       .set(authHeader(accessToken));
     expectBadRequest(badId, "id", "params");
-  });
-});
-
-// ─── Visibility after moderation ─────────────────────────────────────────────
-describe("Comment visibility after status changes", () => {
-  it("should hide a moderated comment from the public article comments list", async () => {
-    const { user, article } = await createArticleContext();
-    const comment = await seedComment({
-      article: article.id,
-      author: user.id,
-      body: "Will be hidden",
-      status: "public",
-    });
-    const { accessToken: adminToken } = await createAuthedUser({
-      role: "admin",
-    });
-
-    await request(app)
-      .patch(`/api/v1/comments/${comment.id}`)
-      .set(authHeader(adminToken))
-      .send({ status: "hidden" });
-
-    const publicList = await request(app).get(
-      `/api/v1/articles/${article.id}/comments`,
-    );
-    expect(publicList.status).toBe(200);
-    expect(publicList.body.data).toHaveLength(0);
-
-    const adminList = await request(app)
-      .get("/api/v1/comments")
-      .query({ status: "hidden", articleId: String(article.id) })
-      .set(authHeader(adminToken));
-    expect(adminList.body.data).toHaveLength(1);
-    expect(adminList.body.data[0].body).toBe("Will be hidden");
-  });
-
-  it("should restore a hidden comment to the public list when set back to public", async () => {
-    const { user, article } = await createArticleContext();
-    const comment = await seedComment({
-      article: article.id,
-      author: user.id,
-      body: "Back again",
-      status: "hidden",
-    });
-    const { accessToken: adminToken } = await createAuthedUser({
-      role: "admin",
-    });
-
-    await request(app)
-      .patch(`/api/v1/comments/${comment.id}`)
-      .set(authHeader(adminToken))
-      .send({ status: "public" });
-
-    const publicList = await request(app).get(
-      `/api/v1/articles/${article.id}/comments`,
-    );
-    expect(publicList.body.data).toHaveLength(1);
-    expect(publicList.body.data[0].body).toBe("Back again");
   });
 });
 

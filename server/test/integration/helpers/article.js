@@ -7,6 +7,7 @@
  */
 
 const Article = require("../../../src/model/Article");
+const Category = require("../../../src/model/Category");
 const { seedUser, issueSession } = require("./auth");
 
 let emailSeq = 0;
@@ -45,19 +46,24 @@ const seedArticle = async ({
   author,
   title = "Seeded Article",
   body = "Seeded body",
-  cover = "",
+  cover = "seeded-cover.png",
   status = "published",
 } = {}) => {
   if (!author) {
     throw new Error("seedArticle requires an author id");
   }
 
+  const category = await Category.create({
+    name: `Integration Category ${Date.now()}-${Math.random()}`,
+  });
+
   const article = await Article.create({
     title,
     body,
-    cover,
+    cover_image_url: cover,
     status,
-    author,
+    author_id: author,
+    category_id: category.id,
   });
 
   return article.toObject();

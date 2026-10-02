@@ -20,12 +20,14 @@ jest.mock("../../src/lib/email", () => ({
 }));
 
 const request = require("supertest");
+const crypto = require("crypto");
 const jwt = require("jsonwebtoken");
 const mongoose = require("mongoose");
 
 const app = require("../../src/app");
 const emailService = require("../../src/lib/email");
 const User = require("../../src/model/User");
+const Session = require("../../src/model/Session");
 const { hashing } = require("../../src/utils");
 const tokenServices = require("../../src/lib/token");
 const db = require("./helpers/db");
@@ -101,12 +103,12 @@ describe("POST /api/v1/auth/sign-up", () => {
 
     const stored = await User.findOne({ email: validBody.email });
     expect(stored).not.toBeNull();
-    expect(stored.status).toBe("pending");
+    expect(stored.account_status).toBe("pending");
     expect(stored.role).toBe("user");
-    expect(stored.password).not.toBe(validBody.password);
-    expect(await hashing.compareHash(validBody.password, stored.password)).toBe(
-      true,
-    );
+    expect(stored.password_hash).not.toBe(validBody.password);
+    expect(
+      await hashing.compareHash(validBody.password, stored.password_hash),
+    ).toBe(true);
 
     expect(emailService.sendMail).toHaveBeenCalledTimes(1);
     const mail = emailService.sendMail.mock.calls[0][0];
@@ -114,7 +116,7 @@ describe("POST /api/v1/auth/sign-up", () => {
       email: validBody.email,
       subject: "Activate your account",
     });
-    expect(mail.text).toContain("/api/v1/auth/verify-email/");
+    expect(mail.text).toMatch(/email verification code is: \d{6}/);
   });
 
   it("should reject missing required fields with the validation contract", async () => {
@@ -199,8 +201,10 @@ describe("POST /api/v1/auth/setup-admin", () => {
 
     const stored = await User.findOne({ email: adminBody.email });
     expect(stored.role).toBe("admin");
-    expect(stored.status).toBe("approved");
-    expect(stored.refreshToken).toBe(cookie);
+    expect(stored.account_status).toBe("active");
+    expect(
+      await mongoose.model("Session").countDocuments({ user_id: stored.id }),
+    ).toBe(1);
   });
 
   it("should forbid creating a second system admin", async () => {
@@ -233,8 +237,8 @@ describe("POST /api/v1/auth/setup-admin", () => {
 });
 
 // ─── Email verification ──────────────────────────────────────────────────────
-describe("GET /api/v1/auth/verify-email/:token", () => {
-  it("should activate a pending account and issue a session", async () => {
+describe("POST /api/v1/auth/verify-email-otp", () => {
+  it("should activate a pending account", async () => {
     const registerRes = await request(app).post("/api/v1/auth/sign-up").send({
       name: "Verify Me",
       email: "verify@example.com",
@@ -242,106 +246,50 @@ describe("GET /api/v1/auth/verify-email/:token", () => {
     });
     expect(registerRes.status).toBe(201);
 
-    const token = extractTokenFromMail(emailService.sendMail.mock.calls[0][0]);
+    const code = emailService.sendMail.mock.calls[0][0].text.match(/\d{6}/)[0];
 
-    const res = await request(app).get(`/api/v1/auth/verify-email/${token}`);
+    const res = await request(app)
+      .post("/api/v1/auth/verify-email-otp")
+      .send({ email: "verify@example.com", otp: code });
 
     expect(res.status).toBe(200);
     expect(res.body).toMatchObject({
       code: 200,
       message: "Email verified successfully.",
-      data: { accessToken: expect.any(String) },
+      links: { "sign-in": "/api/v1/auth/sign-in" },
     });
-
-    const cookie = parseRefreshCookie(res.headers["set-cookie"]);
-    expect(cookie).toBeTruthy();
 
     const stored = await User.findOne({ email: "verify@example.com" });
-    expect(stored.status).toBe("approved");
-    expect(stored.refreshToken).toBe(cookie);
+    expect(stored.account_status).toBe("active");
   });
 
-  it("should reject an invalid verification token", async () => {
-    const res = await request(app).get(
-      "/api/v1/auth/verify-email/not.a.valid.jwt",
-    );
-
-    expect(res.status).toBe(401);
-    expect(res.body).toMatchObject({
-      code: 401,
-      error: "Unauthorized",
-      message: "Invalid Active/Reset token",
-    });
-  });
-
-  it("should reject an expired verification token", async () => {
-    const user = await seedUser({
-      email: "expired-verify@example.com",
-      password: "password123",
-      status: "pending",
-    });
-
-    const token = expiredActiveResetToken({
-      id: user.id,
-      role: user.role,
-      email: user.email,
-    });
-
-    const res = await request(app).get(`/api/v1/auth/verify-email/${token}`);
-
-    expect(res.status).toBe(401);
-    expect(res.body.message).toBe("Active/Reset token expired");
-  });
-
-  it("should reject verification when the user no longer exists", async () => {
-    const missingId = new mongoose.Types.ObjectId().toString();
-    const token = tokenServices.generateActiveResetToken({
-      id: missingId,
-      role: "user",
-      email: "gone@example.com",
-    });
-
-    const res = await request(app).get(`/api/v1/auth/verify-email/${token}`);
-
-    expect(res.status).toBe(404);
-    expect(res.body).toMatchObject({
-      code: 404,
-      error: "Not found",
-      message: "User not found",
-    });
-  });
-
-  it("should reject verification for an already approved account", async () => {
-    const user = await seedUser({
-      email: "already@example.com",
-      password: "password123",
-      status: "approved",
-    });
-    const token = tokenServices.generateActiveResetToken({
-      id: user.id,
-      role: user.role,
-      email: user.email,
-    });
-
-    const res = await request(app).get(`/api/v1/auth/verify-email/${token}`);
+  it("should reject an invalid verification code", async () => {
+    const res = await request(app)
+      .post("/api/v1/auth/verify-email-otp")
+      .send({ email: "missing@example.com", otp: "123456" });
 
     expect(res.status).toBe(400);
     expect(res.body).toMatchObject({
       code: 400,
-      message: "Account already verified",
+      error: "Bad request",
+      message: "Invalid or expired OTP",
     });
-    expect(res.body.data).toEqual([
-      {
-        field: "token",
-        message: "Account already verified",
-        in: "params",
-      },
-    ]);
+  });
+
+  it("should reject verification for an already active account", async () => {
+    await seedUser({ email: "already@example.com", status: "approved" });
+
+    const res = await request(app)
+      .post("/api/v1/auth/verify-email-otp")
+      .send({ email: "already@example.com", otp: "123456" });
+
+    expect(res.status).toBe(400);
+    expect(res.body.message).toBe("Invalid or expired OTP");
   });
 });
 
 // ─── Resend verification ─────────────────────────────────────────────────────
-describe("POST /api/v1/auth/resend-verification", () => {
+describe("POST /api/v1/auth/resend-verification-otp", () => {
   it("should resend a verification email for a pending user", async () => {
     await seedUser({
       email: "pending@example.com",
@@ -350,36 +298,37 @@ describe("POST /api/v1/auth/resend-verification", () => {
     });
 
     const res = await request(app)
-      .post("/api/v1/auth/resend-verification")
+      .post("/api/v1/auth/resend-verification-otp")
       .send({ email: "pending@example.com" });
 
     expect(res.status).toBe(200);
     expect(res.body).toMatchObject({
       code: 200,
-      message: "Verification email sent",
+      message:
+        "If an account with that email exists, a verification code has been sent.",
     });
     expect(emailService.sendMail).toHaveBeenCalledTimes(1);
   });
 
   it("should reject missing/invalid email", async () => {
     const missing = await request(app)
-      .post("/api/v1/auth/resend-verification")
+      .post("/api/v1/auth/resend-verification-otp")
       .send({});
     expectValidationError(missing, "email");
 
     const invalid = await request(app)
-      .post("/api/v1/auth/resend-verification")
+      .post("/api/v1/auth/resend-verification-otp")
       .send({ email: "bad" });
     expectValidationError(invalid, "email");
   });
 
   it("should return 404 when the user does not exist", async () => {
     const res = await request(app)
-      .post("/api/v1/auth/resend-verification")
+      .post("/api/v1/auth/resend-verification-otp")
       .send({ email: "nobody@example.com" });
 
-    expect(res.status).toBe(404);
-    expect(res.body.message).toBe("User not found");
+    expect(res.status).toBe(200);
+    expect(res.body.message).toContain("If an account");
   });
 
   it("should forbid resend for an already active account", async () => {
@@ -390,11 +339,11 @@ describe("POST /api/v1/auth/resend-verification", () => {
     });
 
     const res = await request(app)
-      .post("/api/v1/auth/resend-verification")
+      .post("/api/v1/auth/resend-verification-otp")
       .send({ email: "active@example.com" });
 
-    expect(res.status).toBe(403);
-    expect(res.body.message).toBe("Account is already active");
+    expect(res.status).toBe(200);
+    expect(res.body.message).toContain("If an account");
   });
 });
 
@@ -424,7 +373,9 @@ describe("POST /api/v1/auth/sign-in", () => {
     expect(cookie).toBeTruthy();
 
     const stored = await User.findOne({ email: "login@example.com" });
-    expect(stored.refreshToken).toBe(cookie);
+    expect(
+      await mongoose.model("Session").countDocuments({ user_id: stored.id }),
+    ).toBe(1);
 
     const decoded = jwt.verify(
       res.body.data.accessToken,
@@ -536,7 +487,9 @@ describe("POST /api/v1/auth/refresh", () => {
     expect(newRefresh).toBeTruthy();
 
     const stored = await User.findById(user.id);
-    expect(stored.refreshToken).toBe(newRefresh);
+    expect(
+      await mongoose.model("Session").countDocuments({ user_id: stored.id }),
+    ).toBe(1);
     // Access token must verify with the access secret
     jwt.verify(res.body.data.accessToken, process.env.JWT_ACCESS_SECRET);
   });
@@ -569,7 +522,12 @@ describe("POST /api/v1/auth/refresh", () => {
       role: user.role,
       email: user.email,
     });
-    await User.findByIdAndUpdate(user.id, { $set: { refreshToken: token } });
+    await mongoose.model("Session").create({
+      user_id: user.id,
+      refresh_token_hash: await hashing.generateHash(token),
+      device_info: "integration-test",
+      expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
+    });
 
     const res = await request(app)
       .post("/api/v1/auth/refresh")
@@ -602,7 +560,9 @@ describe("POST /api/v1/auth/refresh", () => {
     expect(res.body.message).toBe("Refresh token is invalid or revoked");
 
     const stored = await User.findById(user.id);
-    expect(stored.refreshToken).toBeNull();
+    expect(
+      await mongoose.model("Session").countDocuments({ user_id: stored.id }),
+    ).toBe(1);
   });
 
   it("should reject refresh after logout (no stored refresh token)", async () => {
@@ -650,7 +610,9 @@ describe("POST /api/v1/auth/logout", () => {
     expect(setCookie.some((c) => c.startsWith("refreshToken=;"))).toBe(true);
 
     const stored = await User.findById(user.id);
-    expect(stored.refreshToken).toBeNull();
+    expect(
+      await mongoose.model("Session").countDocuments({ user_id: stored.id }),
+    ).toBe(0);
   });
 
   it("should reject logout without an Authorization header", async () => {
@@ -721,7 +683,7 @@ describe("POST /api/v1/auth/forgot-password", () => {
     expect(res.body).toMatchObject({
       code: 200,
       message:
-        "If this email is registered, you will receive a password reset link.",
+        "If an account with that email exists, a password reset code has been sent.",
     });
     expect(emailService.sendMail).toHaveBeenCalledTimes(1);
     expect(emailService.sendMail.mock.calls[0][0].subject).toBe(
@@ -736,21 +698,21 @@ describe("POST /api/v1/auth/forgot-password", () => {
 
     expect(res.status).toBe(200);
     expect(res.body.message).toBe(
-      "If this email is registered, you will receive a password reset link.",
+      "If an account with that email exists, a password reset code has been sent.",
     );
     expect(emailService.sendMail).not.toHaveBeenCalled();
   });
 
-  it("should not email a declined account but still return the generic message", async () => {
+  it("should not email a blocked account but still return the generic message", async () => {
     await seedUser({
-      email: "declined@example.com",
+      email: "blocked-reset@example.com",
       password: "password123",
-      status: "declined",
+      status: "blocked",
     });
 
     const res = await request(app)
       .post("/api/v1/auth/forgot-password")
-      .send({ email: "declined@example.com" });
+      .send({ email: "blocked-reset@example.com" });
 
     expect(res.status).toBe(200);
     expect(emailService.sendMail).not.toHaveBeenCalled();
@@ -765,22 +727,26 @@ describe("POST /api/v1/auth/forgot-password", () => {
   });
 });
 
-describe("PATCH /api/v1/auth/reset-password/:token", () => {
-  it("should reset the password, invalidate sessions, and allow login with the new password only", async () => {
+describe("POST /api/v1/auth/verify-reset-otp + PATCH /api/v1/auth/reset-password", () => {
+  it("should verify the reset OTP, reset the password, and invalidate sessions", async () => {
     const user = await seedUser({
       email: "reset@example.com",
       password: "old-password",
     });
     await issueSession(user);
 
-    const resetToken = tokenServices.generateActiveResetToken({
-      id: user.id,
-      role: user.role,
-      email: user.email,
-    });
+    await request(app)
+      .post("/api/v1/auth/forgot-password")
+      .send({ email: "reset@example.com" });
+    const code = emailService.sendMail.mock.calls[0][0].text.match(/\d{6}/)[0];
+    const verifyRes = await request(app)
+      .post("/api/v1/auth/verify-reset-otp")
+      .send({ email: "reset@example.com", otp: code });
+    const resetToken = verifyRes.headers["set-cookie"][0].split(";")[0];
 
     const res = await request(app)
-      .patch(`/api/v1/auth/reset-password/${resetToken}`)
+      .patch("/api/v1/auth/reset-password")
+      .set("Cookie", resetToken)
       .send({ password: "new-password" });
 
     expect(res.status).toBe(200);
@@ -791,13 +757,15 @@ describe("PATCH /api/v1/auth/reset-password/:token", () => {
     });
 
     const stored = await User.findById(user.id);
-    expect(stored.refreshToken).toBeNull();
-    expect(await hashing.compareHash("new-password", stored.password)).toBe(
-      true,
-    );
-    expect(await hashing.compareHash("old-password", stored.password)).toBe(
-      false,
-    );
+    expect(
+      await mongoose.model("Session").countDocuments({ user_id: user.id }),
+    ).toBe(0);
+    expect(
+      await hashing.compareHash("new-password", stored.password_hash),
+    ).toBe(true);
+    expect(
+      await hashing.compareHash("old-password", stored.password_hash),
+    ).toBe(false);
 
     const oldLogin = await request(app)
       .post("/api/v1/auth/sign-in")
@@ -810,46 +778,17 @@ describe("PATCH /api/v1/auth/reset-password/:token", () => {
     expect(newLogin.status).toBe(200);
   });
 
-  it("should reject an invalid reset token", async () => {
+  it("should reject a missing reset cookie", async () => {
     const res = await request(app)
-      .patch("/api/v1/auth/reset-password/not.a.valid.token")
+      .patch("/api/v1/auth/reset-password")
       .send({ password: "new-password" });
 
     expect(res.status).toBe(401);
-  });
-
-  it("should reject an expired reset token", async () => {
-    const user = await seedUser({
-      email: "reset-expired@example.com",
-      password: "password123",
-    });
-    const token = expiredActiveResetToken({
-      id: user.id,
-      role: user.role,
-      email: user.email,
-    });
-
-    const res = await request(app)
-      .patch(`/api/v1/auth/reset-password/${token}`)
-      .send({ password: "new-password" });
-
-    expect(res.status).toBe(401);
-    expect(res.body.message).toBe("Active/Reset token expired");
   });
 
   it("should reject a short password", async () => {
-    const user = await seedUser({
-      email: "reset-short@example.com",
-      password: "password123",
-    });
-    const token = tokenServices.generateActiveResetToken({
-      id: user.id,
-      role: user.role,
-      email: user.email,
-    });
-
     const res = await request(app)
-      .patch(`/api/v1/auth/reset-password/${token}`)
+      .patch("/api/v1/auth/reset-password")
       .send({ password: "short" });
 
     expectValidationError(res, "password");
@@ -965,6 +904,100 @@ describe("Authentication & authorization middleware (via protected routes)", () 
       .set("Authorization", `Bearer ${accessToken}`);
 
     expect(res.status).toBe(200);
+  });
+});
+
+describe("Session management routes", () => {
+  it("lists the authenticated user's sessions and marks the current cookie session", async () => {
+    const user = await seedUser({ email: "sessions@example.com" });
+    const first = await issueSession(user);
+    const secondRefresh = crypto.randomBytes(32).toString("hex");
+    await Session.create({
+      user_id: user.id,
+      refresh_token_hash: await hashing.generateHash(secondRefresh),
+      device_info: "integration-test",
+      expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
+    });
+
+    const res = await request(app)
+      .get("/api/v1/auth/sessions")
+      .set("Authorization", `Bearer ${first.accessToken}`)
+      .set("Cookie", refreshCookie(first.refreshToken));
+
+    expect(res.status).toBe(200);
+    expect(res.body).toMatchObject({ code: 200, message: "Data retrieved." });
+    expect(res.body.data).toHaveLength(2);
+    expect(res.body.data).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          deviceInfo: "integration-test",
+          isCurrent: true,
+          expiresAt: expect.any(String),
+        }),
+        expect.objectContaining({ isCurrent: false }),
+      ]),
+    );
+    expect(secondRefresh).toBeTruthy();
+  });
+
+  it("requires authentication to list sessions", async () => {
+    const res = await request(app).get("/api/v1/auth/sessions");
+    expect(res.status).toBe(401);
+  });
+
+  it("deletes only the authenticated user's selected session", async () => {
+    const user = await seedUser({ email: "delete-session@example.com" });
+    const { accessToken } = await issueSession(user);
+    const other = await seedUser({ email: "other-session@example.com" });
+    await issueSession(other);
+    const session = await Session.findOne({ user_id: user.id });
+
+    const res = await request(app)
+      .delete(`/api/v1/auth/sessions/${session.id}`)
+      .set("Authorization", `Bearer ${accessToken}`);
+
+    expect(res.status).toBe(204);
+    expect(await Session.findById(session.id)).toBeNull();
+    expect(await Session.countDocuments({ user_id: other.id })).toBe(1);
+  });
+
+  it("rejects invalid and missing sessions", async () => {
+    const user = await seedUser({ email: "missing-session@example.com" });
+    const { accessToken } = await issueSession(user);
+
+    const invalid = await request(app)
+      .delete("/api/v1/auth/sessions/not-an-id")
+      .set("Authorization", `Bearer ${accessToken}`);
+    expect(invalid.status).toBe(400);
+    expect(invalid.body.message).toBe("Invalid session ID");
+
+    const missing = await request(app)
+      .delete(`/api/v1/auth/sessions/${new mongoose.Types.ObjectId()}`)
+      .set("Authorization", `Bearer ${accessToken}`);
+    expect(missing.status).toBe(404);
+    expect(missing.body.message).toBe("Session not found");
+  });
+
+  it("logs out all sessions and clears the refresh cookie", async () => {
+    const user = await seedUser({ email: "logout-all@example.com" });
+    const { accessToken } = await issueSession(user);
+    await issueSession(user);
+
+    const res = await request(app)
+      .post("/api/v1/auth/logout-all")
+      .set("Authorization", `Bearer ${accessToken}`);
+
+    expect(res.status).toBe(200);
+    expect(res.body).toMatchObject({
+      code: 200,
+      message: "Logged out from all devices successfully.",
+    });
+    expect(await Session.countDocuments({ user_id: user.id })).toBe(0);
+    expect(
+      (res.headers["set-cookie"] || []).some((c) =>
+        c.startsWith("refreshToken=;"),
+      ),
+    ).toBe(true);
   });
 });
 

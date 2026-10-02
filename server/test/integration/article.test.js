@@ -16,9 +16,11 @@ const mongoose = require("mongoose");
 
 const app = require("../../src/app");
 const Article = require("../../src/model/Article");
+const Category = require("../../src/model/Category");
 const db = require("./helpers/db");
 const { expiredAccessToken } = require("./helpers/auth");
 const { createAuthedUser, seedArticle } = require("./helpers/article");
+const { createArticleContext, seedComment } = require("./helpers/comment");
 
 beforeAll(async () => {
   await db.connect();
@@ -62,11 +64,13 @@ describe("POST /api/v1/articles", () => {
     const res = await request(app)
       .post("/api/v1/articles")
       .set(authHeader(accessToken))
-      .send({
-        title: "My First Post",
-        body: "Hello world",
-        cover: "https://example.com/cover.png",
-      });
+      .field("title", "My First Post")
+      .field("body", "Hello world")
+      .field(
+        "category",
+        String((await Category.create({ name: "Create Category" })).id),
+      )
+      .attach("cover", Buffer.from("cover"), "cover.png");
 
     expect(res.status).toBe(201);
     expect(res.body).toMatchObject({
@@ -75,17 +79,17 @@ describe("POST /api/v1/articles", () => {
       data: {
         title: "My First Post",
         body: "Hello world",
-        cover: "https://example.com/cover.png",
+        cover: expect.any(String),
         status: "published",
       },
       links: { self: expect.stringMatching(/^\/api\/v1\/articles\//) },
     });
-    expect(String(res.body.data.author)).toBe(String(user.id));
+    expect(String(res.body.data.author.id)).toBe(String(user.id));
 
     const stored = await Article.findById(res.body.data.id);
     expect(stored).not.toBeNull();
     expect(stored.title).toBe("My First Post");
-    expect(String(stored.author)).toBe(String(user.id));
+    expect(String(stored.author_id)).toBe(String(user.id));
     expect(stored.status).toBe("published");
   });
 
@@ -95,11 +99,17 @@ describe("POST /api/v1/articles", () => {
     const res = await request(app)
       .post("/api/v1/articles")
       .set(authHeader(accessToken))
-      .send({ title: "Defaults Only" });
+      .field("title", "Defaults Only")
+      .field("body", "Default body")
+      .field(
+        "category",
+        String((await Category.create({ name: "Default Category" })).id),
+      )
+      .attach("cover", Buffer.from("cover"), "cover.png");
 
     expect(res.status).toBe(201);
-    expect(res.body.data.body).toBe("");
-    expect(res.body.data.cover).toBe("");
+    expect(res.body.data.body).toBe("Default body");
+    expect(res.body.data.cover).toEqual(expect.any(String));
     expect(res.body.data.status).toBe("published");
   });
 
@@ -109,10 +119,16 @@ describe("POST /api/v1/articles", () => {
     const res = await request(app)
       .post("/api/v1/articles")
       .set(authHeader(accessToken))
-      .send({ title: "Admin Post" });
+      .field("title", "Admin Post")
+      .field("body", "Admin body")
+      .field(
+        "category",
+        String((await Category.create({ name: "Admin Category" })).id),
+      )
+      .attach("cover", Buffer.from("cover"), "cover.png");
 
     expect(res.status).toBe(201);
-    expect(String(res.body.data.author)).toBe(String(user.id));
+    expect(String(res.body.data.author.id)).toBe(String(user.id));
   });
 
   it("should reject unauthenticated create requests", async () => {
@@ -268,7 +284,7 @@ describe("GET /api/v1/articles", () => {
 });
 
 // ─── Admin list ──────────────────────────────────────────────────────────────
-describe("GET /api/v1/articles/all", () => {
+describe("GET /api/v1/articles/admin/all", () => {
   it("should let an admin list published and draft articles and filter by status", async () => {
     const { user: author } = await createAuthedUser();
     const { accessToken: adminToken } = await createAuthedUser({
@@ -280,7 +296,7 @@ describe("GET /api/v1/articles/all", () => {
     await seedArticle({ author: author.id, title: "Drf", status: "draft" });
 
     const all = await request(app)
-      .get("/api/v1/articles/all")
+      .get("/api/v1/articles/admin/all")
       .set(authHeader(adminToken));
 
     expect(all.status).toBe(200);
@@ -288,7 +304,7 @@ describe("GET /api/v1/articles/all", () => {
     expect(all.body.data.some((a) => a.status === "draft")).toBe(true);
 
     const drafts = await request(app)
-      .get("/api/v1/articles/all")
+      .get("/api/v1/articles/admin/all")
       .query({ status: "draft" })
       .set(authHeader(adminToken));
 
@@ -302,7 +318,7 @@ describe("GET /api/v1/articles/all", () => {
     const { accessToken } = await createAuthedUser();
 
     const res = await request(app)
-      .get("/api/v1/articles/all")
+      .get("/api/v1/articles/admin/all")
       .set(authHeader(accessToken));
 
     expect(res.status).toBe(403);
@@ -312,7 +328,7 @@ describe("GET /api/v1/articles/all", () => {
   });
 
   it("should reject unauthenticated admin-list requests", async () => {
-    const res = await request(app).get("/api/v1/articles/all");
+    const res = await request(app).get("/api/v1/articles/admin/all");
     expect(res.status).toBe(401);
   });
 
@@ -320,7 +336,7 @@ describe("GET /api/v1/articles/all", () => {
     const { accessToken } = await createAuthedUser({ role: "admin" });
 
     const res = await request(app)
-      .get("/api/v1/articles/all")
+      .get("/api/v1/articles/admin/all")
       .query({ status: "archived" })
       .set(authHeader(accessToken));
 
@@ -357,23 +373,6 @@ describe("GET /api/v1/articles/:id", () => {
       },
     });
     expect(res.body.data.status).toBeUndefined();
-  });
-
-  it("should expand author when requested", async () => {
-    const { user } = await createAuthedUser({ name: "Expand Author" });
-    const article = await seedArticle({
-      author: user.id,
-      title: "With Author",
-    });
-
-    const res = await request(app)
-      .get(`/api/v1/articles/${article.id}`)
-      .query({ expand: "author" });
-
-    expect(res.status).toBe(200);
-    expect(res.body.data.author).toMatchObject({
-      name: "Expand Author",
-    });
   });
 
   it("should return 404 for a draft article (public visibility rule)", async () => {
@@ -422,7 +421,6 @@ describe("GET /api/v1/articles/:id/author", () => {
       data: {
         id: String(user.id),
         name: "Byline",
-        email: "byline@example.com",
       },
       links: {
         self: `/api/v1/articles/${article.id}/author`,
@@ -450,143 +448,6 @@ describe("GET /api/v1/articles/:id/author", () => {
   });
 });
 
-// ─── PUT update-or-create ────────────────────────────────────────────────────
-describe("PUT /api/v1/articles/:id", () => {
-  it("should let the owner fully update their article", async () => {
-    const { user, accessToken } = await createAuthedUser();
-    const article = await seedArticle({
-      author: user.id,
-      title: "Old",
-      body: "Old body",
-    });
-
-    const res = await request(app)
-      .put(`/api/v1/articles/${article.id}`)
-      .set(authHeader(accessToken))
-      .send({
-        title: "New Title",
-        body: "New body",
-        cover: "cover.png",
-      });
-
-    expect(res.status).toBe(200);
-    expect(res.body).toMatchObject({
-      code: 200,
-      message: "Successfully updated article",
-      data: {
-        title: "New Title",
-        body: "New body",
-        cover: "cover.png",
-        status: "published",
-      },
-    });
-
-    const stored = await Article.findById(article.id);
-    expect(stored.title).toBe("New Title");
-    expect(stored.body).toBe("New body");
-  });
-
-  it("should create a new article when the id does not exist (upsert path)", async () => {
-    const { user, accessToken } = await createAuthedUser();
-    const missingId = new mongoose.Types.ObjectId().toString();
-
-    const res = await request(app)
-      .put(`/api/v1/articles/${missingId}`)
-      .set(authHeader(accessToken))
-      .send({ title: "Upserted", body: "Created via PUT" });
-
-    expect(res.status).toBe(201);
-    expect(res.body.message).toBe("Article created successfully");
-    expect(res.body.data.title).toBe("Upserted");
-    expect(String(res.body.data.author)).toBe(String(user.id));
-
-    // Implementation creates via Article.create without forcing the URL id
-    const stored = await Article.findById(res.body.data.id);
-    expect(stored).not.toBeNull();
-  });
-
-  it("should forbid a non-owner from updating another user's article", async () => {
-    const { user: owner } = await createAuthedUser();
-    const { accessToken: otherToken } = await createAuthedUser();
-    const article = await seedArticle({
-      author: owner.id,
-      title: "Owned",
-      body: "Leave me",
-    });
-
-    const res = await request(app)
-      .put(`/api/v1/articles/${article.id}`)
-      .set(authHeader(otherToken))
-      .send({ title: "Hijacked" });
-
-    expect(res.status).toBe(403);
-    expect(res.body.message).toBe(
-      "You do not have permission to access this article",
-    );
-
-    const stored = await Article.findById(article.id);
-    expect(stored.title).toBe("Owned");
-  });
-
-  it("should forbid an admin non-owner from PUT (no adminOverride when allowMissing is true)", async () => {
-    const { user: owner } = await createAuthedUser();
-    const { accessToken: adminToken } = await createAuthedUser({
-      role: "admin",
-    });
-    const article = await seedArticle({
-      author: owner.id,
-      title: "Still Owned",
-    });
-
-    const res = await request(app)
-      .put(`/api/v1/articles/${article.id}`)
-      .set(authHeader(adminToken))
-      .send({ title: "Admin rewrite" });
-
-    expect(res.status).toBe(403);
-    const stored = await Article.findById(article.id);
-    expect(stored.title).toBe("Still Owned");
-  });
-
-  it("should reject unauthenticated PUT", async () => {
-    const id = new mongoose.Types.ObjectId().toString();
-    const res = await request(app)
-      .put(`/api/v1/articles/${id}`)
-      .send({ title: "X" });
-
-    expect(res.status).toBe(401);
-  });
-
-  it("should reject invalid id and invalid title on PUT", async () => {
-    const { accessToken } = await createAuthedUser();
-
-    const badId = await request(app)
-      .put("/api/v1/articles/not-valid")
-      .set(authHeader(accessToken))
-      .send({ title: "X" });
-    expectBadRequest(badId, "id", "params");
-
-    const id = new mongoose.Types.ObjectId().toString();
-    const badTitle = await request(app)
-      .put(`/api/v1/articles/${id}`)
-      .set(authHeader(accessToken))
-      .send({ title: "  " });
-    expectBadRequest(badTitle, "title", "body");
-  });
-
-  it("should require a title when upserting a missing article", async () => {
-    const { accessToken } = await createAuthedUser();
-    const id = new mongoose.Types.ObjectId().toString();
-
-    const res = await request(app)
-      .put(`/api/v1/articles/${id}`)
-      .set(authHeader(accessToken))
-      .send({ body: "no title" });
-
-    expectBadRequest(res, "title", "body");
-  });
-});
-
 // ─── PATCH partial update / status ───────────────────────────────────────────
 describe("PATCH /api/v1/articles/:id", () => {
   it("should let the owner patch title/body/cover", async () => {
@@ -600,14 +461,16 @@ describe("PATCH /api/v1/articles/:id", () => {
     const res = await request(app)
       .patch(`/api/v1/articles/${article.id}`)
       .set(authHeader(accessToken))
-      .send({ title: "Patched", body: "After", cover: "c.png" });
+      .field("title", "Patched")
+      .field("body", "After")
+      .attach("cover", Buffer.from("updated-cover"), "c.png");
 
     expect(res.status).toBe(200);
     expect(res.body.message).toBe("Successfully updated article data");
     expect(res.body.data).toMatchObject({
       title: "Patched",
       body: "After",
-      cover: "c.png",
+      cover: expect.any(String),
     });
 
     const stored = await Article.findById(article.id);
@@ -627,10 +490,10 @@ describe("PATCH /api/v1/articles/:id", () => {
       .set(authHeader(accessToken))
       .send({ status: "draft", title: "Still Mine" });
 
-    expect(res.status).toBe(200);
+    expect(res.status).toBe(400);
     const stored = await Article.findById(article.id);
     expect(stored.status).toBe("published");
-    expect(stored.title).toBe("Still Mine");
+    expect(stored.title).toBe("Stay Published");
   });
 
   it("should let an admin owner change article status", async () => {
@@ -642,12 +505,12 @@ describe("PATCH /api/v1/articles/:id", () => {
     });
 
     const res = await request(app)
-      .patch(`/api/v1/articles/${article.id}`)
+      .patch(`/api/v1/articles/${article.id}/status`)
       .set(authHeader(accessToken))
       .send({ status: "draft" });
 
     expect(res.status).toBe(200);
-    expect(res.body.message).toBe("Successfully updated article data");
+    expect(res.body.message).toBe("Successfully updated article status");
 
     const stored = await Article.findById(article.id);
     expect(stored.status).toBe("draft");
@@ -666,7 +529,7 @@ describe("PATCH /api/v1/articles/:id", () => {
     });
 
     const res = await request(app)
-      .patch(`/api/v1/articles/${article.id}`)
+      .patch(`/api/v1/articles/${article.id}/status`)
       .set(authHeader(adminToken))
       .send({ status: "draft", title: "Should Be Ignored", body: "Ignored" });
 
@@ -690,7 +553,7 @@ describe("PATCH /api/v1/articles/:id", () => {
     });
 
     const res = await request(app)
-      .patch(`/api/v1/articles/${article.id}`)
+      .patch(`/api/v1/articles/${article.id}/status`)
       .set(authHeader(adminToken))
       .send({ title: "Only Title" });
 
@@ -826,6 +689,76 @@ describe("DELETE /api/v1/articles/:id", () => {
   });
 });
 
+describe("POST /api/v1/articles/:articleId/comments/:commentId/replies", () => {
+  it("allows an authenticated user to reply to a comment", async () => {
+    const { user, accessToken, article } = await createArticleContext();
+    const parent = await seedComment({
+      article: article.id,
+      author: user.id,
+      body: "Parent comment",
+    });
+
+    const res = await request(app)
+      .post(`/api/v1/articles/${article.id}/comments/${parent.id}/replies`)
+      .set(authHeader(accessToken))
+      .send({ body: "A reply" });
+
+    expect(res.status).toBe(201);
+    expect(res.body).toMatchObject({
+      code: 201,
+      message: "reply posted",
+      data: { body: "A reply", parentCommentId: String(parent.id) },
+      links: {
+        self: `/api/v1/articles/${article.id}/comments/${parent.id}/replies`,
+        article: `/api/v1/articles/${article.id}`,
+      },
+    });
+  });
+
+  it("requires authentication and validates article, comment, and body", async () => {
+    const { user, article } = await createArticleContext();
+    const parent = await seedComment({ article: article.id, author: user.id });
+
+    const unauth = await request(app)
+      .post(`/api/v1/articles/${article.id}/comments/${parent.id}/replies`)
+      .send({ body: "No auth" });
+    expect(unauth.status).toBe(401);
+
+    const { accessToken } = await createAuthedUser();
+    const invalid = await request(app)
+      .post("/api/v1/articles/bad/comments/bad/replies")
+      .set(authHeader(accessToken))
+      .send({ body: " " });
+    expect(invalid.status).toBe(400);
+    expect(invalid.body.data).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ field: "articleId", in: "params" }),
+        expect.objectContaining({ field: "commentId", in: "params" }),
+        expect.objectContaining({ field: "body", in: "body" }),
+      ]),
+    );
+  });
+
+  it("rejects a reply to a comment belonging to another article", async () => {
+    const first = await createArticleContext();
+    const second = await createArticleContext();
+    const parent = await seedComment({
+      article: first.article.id,
+      author: first.user.id,
+    });
+
+    const res = await request(app)
+      .post(
+        `/api/v1/articles/${second.article.id}/comments/${parent.id}/replies`,
+      )
+      .set(authHeader(second.accessToken))
+      .send({ body: "Wrong article" });
+
+    expect(res.status).toBe(404);
+    expect(res.body.message).toBe("Comment not found");
+  });
+});
+
 // ─── Status / visibility edge cases ──────────────────────────────────────────
 describe("Article status and visibility rules", () => {
   it("should hide a draft from public list and single-get after admin status change", async () => {
@@ -840,7 +773,7 @@ describe("Article status and visibility rules", () => {
     });
 
     await request(app)
-      .patch(`/api/v1/articles/${article.id}`)
+      .patch(`/api/v1/articles/${article.id}/status`)
       .set(authHeader(adminToken))
       .send({ status: "draft" });
 
@@ -851,7 +784,7 @@ describe("Article status and visibility rules", () => {
     expect(single.status).toBe(404);
 
     const adminList = await request(app)
-      .get("/api/v1/articles/all")
+      .get("/api/v1/articles/admin/all")
       .query({ status: "draft" })
       .set(authHeader(adminToken));
     expect(
@@ -871,7 +804,7 @@ describe("Article status and visibility rules", () => {
     });
 
     const res = await request(app)
-      .patch(`/api/v1/articles/${article.id}`)
+      .patch(`/api/v1/articles/${article.id}/status`)
       .set(authHeader(adminToken))
       .send({ status: "published" });
 
