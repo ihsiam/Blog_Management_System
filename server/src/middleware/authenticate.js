@@ -35,6 +35,12 @@ const authenticate = async (req, res, next) => {
       return next(unauthorized("Invalid authentication token"));
     }
 
+    const hasSession = await userServices.hasActiveSession(user.id);
+
+    if (!hasSession) {
+      return next(unauthorized("Session expired"));
+    }
+
     // Block inactive accounts even when the access token is otherwise valid.
     if (user.account_status !== "active") {
       return next(forbidden("Your account is not active"));

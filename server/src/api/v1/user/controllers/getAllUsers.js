@@ -107,7 +107,7 @@ const getAllUsers = async (req, res, next) => {
         "name",
         "email",
         "role",
-        "status",
+        "account_status",
         "createdAt",
         "updatedAt",
       ],

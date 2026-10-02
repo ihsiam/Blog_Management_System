@@ -261,6 +261,9 @@ const getActiveSessions = async (id, refreshToken, session) => {
   }));
 };
 
+const hasActiveSession = async (id) =>
+  Session.exists({ user_id: id, expiresAt: { $gt: new Date() } });
+
 const deleteSession = async (userId, sessionId, session) => {
   const query = Session.deleteOne({ _id: sessionId, user_id: userId });
   if (session) query.session(session);
@@ -428,14 +431,17 @@ const getSingleUser = async ({ id, expand = "" }) => {
 
   // expand articles
   if (TrimmedExpand.includes("articles")) {
-    await user.populate({ path: "articles", select: "title status -author" });
+    await user.populate({
+      path: "articles",
+      select: "title status -author_id",
+    });
   }
 
   // expand comments
   if (TrimmedExpand.includes("comments")) {
     await user.populate({
       path: "comments",
-      select: "body status article -author",
+      select: "body status article_id -author_id",
     });
   }
 
@@ -608,6 +614,7 @@ module.exports = {
   clearRefreshToken,
   findSessionByToken,
   getActiveSessions,
+  hasActiveSession,
   deleteSession,
   createOtp,
   findValidOtp,

@@ -1,5 +1,11 @@
 const mongoose = require("mongoose");
 
+const serverSelectionTimeoutMS =
+  Number(process.env.MONGOOSE_SERVER_SELECTION_TIMEOUT_MS) || 5000;
+const bufferTimeoutMS = Number(process.env.MONGOOSE_BUFFER_TIMEOUT_MS) || 10000;
+
+mongoose.set("bufferTimeoutMS", bufferTimeoutMS);
+
 /**
  * Establishes a connection to the MongoDB database, retrying on failure.
  *
@@ -21,7 +27,7 @@ const connectDB = async (retries = 5, delayMs = 5000) => {
     try {
       // eslint-disable-next-line no-await-in-loop
       await mongoose.connect(DB_URL, {
-        serverSelectionTimeoutMS: 5000,
+        serverSelectionTimeoutMS,
       });
       console.log("Database connected successfully");
       return;
