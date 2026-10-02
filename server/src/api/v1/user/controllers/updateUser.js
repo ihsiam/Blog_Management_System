@@ -69,7 +69,13 @@ const updateUser = async (req, res, next) => {
     }
 
     // update user
-    const data = await userServices.updateUser({ id, name, role, status });
+    const data = await userServices.updateUser({
+      id,
+      name,
+      role,
+      status,
+      ...(status !== undefined && { statusTransition: "admin" }),
+    });
 
     // response
     return res.status(200).json({

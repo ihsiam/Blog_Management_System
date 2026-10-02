@@ -264,7 +264,14 @@ const verifyEmailOtp = async ({ email, code }) => {
       }
 
       await userServices.markOtpUsed(otp.id, session);
-      await userServices.updateUser({ id: user.id, status: "active" }, session);
+      await userServices.updateUser(
+        {
+          id: user.id,
+          status: "active",
+          statusTransition: "emailVerification",
+        },
+        session,
+      );
     });
   } finally {
     await session.endSession();

@@ -368,7 +368,11 @@ describe("authentication service (src/lib/authentication)", () => {
 
       expect(mockMarkOtpUsed).toHaveBeenCalledWith("otp-1", session);
       expect(mockUpdateUser).toHaveBeenCalledWith(
-        { id: "1", status: "active" },
+        {
+          id: "1",
+          status: "active",
+          statusTransition: "emailVerification",
+        },
         session,
       );
     });

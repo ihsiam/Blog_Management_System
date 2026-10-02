@@ -2,7 +2,7 @@ const User = require("../../model/User");
 const Session = require("../../model/Session");
 const OTP = require("../../model/OTP");
 const PasswordResetToken = require("../../model/PasswordResetToken");
-const { badRequest, notFound } = require("../../utils/error");
+const { badRequest, conflict, notFound } = require("../../utils/error");
 const { hashing } = require("../../utils");
 const defaults = require("../../config/defaults");
 const { deleteCachePattern } = require("../../utils/cache");
@@ -450,14 +450,65 @@ const getSingleUser = async ({ id, expand = "" }) => {
  * @param {string} [params.name]
  * @param {string} [params.role]
  * @param {string} [params.status]
+ * @param {string} [params.statusTransition] - Transition context for status updates
  * @returns {Promise<Object>}
  */
-const updateUser = async ({ id, name, role, status }, session) => {
+const updateUser = async (
+  { id, name, role, status, statusTransition },
+  session,
+) => {
   const payload = {};
 
   if (name !== undefined) payload.name = name;
   if (role !== undefined) payload.role = role;
   if (status !== undefined) payload.account_status = status;
+
+  if (status !== undefined) {
+    if (!statusTransition) {
+      throw conflict("Account status transition is not allowed");
+    }
+
+    const currentQuery = User.findById(id);
+    if (session) currentQuery.session(session);
+    const currentUser = await currentQuery;
+
+    if (!currentUser) throw notFound();
+
+    const isEmailVerification =
+      statusTransition === "emailVerification" &&
+      currentUser.account_status === "pending" &&
+      status === "active";
+    const isAdminTransition =
+      statusTransition === "admin" &&
+      ((currentUser.account_status === "active" && status === "blocked") ||
+        (currentUser.account_status === "blocked" && status === "active"));
+
+    if (!isEmailVerification && !isAdminTransition) {
+      throw conflict("Account status transition is not allowed");
+    }
+
+    const query = User.findOneAndUpdate(
+      { _id: id, account_status: currentUser.account_status },
+      { $set: payload },
+      { new: true, runValidators: true, ...(session && { session }) },
+    ).select("-password_hash");
+    if (session) query.session(session);
+
+    const user = await query;
+
+    if (!user) {
+      throw conflict("Account status transition is no longer valid");
+    }
+
+    if (name !== undefined) {
+      await deleteCachePattern("article:list:*");
+      await deleteCachePattern("article:*:author");
+      await deleteCachePattern("article:*:expand:*");
+      await deleteCachePattern("article:*:comments:*");
+    }
+
+    return user.toObject();
+  }
 
   // find user and update data
   const query = User.findByIdAndUpdate(

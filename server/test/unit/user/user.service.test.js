@@ -38,6 +38,7 @@ MockUserModel.find = jest.fn();
 MockUserModel.findOne = jest.fn();
 MockUserModel.findById = jest.fn();
 MockUserModel.findByIdAndUpdate = jest.fn();
+MockUserModel.findOneAndUpdate = jest.fn();
 MockUserModel.findByIdAndDelete = jest.fn();
 MockUserModel.countDocuments = jest.fn();
 
@@ -84,6 +85,7 @@ describe("user service (src/lib/user)", () => {
     MockUserModel.findOne.mockReset();
     MockUserModel.findById.mockReset();
     MockUserModel.findByIdAndUpdate.mockReset();
+    MockUserModel.findOneAndUpdate.mockReset();
     MockUserModel.findByIdAndDelete.mockReset();
     MockUserModel.countDocuments.mockReset();
     MockSessionModel.find.mockReset();
@@ -768,6 +770,96 @@ describe("user service (src/lib/user)", () => {
       await expect(
         userService.updateUser({ id: "1", name: "x" }),
       ).rejects.toThrow("db down");
+    });
+
+    it.each([
+      ["pending", "active", "emailVerification"],
+      ["active", "blocked", "admin"],
+      ["blocked", "active", "admin"],
+    ])(
+      "should allow the diagram transition %s -> %s",
+      async (currentStatus, nextStatus, statusTransition) => {
+        const currentUser = createFakeUserDoc({
+          id: "1",
+          account_status: currentStatus,
+        });
+        const updatedUser = createFakeUserDoc({
+          id: "1",
+          account_status: nextStatus,
+        });
+        MockUserModel.findById.mockReturnValue(createQueryChain(currentUser));
+        MockUserModel.findOneAndUpdate.mockReturnValue(
+          createQueryChain(updatedUser),
+        );
+
+        const result = await userService.updateUser({
+          id: "1",
+          status: nextStatus,
+          statusTransition,
+        });
+
+        expect(MockUserModel.findOneAndUpdate).toHaveBeenCalledWith(
+          { _id: "1", account_status: currentStatus },
+          { $set: { account_status: nextStatus } },
+          { new: true, runValidators: true },
+        );
+        expect(result).toEqual({ id: "1", account_status: nextStatus });
+      },
+    );
+
+    it.each([
+      ["pending", "blocked", "admin"],
+      ["active", "pending", "admin"],
+      ["blocked", "pending", "admin"],
+      ["active", "active", "admin"],
+      ["pending", "active", "admin"],
+    ])(
+      "should reject the invalid transition %s -> %s",
+      async (currentStatus, nextStatus, statusTransition) => {
+        MockUserModel.findById.mockReturnValue(
+          createQueryChain(
+            createFakeUserDoc({ id: "1", account_status: currentStatus }),
+          ),
+        );
+
+        await expect(
+          userService.updateUser({
+            id: "1",
+            status: nextStatus,
+            statusTransition,
+          }),
+        ).rejects.toMatchObject({ statusCode: 409 });
+        expect(MockUserModel.findOneAndUpdate).not.toHaveBeenCalled();
+      },
+    );
+
+    it("should reject a status update when the user does not exist", async () => {
+      MockUserModel.findById.mockReturnValue(createQueryChain(null));
+
+      await expect(
+        userService.updateUser({
+          id: "missing",
+          status: "blocked",
+          statusTransition: "admin",
+        }),
+      ).rejects.toMatchObject({ statusCode: 404 });
+    });
+
+    it("should reject a status update that loses its current-state race", async () => {
+      const currentUser = createFakeUserDoc({
+        id: "1",
+        account_status: "active",
+      });
+      MockUserModel.findById.mockReturnValue(createQueryChain(currentUser));
+      MockUserModel.findOneAndUpdate.mockReturnValue(createQueryChain(null));
+
+      await expect(
+        userService.updateUser({
+          id: "1",
+          status: "blocked",
+          statusTransition: "admin",
+        }),
+      ).rejects.toMatchObject({ statusCode: 409 });
     });
   });
 

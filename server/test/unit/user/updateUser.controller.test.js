@@ -99,6 +99,24 @@ describe("user updateUser controller", () => {
       });
       expect(next).not.toHaveBeenCalled();
     });
+
+    it("should mark admin status updates with the admin transition context", async () => {
+      const updatedUser = { id: validId, account_status: "blocked" };
+      mockUpdateUser.mockResolvedValue(updatedUser);
+
+      const req = { params: { id: validId }, body: { status: "blocked" } };
+      await updateUserController(req, res, next);
+
+      expect(mockUpdateUser).toHaveBeenCalledWith({
+        id: validId,
+        name: undefined,
+        role: undefined,
+        status: "blocked",
+        statusTransition: "admin",
+      });
+      expect(res.status).toHaveBeenCalledWith(200);
+      expect(next).not.toHaveBeenCalled();
+    });
   });
 
   describe("dependency failures", () => {
