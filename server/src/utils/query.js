@@ -124,7 +124,21 @@ const hateOAS = ({
   return links;
 };
 
+/**
+ * Escapes regular expression special characters in user input.
+ *
+ * Prevents regex injection and ReDoS when the value is used in `$regex`.
+ *
+ * @param {*} value - Raw search value from the request
+ *
+ * @returns {string} Value safe to use as a literal in a regular expression
+ */
+const escapeRegex = (value) =>
+  // prefix every regex metacharacter with a backslash
+  String(value).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+
 module.exports = {
+  escapeRegex,
   getPagination,
   transformData,
   hateOAS,

@@ -1,6 +1,5 @@
 const authServices = require("../../../../lib/authentication");
-const tokenServices = require("../../../../lib/token");
-const userServices = require("../../../../lib/user");
+
 const { badRequest } = require("../../../../utils/error");
 
 /**
@@ -74,20 +73,10 @@ const setupAdmin = async (req, res, next) => {
 
     const user = await authServices.systemAdmin({ name, email, password });
 
-    const payload = {
-      id: user.id,
-      role: user.role,
-      email: user.email,
-    };
-
-    const accessToken = tokenServices.generateAccessToken(payload);
-    const refreshToken = tokenServices.generateRefreshToken(payload);
-
-    await userServices.saveRefreshToken(
-      user.id,
-      refreshToken,
-      req.get("user-agent") || "unknown",
-    );
+    const { accessToken, refreshToken } = await authServices.createSession({
+      user,
+      deviceInfo: req.get("user-agent") || "unknown",
+    });
 
     res.cookie("refreshToken", refreshToken, {
       httpOnly: true,

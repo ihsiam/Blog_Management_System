@@ -138,7 +138,40 @@ const deleteCachePattern = async (pattern) => {
   }
 };
 
+/**
+ * Atomically increments a counter that expires after the given TTL.
+ *
+ * The TTL is set when the counter is created, so the window starts at the
+ * first increment. Returns null when Redis is unavailable so callers can
+ * decide how to degrade.
+ *
+ * @param {string} key - Counter key
+ * @param {number} ttlSeconds - Counter lifetime in seconds
+ * @returns {Promise<number|null>} Counter value after the increment
+ */
+const incrementCounter = async (key, ttlSeconds) => {
+  try {
+    const client = getOpenClient();
+
+    if (!client) {
+      return null;
+    }
+
+    const value = await client.incr(key);
+
+    if (value === 1) {
+      await client.expire(key, ttlSeconds);
+    }
+
+    return value;
+  } catch (err) {
+    logger.error("Cache counter error", { key, message: err.message });
+    return null;
+  }
+};
+
 module.exports = {
+  incrementCounter,
   getCache,
   setCache,
   deleteCache,

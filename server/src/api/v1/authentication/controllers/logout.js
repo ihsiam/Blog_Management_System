@@ -29,23 +29,22 @@ const logout = async (req, res, next) => {
 
     const decoded = tokenServices.verifyRefreshToken(refreshToken);
 
-    const user = await userServices.findAuthUserById(decoded.id);
-
-    if (!user) {
+    // The cookie must belong to the authenticated user.
+    if (decoded.id !== req.user.id) {
       throw unauthorized("Invalid session");
     }
 
-    const session = await userServices.findSessionByToken(
-      decoded.id,
+    const session = await userServices.findSessionByToken({
+      id: decoded.id,
+      sessionId: decoded.sid,
       refreshToken,
-    );
+    });
 
     if (!session) {
-      await userServices.clearRefreshToken(decoded.id, refreshToken);
       throw unauthorized("Session already invalidated");
     }
 
-    await userServices.clearRefreshToken(decoded.id, refreshToken);
+    await userServices.deleteSession(decoded.id, session.id);
 
     res.clearCookie("refreshToken", {
       httpOnly: true,

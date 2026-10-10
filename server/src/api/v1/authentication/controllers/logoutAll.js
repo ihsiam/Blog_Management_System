@@ -10,7 +10,7 @@ const userServices = require("../../../../lib/user");
  */
 const logoutAll = async (req, res, next) => {
   try {
-    await userServices.clearRefreshToken(req.user.id);
+    await userServices.clearRefreshToken({ id: req.user.id });
     res.clearCookie("refreshToken", {
       httpOnly: true,
       secure: true,

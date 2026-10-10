@@ -21,12 +21,16 @@ const authenticateOptional = async (req, _res, next) => {
     const decoded = tokenServices.verifyAccessToken(token);
     const user = await userServices.findAuthUserById(decoded.id);
 
-    if (user && user.account_status === "active") {
+    const hasSession =
+      user && (await userServices.hasActiveSession(user.id, decoded.sid));
+
+    if (hasSession && user.account_status === "active") {
       req.user = {
         id: user.id,
         email: user.email,
         role: user.role,
         status: user.account_status,
+        sessionId: decoded.sid,
       };
     }
 

@@ -2,7 +2,7 @@ const authServices = require("../../../../lib/authentication");
 const { unauthorized } = require("../../../../utils/error");
 
 /**
- * Refreshes the access token and rotates the refresh-token session.
+ * Issues a new access token for the device session of the refresh token.
  *
  * @param {import("express").Request} req - Express request object.
  * @param {Object} req.cookies - Request cookies.
@@ -23,20 +23,13 @@ const refresh = async (req, res, next) => {
       throw unauthorized("Refresh token is missing");
     }
 
-    const { newAccessToken, newRefreshToken } =
-      await authServices.refreshToken(refreshToken);
-
-    res.cookie("refreshToken", newRefreshToken, {
-      httpOnly: true,
-      secure: true,
-      sameSite: "strict",
-    });
+    const { accessToken } = await authServices.refreshToken(refreshToken);
 
     return res.status(200).json({
       code: 200,
       message: "Token refreshed successfully",
       data: {
-        accessToken: newAccessToken,
+        accessToken,
       },
     });
   } catch (err) {

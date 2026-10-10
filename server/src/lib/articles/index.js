@@ -4,6 +4,8 @@ const categoryServices = require("../categories");
 const storageService = require("../storage");
 const defaults = require("../../config/defaults");
 const { notFound, badRequest } = require("../../utils/error");
+const { escapeRegex } = require("../../utils/query");
+const { generateDigest } = require("../../utils/hashing");
 const {
   getCache,
   setCache,
@@ -104,7 +106,8 @@ const findAll = async ({
   status,
   category,
 }) => {
-  const listCacheKey = `article:list:${page}:${limit}:${sortBy}:${sortType}:${searchTerm}:${category || ""}`;
+  // digest keeps the key short and safe even for arbitrary search input
+  const listCacheKey = `article:list:${page}:${limit}:${sortBy}:${sortType}:${generateDigest(searchTerm)}:${category || ""}`;
 
   if (status === "published") {
     const cached = await getCache(listCacheKey);
@@ -117,7 +120,7 @@ const findAll = async ({
 
   // build query filter
   const filter = {
-    title: { $regex: searchTerm, $options: "i" },
+    title: { $regex: escapeRegex(searchTerm), $options: "i" },
   };
 
   if (status) {
@@ -155,7 +158,7 @@ const findAll = async ({
  * @returns {Promise<number>}
  */
 const count = async ({ searchTerm = "", status, category }) => {
-  const countCacheKey = `article:count:${searchTerm}:${category || ""}`;
+  const countCacheKey = `article:count:${generateDigest(searchTerm)}:${category || ""}`;
 
   if (status === "published") {
     const cached = await getCache(countCacheKey);
@@ -166,7 +169,7 @@ const count = async ({ searchTerm = "", status, category }) => {
 
   // build query filter
   const filter = {
-    title: { $regex: searchTerm, $options: "i" },
+    title: { $regex: escapeRegex(searchTerm), $options: "i" },
   };
 
   if (status) {

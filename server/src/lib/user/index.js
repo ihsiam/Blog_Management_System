@@ -1,3 +1,4 @@
+const mongoose = require("mongoose");
 const User = require("../../model/User");
 const Session = require("../../model/Session");
 const OTP = require("../../model/OTP");
@@ -5,7 +6,12 @@ const PasswordResetToken = require("../../model/PasswordResetToken");
 const { badRequest, conflict, notFound } = require("../../utils/error");
 const { hashing } = require("../../utils");
 const defaults = require("../../config/defaults");
-const { deleteCachePattern } = require("../../utils/cache");
+const {
+  deleteCache,
+  deleteCachePattern,
+  incrementCounter,
+} = require("../../utils/cache");
+const { escapeRegex } = require("../../utils/query");
 
 /**
  * Find user by email
@@ -149,20 +155,29 @@ const createUserByAdmin = async ({ name, email, password, role = "user" }) => {
 };
 
 /**
- * Save refresh token
+ * Save refresh token as a new session
  *
- * @param {string} id - User ID
- * @param {string} refreshToken - Raw refresh token
- * @param {string} [deviceInfo] - Client device information
+ * The token is stored as a SHA-256 digest so the session can be found with
+ * an indexed lookup (bcrypt would truncate JWTs at 72 bytes).
+ *
+ * @param {Object} params
+ * @param {string} params.id - User ID
+ * @param {string|ObjectId} params.sessionId - Pre-generated session ID embedded in the token
+ * @param {string} params.refreshToken - Raw refresh token
+ * @param {string} [params.deviceInfo] - Client device information
  * @param {ClientSession} [session] - Optional MongoDB session
  * @returns {Promise<void>}
  */
-const saveRefreshToken = async (id, refreshToken, deviceInfo, session) => {
-  const refreshTokenHash = await hashing.generateHash(refreshToken);
+const saveRefreshToken = async (
+  { id, sessionId, refreshToken, deviceInfo },
+  session,
+) => {
+  const refreshTokenHash = hashing.generateDigest(refreshToken);
 
   const expiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
 
   const sessionData = new Session({
+    _id: sessionId,
     user_id: id,
     refresh_token_hash: refreshTokenHash,
     device_info: deviceInfo || "unknown",
@@ -173,68 +188,58 @@ const saveRefreshToken = async (id, refreshToken, deviceInfo, session) => {
 };
 
 /**
- * Clear refresh token
+ * Clear all refresh-token sessions of a user
  *
- * @param {string} id - User ID
- * @param {string} [refreshToken] - Raw refresh token to invalidate
+ * @param {Object} params
+ * @param {string} params.id - User ID
+ * @param {string} [params.exceptSessionId] - Session ID to keep (e.g. the current device)
  * @param {ClientSession} [session] - Optional MongoDB session
  * @returns {Promise<void>}
  */
-const clearRefreshToken = async (id, refreshToken, session) => {
-  if (!refreshToken) {
-    await Session.deleteMany(
-      { user_id: id },
-      session ? { session } : undefined,
-    );
-    return;
-  }
+const clearRefreshToken = async ({ id, exceptSessionId }, session) => {
+  const filter = { user_id: id };
 
-  const query = Session.find({ user_id: id });
-  if (session) query.session(session);
-  const sessions = await query;
+  if (exceptSessionId) filter._id = { $ne: exceptSessionId };
 
-  const matches = await Promise.all(
-    sessions.map((item) =>
-      hashing.compareHash(refreshToken, item.refresh_token_hash),
-    ),
-  );
-  const matchingSession = sessions[matches.indexOf(true)];
-
-  if (matchingSession) {
-    await Session.deleteOne(
-      { _id: matchingSession._id },
-      session ? { session } : undefined,
-    );
-  }
+  await Session.deleteMany(filter, session ? { session } : undefined);
 };
 
 /**
- * Find a user's active session by raw refresh token.
+ * Find a user's active session by session ID and raw refresh token.
  *
- * @param {string} id - User ID
- * @param {string} refreshToken - Raw refresh token
+ * @param {Object} params
+ * @param {string} params.id - User ID
+ * @param {string} params.sessionId - Session ID taken from the verified token
+ * @param {string} params.refreshToken - Raw refresh token
  * @param {ClientSession} [session] - Optional MongoDB session
  * @returns {Promise<Object|null>} Matching session or null
  */
-const findSessionByToken = async (id, refreshToken, session) => {
-  if (!refreshToken) return null;
+const findSessionByToken = async (
+  { id, sessionId, refreshToken },
+  session,
+) => {
+  if (!refreshToken || !mongoose.isValidObjectId(sessionId)) return null;
 
-  const query = Session.find({ user_id: id });
+  const query = Session.findOne({
+    _id: sessionId,
+    user_id: id,
+    refresh_token_hash: hashing.generateDigest(refreshToken),
+    expiresAt: { $gt: new Date() },
+  });
   if (session) query.session(session);
-  const sessions = await query;
 
-  const matches = await Promise.all(
-    sessions.map(
-      async (item) =>
-        item.expiresAt > new Date() &&
-        hashing.compareHash(refreshToken, item.refresh_token_hash),
-    ),
-  );
-
-  return sessions[matches.indexOf(true)] || null;
+  return query;
 };
 
-const getActiveSessions = async (id, refreshToken, session) => {
+/**
+ * Get a user's active sessions
+ *
+ * @param {string} id - User ID
+ * @param {string} [currentSessionId] - Session ID of the calling device
+ * @param {ClientSession} [session] - Optional MongoDB session
+ * @returns {Promise<Array<Object>>}
+ */
+const getActiveSessions = async (id, currentSessionId, session) => {
   const query = Session.find({
     user_id: id,
     expiresAt: { $gt: new Date() },
@@ -244,25 +249,34 @@ const getActiveSessions = async (id, refreshToken, session) => {
   if (session) query.session(session);
 
   const sessions = await query;
-  const current = refreshToken
-    ? await Promise.all(
-        sessions.map((item) =>
-          hashing.compareHash(refreshToken, item.refresh_token_hash),
-        ),
-      )
-    : [];
 
-  return sessions.map((item, index) => ({
+  return sessions.map((item) => ({
     id: item.id,
     deviceInfo: item.device_info,
-    isCurrent: current[index] || false,
+    isCurrent: item.id === currentSessionId,
     createdAt: item.createdAt,
     expiresAt: item.expiresAt,
   }));
 };
 
-const hasActiveSession = async (id) =>
-  Session.exists({ user_id: id, expiresAt: { $gt: new Date() } });
+/**
+ * Check that a session is still active for a user
+ *
+ * @param {string} id - User ID
+ * @param {string} sessionId - Session ID taken from the verified access token
+ * @returns {Promise<boolean>}
+ */
+const hasActiveSession = async (id, sessionId) => {
+  if (!mongoose.isValidObjectId(sessionId)) return false;
+
+  const exists = await Session.exists({
+    _id: sessionId,
+    user_id: id,
+    expiresAt: { $gt: new Date() },
+  });
+
+  return !!exists;
+};
 
 const deleteSession = async (userId, sessionId, session) => {
   const query = Session.deleteOne({ _id: sessionId, user_id: userId });
@@ -272,6 +286,10 @@ const deleteSession = async (userId, sessionId, session) => {
   return result.deletedCount > 0;
 };
 
+const OTP_TTL_SECONDS = 5 * 60;
+
+const otpAttemptsKey = (userId, purpose) => `otp:attempts:${purpose}:${userId}`;
+
 const createOtp = async (userId, purpose, codeHash, session) => {
   await OTP.findOneAndUpdate(
     { user_id: userId, purpose },
@@ -279,20 +297,45 @@ const createOtp = async (userId, purpose, codeHash, session) => {
       $set: {
         code_hash: codeHash,
         is_used: false,
-        expiresAt: new Date(Date.now() + 5 * 60 * 1000),
+        expiresAt: new Date(Date.now() + OTP_TTL_SECONDS * 1000),
       },
     },
     { upsert: true, new: true, session },
   );
+
+  // a new code starts with a fresh attempt budget
+  await deleteCache(otpAttemptsKey(userId, purpose));
 };
 
-const findValidOtp = async (userId, purpose, session) => {
+/**
+ * Atomically consume one verification attempt of a valid OTP
+ *
+ * The attempt is counted in Redis before the code is compared, so concurrent
+ * guesses cannot exceed `defaults.otpMaxAttempts`. A code that ran out of
+ * attempts is no longer returned and must be requested again. When Redis is
+ * unavailable the counter is skipped and only the IP rate limit applies.
+ *
+ * @param {string} userId - User ID
+ * @param {string} purpose - OTP purpose
+ * @param {ClientSession} [session] - Optional MongoDB session
+ * @returns {Promise<Object|null>} OTP document or null
+ */
+const claimOtpAttempt = async (userId, purpose, session) => {
+  const attempts = await incrementCounter(
+    otpAttemptsKey(userId, purpose),
+    OTP_TTL_SECONDS,
+  );
+
+  if (attempts !== null && attempts > defaults.otpMaxAttempts) {
+    return null;
+  }
+
   const query = OTP.findOne({
     user_id: userId,
     purpose,
     is_used: false,
     expiresAt: { $gt: new Date() },
-  }).sort({ createdAt: -1 });
+  });
   if (session) query.session(session);
 
   return query;
@@ -323,19 +366,22 @@ const savePasswordResetToken = async (userId, tokenHash, session) => {
   );
 };
 
+/**
+ * Find an unused, unexpired password reset token by its raw value
+ *
+ * @param {string} token - Raw reset token
+ * @param {ClientSession} [session] - Optional MongoDB session
+ * @returns {Promise<Object|null>} Reset token document or null
+ */
 const findPasswordResetToken = async (token, session) => {
-  const query = PasswordResetToken.find({
+  const query = PasswordResetToken.findOne({
+    token_hash: hashing.generateDigest(token),
     is_used: false,
     expiresAt: { $gt: new Date() },
   });
   if (session) query.session(session);
 
-  const tokens = await query;
-  const matches = await Promise.all(
-    tokens.map((item) => hashing.compareHash(token, item.token_hash)),
-  );
-
-  return tokens[matches.indexOf(true)] || null;
+  return query;
 };
 
 const markPasswordResetTokenUsed = async (id, session) => {
@@ -377,8 +423,8 @@ const getAllUsers = async ({
   // build filter
   const filter = {};
 
-  if (email) filter.email = { $regex: email, $options: "i" };
-  if (name) filter.name = { $regex: name, $options: "i" };
+  if (email) filter.email = { $regex: escapeRegex(email), $options: "i" };
+  if (name) filter.name = { $regex: escapeRegex(name), $options: "i" };
   if (status) filter.account_status = status;
 
   const users = await User.find(filter)
@@ -401,8 +447,8 @@ const getAllUsers = async ({
 const countTotal = async ({ name, email, status }) => {
   const filter = {};
 
-  if (email) filter.email = { $regex: email, $options: "i" };
-  if (name) filter.name = { $regex: name, $options: "i" };
+  if (email) filter.email = { $regex: escapeRegex(email), $options: "i" };
+  if (name) filter.name = { $regex: escapeRegex(name), $options: "i" };
   if (status) filter.account_status = status;
 
   return await User.countDocuments(filter);
@@ -617,7 +663,7 @@ module.exports = {
   hasActiveSession,
   deleteSession,
   createOtp,
-  findValidOtp,
+  claimOtpAttempt,
   markOtpUsed,
   savePasswordResetToken,
   findPasswordResetToken,

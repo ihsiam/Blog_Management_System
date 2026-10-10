@@ -12,7 +12,7 @@ const listSessions = async (req, res, next) => {
   try {
     const sessions = await userServices.getActiveSessions(
       req.user.id,
-      req.cookies?.refreshToken,
+      req.user.sessionId,
     );
 
     return res.status(200).json({

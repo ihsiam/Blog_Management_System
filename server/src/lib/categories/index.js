@@ -1,6 +1,7 @@
 const Category = require("../../model/Category");
 const defaults = require("../../config/defaults");
 const { notFound } = require("../../utils/error");
+const { escapeRegex } = require("../../utils/query");
 
 /**
  * Retrieves paginated categories with optional name filtering.
@@ -25,7 +26,7 @@ const findAll = async ({
 }) => {
   const sortKey = `${sortType === "desc" ? "-" : ""}${sortBy}`;
   const filter = {
-    name: { $regex: searchTerm, $options: "i" },
+    name: { $regex: escapeRegex(searchTerm), $options: "i" },
     status,
   };
 
@@ -48,7 +49,7 @@ const findAll = async ({
  */
 const count = async ({ searchTerm = "", status = "active" }) =>
   Category.countDocuments({
-    name: { $regex: searchTerm, $options: "i" },
+    name: { $regex: escapeRegex(searchTerm), $options: "i" },
     status,
   });
 

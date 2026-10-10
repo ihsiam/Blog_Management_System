@@ -5,6 +5,7 @@ const { hashing } = require("../../../../utils");
 
 /**
  * Changes a user's password after verifying old password.
+ * All other device sessions of the user are signed out.
  *
  * @param {import("express").Request} req - Express request object
  *
@@ -81,6 +82,12 @@ const changePassword = async (req, res, next) => {
     await userServices.updatePassword({
       id,
       password: newPassword, // raw password (hashed inside service layer)
+    });
+
+    // revoke every other device session, keep the current one
+    await userServices.clearRefreshToken({
+      id,
+      exceptSessionId: req.user.sessionId,
     });
 
     // response

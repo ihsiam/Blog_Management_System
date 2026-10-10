@@ -1,3 +1,4 @@
+const crypto = require("crypto");
 const bcrypt = require("bcryptjs");
 
 /**
@@ -28,7 +29,23 @@ const compareHash = (plainText, hashedText) =>
   // compare raw text with stored hash
   bcrypt.compare(plainText, hashedText);
 
+/**
+ * Generates a deterministic SHA-256 digest from plain text.
+ *
+ * Use this for high-entropy secrets (refresh tokens, reset tokens) that must
+ * be looked up by value. bcrypt is unsuitable there: it is salted (no
+ * equality lookup) and ignores everything past 72 bytes.
+ *
+ * @param {string} plainText - Raw text to be hashed
+ *
+ * @returns {string} Hex encoded SHA-256 digest
+ */
+const generateDigest = (plainText) =>
+  // deterministic digest so the value can be matched with an indexed query
+  crypto.createHash("sha256").update(String(plainText)).digest("hex");
+
 module.exports = {
   generateHash,
   compareHash,
+  generateDigest,
 };

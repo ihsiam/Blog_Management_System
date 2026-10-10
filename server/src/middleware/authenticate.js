@@ -35,7 +35,11 @@ const authenticate = async (req, res, next) => {
       return next(unauthorized("Invalid authentication token"));
     }
 
-    const hasSession = await userServices.hasActiveSession(user.id);
+    // The access token is bound to the device session it was issued for.
+    const hasSession = await userServices.hasActiveSession(
+      user.id,
+      decoded.sid,
+    );
 
     if (!hasSession) {
       return next(unauthorized("Session expired"));
@@ -51,6 +55,7 @@ const authenticate = async (req, res, next) => {
       email: user.email,
       role: user.role,
       status: user.account_status,
+      sessionId: decoded.sid,
     };
 
     return next();

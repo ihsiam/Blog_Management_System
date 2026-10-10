@@ -9,6 +9,7 @@ const config = {
   cover: "",
   articleStatus: "published",
   commentStatus: "public",
+  otpMaxAttempts: 5,
 };
 
 module.exports = Object.freeze(config);
