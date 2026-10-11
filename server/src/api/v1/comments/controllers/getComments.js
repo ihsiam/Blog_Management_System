@@ -40,7 +40,7 @@ const getComments = async (req, res, next) => {
     const errors = [];
 
     // validate page
-    if (!Number.isFinite(page) || page < 1) {
+    if (!Number.isInteger(page) || page < 1) {
       errors.push({
         field: "page",
         message: "invalid input",
@@ -49,7 +49,7 @@ const getComments = async (req, res, next) => {
     }
 
     // validate limit
-    if (!Number.isFinite(limit) || limit <= 0) {
+    if (!Number.isInteger(limit) || limit < 1 || limit > defaults.maxLimit) {
       errors.push({
         field: "limit",
         message: "invalid input",
@@ -84,7 +84,10 @@ const getComments = async (req, res, next) => {
     }
 
     // id validation
-    if (postId && !mongoose.Types.ObjectId.isValid(postId)) {
+    if (
+      postId &&
+      (typeof postId !== "string" || !mongoose.Types.ObjectId.isValid(postId))
+    ) {
       errors.push({
         field: "articleId",
         message: "invalid input",

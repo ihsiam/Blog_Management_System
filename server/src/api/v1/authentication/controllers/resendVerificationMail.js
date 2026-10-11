@@ -1,6 +1,7 @@
 const authServices = require("../../../../lib/authentication");
 const { badRequest } = require("../../../../utils/error");
 const emailService = require("../../../../lib/email");
+const { validation } = require("../../../../utils");
 
 /**
  * Resends an account verification code to a pending user.
@@ -22,7 +23,7 @@ const resendVerificationMail = async (req, res, next) => {
   try {
     const { email } = req.body;
 
-    if (!email) {
+    if (!email || typeof email !== "string") {
       throw badRequest([
         {
           field: "email",
@@ -32,9 +33,7 @@ const resendVerificationMail = async (req, res, next) => {
       ]);
     }
 
-    const isValidEmail = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim());
-
-    if (!isValidEmail) {
+    if (!validation.isValidEmail(email)) {
       throw badRequest([
         {
           field: "email",

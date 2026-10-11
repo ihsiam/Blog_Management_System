@@ -9,7 +9,7 @@ const express = require("express");
 
 const applyMiddleware = require("./middleware");
 const routes = require("./routes");
-const { notFound } = require("./utils/error");
+const { notFound, toHttpError } = require("./utils/error");
 const { requestLogger, errorLogger } = require("./middleware/expressWinston");
 const setCorrelationID = require("./middleware/setCorrelationID");
 
@@ -61,7 +61,9 @@ app.use(errorLogger);
 /**
  * Global error handler.
  */
-app.use((err, req, res, _next) => {
+app.use((error, req, res, _next) => {
+  // map Multer, Mongoose and duplicate-key errors to 4xx responses
+  const err = toHttpError(error);
   const statusCode = err.statusCode ?? 500;
 
   res.status(statusCode).json({

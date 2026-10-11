@@ -27,10 +27,13 @@ const findSingleItem = async (req, res, next) => {
   try {
     const { id } = req.params;
     const expand = req.query.expand || "";
-    const expandValues = expand
-      .split(",")
-      .map((item) => item.trim())
-      .filter(Boolean);
+    const expandValues =
+      typeof expand === "string"
+        ? expand
+            .split(",")
+            .map((item) => item.trim())
+            .filter(Boolean)
+        : [];
 
     /**
      * Collect validation errors

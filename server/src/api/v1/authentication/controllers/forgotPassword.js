@@ -1,6 +1,7 @@
 const { badRequest } = require("../../../../utils/error");
 const authServices = require("../../../../lib/authentication");
 const emailService = require("../../../../lib/email");
+const { validation } = require("../../../../utils");
 
 /**
  * Requests a password reset email for a registered user.
@@ -18,7 +19,7 @@ const forgotPassword = async (req, res, next) => {
   try {
     const { email } = req.body;
 
-    if (!email) {
+    if (!email || typeof email !== "string") {
       throw badRequest([
         {
           field: "email",
@@ -28,9 +29,7 @@ const forgotPassword = async (req, res, next) => {
       ]);
     }
 
-    const isValidEmail = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim());
-
-    if (!isValidEmail) {
+    if (!validation.isValidEmail(email)) {
       throw badRequest([
         {
           field: "email",

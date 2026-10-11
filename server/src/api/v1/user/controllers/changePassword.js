@@ -1,7 +1,7 @@
 const mongoose = require("mongoose");
 const { badRequest, unauthorized } = require("../../../../utils/error");
 const userServices = require("../../../../lib/user");
-const { hashing } = require("../../../../utils");
+const { hashing, validation } = require("../../../../utils");
 
 /**
  * Changes a user's password after verifying old password.
@@ -55,6 +55,12 @@ const changePassword = async (req, res, next) => {
       errors.push({
         field: "newPassword",
         message: "Password must be at least 8 character",
+        in: "body",
+      });
+    } else if (validation.isPasswordTooLong(newPassword)) {
+      errors.push({
+        field: "newPassword",
+        message: "Password must be at most 72 bytes long",
         in: "body",
       });
     }

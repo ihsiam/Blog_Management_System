@@ -1,5 +1,6 @@
 const authServices = require("../../../../lib/authentication");
 const { badRequest } = require("../../../../utils/error");
+const { validation } = require("../../../../utils");
 
 /**
  * Authenticates a user and issues access and refresh tokens.
@@ -28,16 +29,12 @@ const login = async (req, res, next) => {
         message: "Email is required",
         in: "body",
       });
-    } else {
-      const isValidEmail = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim());
-
-      if (!isValidEmail) {
-        errors.push({
-          field: "email",
-          message: "Invalid email format",
-          in: "body",
-        });
-      }
+    } else if (!validation.isValidEmail(email)) {
+      errors.push({
+        field: "email",
+        message: "Invalid email format",
+        in: "body",
+      });
     }
 
     if (!password || typeof password !== "string") {

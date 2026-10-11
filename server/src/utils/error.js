@@ -130,7 +130,63 @@ const serverError = (message = "Internal server error") =>
     message,
   });
 
+/**
+ * Converts known library errors into HTTP errors.
+ *
+ * Errors that already carry a status code are returned unchanged.
+ * Multer, Mongoose cast/validation and duplicate-key errors are mapped to
+ * 4xx responses instead of falling through as 500.
+ *
+ * @param {Error} err - Error raised while handling a request.
+ *
+ * @returns {Error} Error with HTTP error properties when it can be mapped.
+ */
+const toHttpError = (err) => {
+  if (err.statusCode) {
+    return err;
+  }
+
+  // file upload limits and unexpected fields
+  if (err.name === "MulterError") {
+    const message =
+      err.code === "LIMIT_FILE_SIZE" ? "file is too large" : "invalid input";
+
+    return badRequest(
+      [{ field: err.field || "cover", message, in: "file" }],
+      "invalid input",
+    );
+  }
+
+  // malformed values such as an invalid ObjectId
+  if (err.name === "CastError") {
+    return badRequest(
+      [{ field: err.path, message: "invalid input", in: "body" }],
+      "invalid input",
+    );
+  }
+
+  // schema validation failures
+  if (err.name === "ValidationError" && err.errors) {
+    return badRequest(
+      Object.keys(err.errors).map((field) => ({
+        field,
+        message: "invalid input",
+        in: "body",
+      })),
+      "invalid input",
+    );
+  }
+
+  // unique index violation, e.g. concurrent requests with the same email
+  if (err.code === 11000) {
+    return conflict();
+  }
+
+  return err;
+};
+
 module.exports = {
+  toHttpError,
   badRequest,
   unauthorized,
   forbidden,

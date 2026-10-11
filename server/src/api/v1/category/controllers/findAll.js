@@ -22,10 +22,10 @@ const findAll = async (req, res, next) => {
     const searchTerm = req.query.search || defaults.searchTerm;
     const errors = [];
 
-    if (!Number.isFinite(page) || page < 1) {
+    if (!Number.isInteger(page) || page < 1) {
       errors.push({ field: "page", message: "invalid input", in: "query" });
     }
-    if (!Number.isFinite(limit) || limit < 1) {
+    if (!Number.isInteger(limit) || limit < 1 || limit > defaults.maxLimit) {
       errors.push({ field: "limit", message: "invalid input", in: "query" });
     }
     if (!["asc", "desc"].includes(sortType)) {
@@ -38,7 +38,10 @@ const findAll = async (req, res, next) => {
     if (!["createdAt", "name"].includes(sortBy)) {
       errors.push({ field: "sort_by", message: "invalid input", in: "query" });
     }
-    if (typeof searchTerm !== "string") {
+    if (
+      typeof searchTerm !== "string" ||
+      searchTerm.length > defaults.maxSearchLength
+    ) {
       errors.push({ field: "search", message: "invalid input", in: "query" });
     }
 

@@ -37,7 +37,7 @@ const getArticleComments = async (req, res, next) => {
     }
 
     // page validation
-    if (!Number.isFinite(page) || page < 1) {
+    if (!Number.isInteger(page) || page < 1) {
       errors.push({
         field: "page",
         message: "invalid input",
@@ -46,7 +46,7 @@ const getArticleComments = async (req, res, next) => {
     }
 
     // limit validation
-    if (!Number.isFinite(limit) || limit < 1) {
+    if (!Number.isInteger(limit) || limit < 1 || limit > defaults.maxLimit) {
       errors.push({
         field: "limit",
         message: "invalid input",

@@ -53,14 +53,14 @@ const getAllByAdmin = async (req, res, next) => {
     /**
      * Validate page
      */
-    if (!Number.isFinite(page) || page < 1) {
+    if (!Number.isInteger(page) || page < 1) {
       errors.push({ field: "page", message: "invalid input", in: "query" });
     }
 
     /**
      * Validate limit
      */
-    if (!Number.isFinite(limit) || limit < 1) {
+    if (!Number.isInteger(limit) || limit < 1 || limit > defaults.maxLimit) {
       errors.push({ field: "limit", message: "invalid input", in: "query" });
     }
 
@@ -87,7 +87,18 @@ const getAllByAdmin = async (req, res, next) => {
       errors.push({ field: "status", message: "invalid input", in: "query" });
     }
 
-    if (category && !mongoose.Types.ObjectId.isValid(category)) {
+    if (
+      typeof searchTerm !== "string" ||
+      searchTerm.length > defaults.maxSearchLength
+    ) {
+      errors.push({ field: "search", message: "invalid input", in: "query" });
+    }
+
+    if (
+      category &&
+      (typeof category !== "string" ||
+        !mongoose.Types.ObjectId.isValid(category))
+    ) {
       errors.push({ field: "category", message: "invalid input", in: "query" });
     }
 

@@ -40,12 +40,12 @@ const getAllUsers = async (req, res, next) => {
     const errors = [];
 
     // page validation
-    if (!Number.isFinite(page) || page < 1) {
+    if (!Number.isInteger(page) || page < 1) {
       errors.push({ field: "page", message: "invalid input", in: "query" });
     }
 
     // limit validation
-    if (!Number.isFinite(limit) || limit < 1) {
+    if (!Number.isInteger(limit) || limit < 1 || limit > defaults.maxLimit) {
       errors.push({ field: "limit", message: "invalid input", in: "query" });
     }
 
@@ -68,6 +68,18 @@ const getAllUsers = async (req, res, next) => {
     }
 
     // status validation (optional filter)
+    [
+      { field: "name", value: name },
+      { field: "email", value: email },
+    ].forEach(({ field, value }) => {
+      if (
+        value !== undefined &&
+        (typeof value !== "string" || value.length > defaults.maxSearchLength)
+      ) {
+        errors.push({ field, message: "invalid input", in: "query" });
+      }
+    });
+
     if (status && !["pending", "active", "blocked"].includes(status)) {
       errors.push({
         field: "status",

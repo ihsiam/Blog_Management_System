@@ -43,7 +43,19 @@ const updateItemPatch = async (req, res, next) => {
       });
     }
 
-    if (category !== undefined && !mongoose.Types.ObjectId.isValid(category)) {
+    if (body !== undefined && (typeof body !== "string" || !body.trim())) {
+      errors.push({
+        field: "body",
+        message: "invalid input",
+        in: "body",
+      });
+    }
+
+    if (
+      category !== undefined &&
+      (typeof category !== "string" ||
+        !mongoose.Types.ObjectId.isValid(category))
+    ) {
       errors.push({
         field: "category",
         message: "invalid input",

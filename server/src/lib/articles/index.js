@@ -55,7 +55,10 @@ const validateCategory = async (category) => {
 
   try {
     await categoryServices.findSingleItem({ id: category });
-  } catch (_error) {
+  } catch (err) {
+    // only a missing/unavailable category is a client error
+    if (err.statusCode !== 404) throw err;
+
     throw badRequest(
       [{ field: "category", message: "invalid input", in: "body" }],
       "invalid input",

@@ -4,7 +4,7 @@ const Session = require("../../model/Session");
 const OTP = require("../../model/OTP");
 const PasswordResetToken = require("../../model/PasswordResetToken");
 const { badRequest, conflict, notFound } = require("../../utils/error");
-const { hashing } = require("../../utils");
+const { hashing, validation } = require("../../utils");
 const defaults = require("../../config/defaults");
 const {
   deleteCache,
@@ -21,7 +21,7 @@ const { escapeRegex } = require("../../utils/query");
  * @returns {Promise<Object|null>} User object or null
  */
 const findUserByEmail = async (email, session) => {
-  const query = User.findOne({ email });
+  const query = User.findOne({ email: validation.normalizeEmail(email) });
   if (session) query.session(session);
 
   const user = await query;
@@ -88,7 +88,7 @@ const adminExist = async (session) => {
 const createAdmin = async ({ name, email, password }, session) => {
   const user = new User({
     name,
-    email,
+    email: validation.normalizeEmail(email),
     password_hash: password,
     role: "admin",
     account_status: "active",
@@ -108,7 +108,11 @@ const createAdmin = async ({ name, email, password }, session) => {
  * @returns {Promise<Object>} Created user
  */
 const createUser = async ({ name, email, password }, session) => {
-  const user = new User({ name, email, password_hash: password });
+  const user = new User({
+    name,
+    email: validation.normalizeEmail(email),
+    password_hash: password,
+  });
 
   await user.save({ session });
   return user.toObject();
@@ -139,7 +143,7 @@ const createUserByAdmin = async ({ name, email, password, role = "user" }) => {
 
   const user = new User({
     name,
-    email,
+    email: validation.normalizeEmail(email),
     password_hash: hashPassword,
     role,
     account_status: "active",

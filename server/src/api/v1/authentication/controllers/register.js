@@ -1,6 +1,7 @@
 const authServices = require("../../../../lib/authentication");
 const { badRequest } = require("../../../../utils/error");
 const emailService = require("../../../../lib/email");
+const { validation } = require("../../../../utils");
 
 /**
  * Registers a user and sends an email verification code.
@@ -32,22 +33,18 @@ const register = async (req, res, next) => {
       });
     }
 
-    if (!email) {
+    if (!email || typeof email !== "string") {
       errors.push({
         field: "email",
         message: "Email is required",
         in: "body",
       });
-    } else {
-      const isValidEmail = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim());
-
-      if (!isValidEmail) {
-        errors.push({
-          field: "email",
-          message: "Invalid email format",
-          in: "body",
-        });
-      }
+    } else if (!validation.isValidEmail(email)) {
+      errors.push({
+        field: "email",
+        message: "Invalid email format",
+        in: "body",
+      });
     }
 
     if (!password || typeof password !== "string") {
@@ -60,6 +57,12 @@ const register = async (req, res, next) => {
       errors.push({
         field: "password",
         message: "Password must be at least 8 characters long",
+        in: "body",
+      });
+    } else if (validation.isPasswordTooLong(password)) {
+      errors.push({
+        field: "password",
+        message: "Password must be at most 72 bytes long",
         in: "body",
       });
     }
@@ -75,7 +78,7 @@ const register = async (req, res, next) => {
     });
 
     await emailService.sendMail({
-      email,
+      email: user.email,
       subject: "Activate your account",
       text: `Hello ${user.name},\n\nYour email verification code is: ${verificationCode}`,
     });

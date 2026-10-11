@@ -1,5 +1,6 @@
 const authServices = require("../../../../lib/authentication");
 const { badRequest, unauthorized } = require("../../../../utils/error");
+const { validation } = require("../../../../utils");
 
 /**
  * Resets a user's password using a valid reset token.
@@ -36,6 +37,16 @@ const resetPassword = async (req, res, next) => {
         {
           field: "password",
           message: "Password must be at least 8 characters long",
+          in: "body",
+        },
+      ]);
+    }
+
+    if (validation.isPasswordTooLong(password)) {
+      throw badRequest([
+        {
+          field: "password",
+          message: "Password must be at most 72 bytes long",
           in: "body",
         },
       ]);

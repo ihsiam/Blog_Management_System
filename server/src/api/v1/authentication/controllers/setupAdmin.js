@@ -1,6 +1,7 @@
 const authServices = require("../../../../lib/authentication");
 
 const { badRequest } = require("../../../../utils/error");
+const { validation } = require("../../../../utils");
 
 /**
  * Creates the initial system administrator account and session.
@@ -35,22 +36,18 @@ const setupAdmin = async (req, res, next) => {
       });
     }
 
-    if (!email) {
+    if (!email || typeof email !== "string") {
       errors.push({
         field: "email",
         message: "Email is required",
         in: "body",
       });
-    } else {
-      const isValidEmail = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim());
-
-      if (!isValidEmail) {
-        errors.push({
-          field: "email",
-          message: "Invalid email format",
-          in: "body",
-        });
-      }
+    } else if (!validation.isValidEmail(email)) {
+      errors.push({
+        field: "email",
+        message: "Invalid email format",
+        in: "body",
+      });
     }
 
     if (!password || typeof password !== "string") {
@@ -63,6 +60,12 @@ const setupAdmin = async (req, res, next) => {
       errors.push({
         field: "password",
         message: "Password must be at least 8 characters",
+        in: "body",
+      });
+    } else if (validation.isPasswordTooLong(password)) {
+      errors.push({
+        field: "password",
+        message: "Password must be at most 72 bytes long",
         in: "body",
       });
     }

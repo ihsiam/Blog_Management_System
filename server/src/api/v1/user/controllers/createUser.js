@@ -1,5 +1,6 @@
 const { badRequest } = require("../../../../utils/error");
 const userServices = require("../../../../lib/user");
+const { validation } = require("../../../../utils");
 
 /**
  * Creates a new user.
@@ -35,17 +36,13 @@ const createUser = async (req, res, next) => {
         message: "invalid input",
         in: "body",
       });
-    } else {
+    } else if (!validation.isValidEmail(email)) {
       // email format validation
-      const isValidEmail = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim());
-
-      if (!isValidEmail) {
-        errors.push({
-          field: "email",
-          message: "invalid input",
-          in: "body",
-        });
-      }
+      errors.push({
+        field: "email",
+        message: "invalid input",
+        in: "body",
+      });
     }
 
     // password validation
@@ -55,6 +52,12 @@ const createUser = async (req, res, next) => {
       errors.push({
         field: "password",
         message: "Password must be at least 8 character",
+        in: "body",
+      });
+    } else if (validation.isPasswordTooLong(password)) {
+      errors.push({
+        field: "password",
+        message: "Password must be at most 72 bytes long",
         in: "body",
       });
     }
