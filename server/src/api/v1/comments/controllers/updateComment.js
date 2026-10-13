@@ -3,18 +3,17 @@ const { badRequest } = require("../../../../utils/error");
 const commentServices = require("../../../../lib/comments");
 
 /**
- * Updates an existing comment.
+ * Updates the body of an existing comment.
  *
- * - If `req.adminOverride` is true → only comment status can be updated
- * - If normal user → can update comment body (and admin may optionally update status)
+ * Only the comment owner can reach this handler. Visibility (status) is
+ * changed by admins through the status endpoint.
  *
  * @param {import("express").Request} req - Express request object
  * @param {Object} req.params - Route parameters
  * @param {string} req.params.id - Comment ID
  *
  * @param {Object} req.body - Request payload
- * @param {string} [req.body.body] - Comment text content
- * @param {string} [req.body.status] - Comment status (public | hidden)
+ * @param {string} req.body.body - Comment text content
  *
  * @param {import("express").Response} res - Express response object
  * @param {Function} next - Express error handler middleware

@@ -163,7 +163,8 @@ const getArticleAuthor = async (articleID) => {
 
   const article = await articleServices.findArticleById(articleID);
 
-  if (!article) {
+  // drafts are not publicly visible, so their author is not exposed either
+  if (!article || article.status !== defaults.articleStatus) {
     throw notFound("Article not found");
   }
 
@@ -192,6 +193,9 @@ const deleteUser = async (id) => {
   if (!user) {
     throw notFound();
   }
+
+  // the system must always keep one active administrator
+  await UserServices.ensureAnotherActiveAdmin(id);
 
   // get all article IDs by user
   const articleIds = await articleServices.findArticlesByUser(id);

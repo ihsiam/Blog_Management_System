@@ -3,7 +3,10 @@ const categoryServices = require("../../../../lib/categories");
 const { badRequest } = require("../../../../utils/error");
 
 /**
- * Retrieves a single active category by ID.
+ * Retrieves a single category by ID.
+ *
+ * Public callers can only retrieve active categories. Admins can also
+ * retrieve unavailable ones.
  *
  * @param {import("express").Request} req - Express request object
  * @param {import("express").Response} res - Express response object
@@ -22,7 +25,10 @@ const findSingleItem = async (req, res, next) => {
       );
     }
 
-    const category = await categoryServices.findSingleItem({ id });
+    const category = await categoryServices.findSingleItem({
+      id,
+      includeUnavailable: req.user?.role === "admin",
+    });
 
     return res.status(200).json({
       code: 200,

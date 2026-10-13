@@ -20,7 +20,10 @@ const updateItemPatch = async (req, res, next) => {
     if (!id || !mongoose.Types.ObjectId.isValid(id)) {
       errors.push({ field: "id", message: "invalid input", in: "params" });
     }
-    if (!name || typeof name !== "string" || !name.trim()) {
+    if (name === undefined && description === undefined) {
+      errors.push({ field: "body", message: "invalid input", in: "body" });
+    }
+    if (name !== undefined && (typeof name !== "string" || !name.trim())) {
       errors.push({ field: "name", message: "invalid input", in: "body" });
     }
     if (
@@ -38,7 +41,7 @@ const updateItemPatch = async (req, res, next) => {
 
     try {
       const category = await categoryServices.updateItemPatch(id, {
-        name: name.trim(),
+        name: name?.trim(),
         description,
       });
       return res.status(200).json({

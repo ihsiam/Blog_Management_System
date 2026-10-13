@@ -1,5 +1,5 @@
 const mongoose = require("mongoose");
-const { badRequest } = require("../../../../utils/error");
+const { badRequest, conflict } = require("../../../../utils/error");
 const serviceRegistry = require("../../../../lib/service registry");
 
 /**
@@ -25,6 +25,11 @@ const deleteUser = async (req, res, next) => {
         [{ field: "id", message: "invalid input", in: "params" }],
         "invalid input",
       );
+    }
+
+    // an admin cannot delete their own account
+    if (new mongoose.Types.ObjectId(id).toString() === req.user.id) {
+      throw conflict("You cannot delete your own account");
     }
 
     // delete user and related credentials

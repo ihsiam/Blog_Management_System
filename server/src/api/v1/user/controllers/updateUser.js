@@ -1,5 +1,5 @@
 const mongoose = require("mongoose");
-const { badRequest } = require("../../../../utils/error");
+const { badRequest, conflict } = require("../../../../utils/error");
 const userServices = require("../../../../lib/user");
 
 /**
@@ -66,6 +66,14 @@ const updateUser = async (req, res, next) => {
     // throw error if any
     if (errors.length) {
       throw badRequest(errors, "invalid input");
+    }
+
+    // an admin cannot block or demote their own account
+    if (
+      new mongoose.Types.ObjectId(id).toString() === req.user.id &&
+      ((role !== undefined && role !== "admin") || status === "blocked")
+    ) {
+      throw conflict("You cannot block or demote your own account");
     }
 
     // update user

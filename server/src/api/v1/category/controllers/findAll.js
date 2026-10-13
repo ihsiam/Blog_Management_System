@@ -4,10 +4,14 @@ const defaults = require("../../../../config/defaults");
 const { badRequest } = require("../../../../utils/error");
 
 /**
- * Retrieves a paginated list of active categories.
+ * Retrieves a paginated list of categories.
+ *
+ * Public callers only see active categories. Admins see every category and
+ * may filter by status.
  *
  * @param {import("express").Request} req - Express request object
  * @param {Object} req.query - Query parameters
+ * @param {string} [req.query.status] - Status filter (admin only)
  * @param {import("express").Response} res - Express response object
  * @param {Function} next - Express error handler middleware
  *
@@ -20,6 +24,8 @@ const findAll = async (req, res, next) => {
     const sortType = req.query.sortType || defaults.sortType;
     const sortBy = req.query.sortBy || defaults.sortBy;
     const searchTerm = req.query.search || defaults.searchTerm;
+    const isAdmin = req.user?.role === "admin";
+    const { status } = req.query;
     const errors = [];
 
     if (!Number.isInteger(page) || page < 1) {
@@ -45,7 +51,14 @@ const findAll = async (req, res, next) => {
       errors.push({ field: "search", message: "invalid input", in: "query" });
     }
 
+    if (isAdmin && status && !["active", "unavailable"].includes(status)) {
+      errors.push({ field: "status", message: "invalid input", in: "query" });
+    }
+
     if (errors.length) throw badRequest(errors, "invalid input");
+
+    // public callers are always limited to active categories
+    const statusFilter = isAdmin ? status : "active";
 
     const categories = await categoryServices.findAll({
       page,
@@ -53,8 +66,12 @@ const findAll = async (req, res, next) => {
       sortBy,
       sortType,
       searchTerm,
+      status: statusFilter,
     });
-    const totalItems = await categoryServices.count({ searchTerm });
+    const totalItems = await categoryServices.count({
+      searchTerm,
+      status: statusFilter,
+    });
     const data = query.transformData({
       items: categories,
       selection: [

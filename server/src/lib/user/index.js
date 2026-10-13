@@ -499,6 +499,34 @@ const getSingleUser = async ({ id, expand = "" }) => {
 };
 
 /**
+ * Ensure the system keeps at least one other active administrator
+ *
+ * Does nothing when the target is not an active administrator.
+ *
+ * @param {string} id - ID of the user about to be deleted, blocked or demoted
+ * @returns {Promise<void>}
+ * @throws {Error} NotFound if user does not exist
+ * @throws {Error} Conflict if the user is the last active administrator
+ */
+const ensureAnotherActiveAdmin = async (id) => {
+  const target = await User.findById(id);
+
+  if (!target) throw notFound();
+
+  if (target.role !== "admin" || target.account_status !== "active") return;
+
+  const others = await User.countDocuments({
+    _id: { $ne: id },
+    role: "admin",
+    account_status: "active",
+  });
+
+  if (!others) {
+    throw conflict("Cannot remove the last active administrator");
+  }
+};
+
+/**
  * Update user data
  *
  * @param {Object} params
@@ -514,6 +542,11 @@ const updateUser = async (
   session,
 ) => {
   const payload = {};
+
+  // blocking or demoting must not remove the last active administrator
+  if ((role !== undefined && role !== "admin") || status === "blocked") {
+    await ensureAnotherActiveAdmin(id);
+  }
 
   if (name !== undefined) payload.name = name;
   if (role !== undefined) payload.role = role;
@@ -678,6 +711,7 @@ module.exports = {
   updateUser,
   updatePassword,
   deleteItem,
+  ensureAnotherActiveAdmin,
   findAuthUserById,
   checkOwner,
 };

@@ -219,9 +219,11 @@ const create = async ({
   parentCommentId = null,
 }) => {
   if (parentCommentId) {
+    // replies are only allowed on visible comments of the same article
     const parentComment = await Comment.findOne({
       _id: parentCommentId,
       article_id: articleID,
+      status: defaults.commentStatus,
     });
 
     if (!parentComment) throw notFound("Comment not found");

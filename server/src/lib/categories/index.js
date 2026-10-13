@@ -12,7 +12,7 @@ const { escapeRegex } = require("../../utils/query");
  * @param {string} params.sortBy
  * @param {string} params.sortType
  * @param {string} params.searchTerm
- * @param {string} [params.status="active"]
+ * @param {string} [params.status] - Status filter, all statuses when omitted
  *
  * @returns {Promise<Array<Object>>}
  */
@@ -22,13 +22,14 @@ const findAll = async ({
   sortBy = defaults.sortBy,
   sortType = defaults.sortType,
   searchTerm = defaults.searchTerm,
-  status = "active",
+  status,
 }) => {
   const sortKey = `${sortType === "desc" ? "-" : ""}${sortBy}`;
   const filter = {
     name: { $regex: escapeRegex(searchTerm), $options: "i" },
-    status,
   };
+
+  if (status) filter.status = status;
 
   const categories = await Category.find(filter)
     .sort(sortKey)
@@ -43,14 +44,14 @@ const findAll = async ({
  *
  * @param {Object} params
  * @param {string} params.searchTerm
- * @param {string} [params.status="active"]
+ * @param {string} [params.status] - Status filter, all statuses when omitted
  *
  * @returns {Promise<number>}
  */
-const count = async ({ searchTerm = "", status = "active" }) =>
+const count = async ({ searchTerm = "", status }) =>
   Category.countDocuments({
     name: { $regex: escapeRegex(searchTerm), $options: "i" },
-    status,
+    ...(status && { status }),
   });
 
 /**
@@ -92,7 +93,7 @@ const findSingleItem = async ({ id, includeUnavailable = false }) => {
  *
  * @param {string} id
  * @param {Object} data
- * @param {string} data.name
+ * @param {string} [data.name]
  * @param {string|null} [data.description]
  *
  * @returns {Promise<Object>}
@@ -102,7 +103,7 @@ const updateItemPatch = async (id, { name, description }) => {
 
   if (!category) throw notFound("Category not found");
 
-  category.name = name;
+  if (name !== undefined) category.name = name;
   if (description !== undefined) category.description = description;
   await category.save();
 

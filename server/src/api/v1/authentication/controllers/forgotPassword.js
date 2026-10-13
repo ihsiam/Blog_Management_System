@@ -1,4 +1,4 @@
-const { badRequest } = require("../../../../utils/error");
+const { badRequest, notFound } = require("../../../../utils/error");
 const authServices = require("../../../../lib/authentication");
 const emailService = require("../../../../lib/email");
 const { validation } = require("../../../../utils");
@@ -13,7 +13,9 @@ const { validation } = require("../../../../utils");
  * @param {import("express").Response} res - Express response object.
  * @param {Function} next - Express error-handling middleware.
  *
- * @returns {Promise<void>} Sends a generic confirmation response.
+ * @returns {Promise<void>} Sends a confirmation response.
+ *
+ * @throws {Error} NotFound if the email is not registered.
  */
 const forgotPassword = async (req, res, next) => {
   try {
@@ -43,11 +45,12 @@ const forgotPassword = async (req, res, next) => {
       email.trim(),
     );
 
-    // Keep the response generic to prevent user enumeration.
-    const responseMessage =
-      "If an account with that email exists, a password reset code has been sent.";
+    // The email must belong to a registered account.
+    if (!user) {
+      throw notFound("Email is not registered");
+    }
 
-    if (user && user.account_status !== "blocked") {
+    if (user.account_status !== "blocked") {
       await emailService.sendMail({
         email: user.email,
         subject: "Reset your password",
@@ -57,7 +60,7 @@ const forgotPassword = async (req, res, next) => {
 
     return res.status(200).json({
       code: 200,
-      message: responseMessage,
+      message: "A password reset code has been sent to your email.",
     });
   } catch (err) {
     return next(err);

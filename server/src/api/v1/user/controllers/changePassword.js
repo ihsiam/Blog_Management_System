@@ -80,8 +80,18 @@ const changePassword = async (req, res, next) => {
     // verify old password
     const isMatch = await hashing.compareHash(oldPassword, user.password_hash);
 
+    // 400 (not 401) so clients do not mistake it for an expired token
     if (!isMatch) {
-      throw unauthorized("Old password is incorrect");
+      throw badRequest(
+        [
+          {
+            field: "oldPassword",
+            message: "Old password is incorrect",
+            in: "body",
+          },
+        ],
+        "invalid input",
+      );
     }
 
     // update password

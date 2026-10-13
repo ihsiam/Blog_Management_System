@@ -182,7 +182,7 @@ router.post(
  */
 router
   .route("/api/v1/categories")
-  .get(categoryController.findAll)
+  .get(authenticateOptional, categoryController.findAll)
   .post(authenticate, authorize(["admin"]), categoryController.create);
 
 /**
@@ -190,7 +190,7 @@ router
  */
 router
   .route("/api/v1/categories/:id")
-  .get(categoryController.findSingleItem)
+  .get(authenticateOptional, categoryController.findSingleItem)
   .patch(
     authenticate,
     authorize(["admin"]),
@@ -234,7 +234,7 @@ router
   .delete(
     authenticate,
     authorize(["user", "admin"]),
-    ownership("comment"),
+    ownership("comment", { allowAdmin: true }),
     commentsController.deleteComment,
   );
 
@@ -242,7 +242,6 @@ router.patch(
   "/api/v1/comments/:id/status",
   authenticate,
   authorize(["admin"]),
-  ownership("comment"),
   commentsController.updateCommentStatus,
 );
 

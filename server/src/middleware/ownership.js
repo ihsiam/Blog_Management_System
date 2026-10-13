@@ -74,9 +74,8 @@ const ownership =
           return next();
         }
 
-        // Admin override
-        if (req.user.role === "admin") {
-          req.adminOverride = true;
+        // Allow admin access when needed
+        if (options.allowAdmin && req.user.role === "admin") {
           return next();
         }
 
