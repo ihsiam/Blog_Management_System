@@ -6,18 +6,18 @@
  */
 
 const mockUpdateItemPatch = jest.fn();
-jest.doMock('../../../src/lib/articles', () => ({
+jest.doMock("../../../src/lib/articles", () => ({
   updateItemPatch: mockUpdateItemPatch,
 }));
 
-const updateItemPatchController = require('../../../src/api/v1/article/controllers/updateItemPatch');
-const { createMockResponse } = require('../helpers/mockExpress');
+const updateItemPatchController = require("../../../src/api/v1/article/controllers/updateItemPatch");
+const { createMockResponse } = require("../helpers/mockExpress");
 
-describe('article updateItemPatch controller', () => {
+describe("article updateItemPatch controller", () => {
   let res;
   let next;
 
-  const validId = '507f1f77bcf86cd799439011';
+  const validId = "507f1f77bcf86cd799439011";
 
   beforeEach(() => {
     mockUpdateItemPatch.mockReset();
@@ -25,11 +25,11 @@ describe('article updateItemPatch controller', () => {
     next = jest.fn();
   });
 
-  describe('input validation', () => {
-    it('should reject an invalid article id', async () => {
+  describe("input validation", () => {
+    it("should reject an invalid article id", async () => {
       const req = {
-        params: { id: 'not-an-id' },
-        body: { title: 'New title' },
+        params: { id: "not-an-id" },
+        body: { title: "New title" },
       };
 
       await updateItemPatchController(req, res, next);
@@ -40,7 +40,7 @@ describe('article updateItemPatch controller', () => {
       );
     });
 
-    it('should reject a non-string title when provided', async () => {
+    it("should reject a non-string title when provided", async () => {
       const req = {
         params: { id: validId },
         body: { title: 42 },
@@ -54,10 +54,10 @@ describe('article updateItemPatch controller', () => {
       );
     });
 
-    it('should reject a status field even when present in the update payload', async () => {
+    it("should reject a status field even when present in the update payload", async () => {
       const req = {
         params: { id: validId },
-        body: { title: 'New title', status: 'draft' },
+        body: { title: "New title", status: "draft" },
       };
 
       await updateItemPatchController(req, res, next);
@@ -69,44 +69,47 @@ describe('article updateItemPatch controller', () => {
     });
   });
 
-  describe('successful update', () => {
-    it('should patch only the supported fields', async () => {
-      mockUpdateItemPatch.mockResolvedValue({ id: validId, title: 'New title' });
+  describe("successful update", () => {
+    it("should patch only the supported fields", async () => {
+      mockUpdateItemPatch.mockResolvedValue({
+        id: validId,
+        title: "New title",
+      });
 
       const req = {
         params: { id: validId },
-        body: { title: 'New title', body: 'Updated body' },
+        body: { title: "New title", body: "Updated body" },
       };
 
       await updateItemPatchController(req, res, next);
 
       expect(mockUpdateItemPatch).toHaveBeenCalledWith(validId, {
-        title: 'New title',
-        body: 'Updated body',
+        title: "New title",
+        body: "Updated body",
         category: undefined,
         file: undefined,
       });
       expect(res.status).toHaveBeenCalledWith(200);
       expect(res.json).toHaveBeenCalledWith(
         expect.objectContaining({
-          message: 'Successfully updated article data',
-          data: { id: validId, title: 'New title' },
+          message: "Successfully updated article data",
+          data: { id: validId, title: "New title" },
         }),
       );
       expect(next).not.toHaveBeenCalled();
     });
   });
 
-  describe('dependency failures', () => {
-    it('should propagate the error when the article does not exist', async () => {
-      const notFoundError = Object.assign(new Error('Not found'), {
+  describe("dependency failures", () => {
+    it("should propagate the error when the article does not exist", async () => {
+      const notFoundError = Object.assign(new Error("Not found"), {
         statusCode: 404,
       });
       mockUpdateItemPatch.mockRejectedValue(notFoundError);
 
       const req = {
         params: { id: validId },
-        body: { title: 'New title' },
+        body: { title: "New title" },
       };
       await updateItemPatchController(req, res, next);
 

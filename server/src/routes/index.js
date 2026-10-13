@@ -12,6 +12,7 @@ const authenticateOptional = require("../middleware/authenticateOptional");
 const authorize = require("../middleware/authorize");
 const ownership = require("../middleware/ownership");
 const articleUpload = require("../middleware/articleUpload");
+const uploadCleanup = require("../middleware/uploadCleanup");
 const upload = require("../utils/multer");
 
 /**
@@ -108,6 +109,7 @@ router
     upload.single("cover"),
     articleUpload,
     articleController.create,
+    uploadCleanup,
   );
 
 /**
@@ -130,6 +132,7 @@ router
     upload.single("cover"),
     articleUpload,
     articleController.updateItemPatch,
+    uploadCleanup,
   )
   .delete(
     authenticate,

@@ -218,10 +218,7 @@ const clearRefreshToken = async ({ id, exceptSessionId }, session) => {
  * @param {ClientSession} [session] - Optional MongoDB session
  * @returns {Promise<Object|null>} Matching session or null
  */
-const findSessionByToken = async (
-  { id, sessionId, refreshToken },
-  session,
-) => {
+const findSessionByToken = async ({ id, sessionId, refreshToken }, session) => {
   if (!refreshToken || !mongoose.isValidObjectId(sessionId)) return null;
 
   const query = Session.findOne({
@@ -504,22 +501,29 @@ const getSingleUser = async ({ id, expand = "" }) => {
  * Does nothing when the target is not an active administrator.
  *
  * @param {string} id - ID of the user about to be deleted, blocked or demoted
+ * @param {ClientSession} [session] - Optional MongoDB session
  * @returns {Promise<void>}
  * @throws {Error} NotFound if user does not exist
  * @throws {Error} Conflict if the user is the last active administrator
  */
-const ensureAnotherActiveAdmin = async (id) => {
-  const target = await User.findById(id);
+const ensureAnotherActiveAdmin = async (id, session) => {
+  const targetQuery = User.findById(id);
+  if (session) targetQuery.session(session);
+
+  const target = await targetQuery;
 
   if (!target) throw notFound();
 
   if (target.role !== "admin" || target.account_status !== "active") return;
 
-  const others = await User.countDocuments({
+  const othersQuery = User.countDocuments({
     _id: { $ne: id },
     role: "admin",
     account_status: "active",
   });
+  if (session) othersQuery.session(session);
+
+  const others = await othersQuery;
 
   if (!others) {
     throw conflict("Cannot remove the last active administrator");
@@ -655,14 +659,33 @@ const updatePassword = async ({ id, password }, session) => {
 };
 
 /**
- * Delete user by ID
+ * Delete user by ID together with their sessions, OTPs and reset tokens
  *
  * @param {string} id
+ * @param {ClientSession} [session] - Optional MongoDB session
  * @returns {Promise<boolean>}
  */
-const deleteItem = async (id) => {
-  const result = await User.findByIdAndDelete(id);
+const deleteItem = async (id, session) => {
+  const options = session ? { session } : undefined;
+
+  await Session.deleteMany({ user_id: id }, options);
+  await OTP.deleteMany({ user_id: id }, options);
+  await PasswordResetToken.deleteMany({ user_id: id }, options);
+
+  const result = await User.findByIdAndDelete(id, options);
   return !!result;
+};
+
+/**
+ * Delete expired sessions of a user
+ *
+ * Keeps the sessions collection from growing without a TTL index.
+ *
+ * @param {string} id - User ID
+ * @returns {Promise<void>}
+ */
+const deleteExpiredSessions = async (id) => {
+  await Session.deleteMany({ user_id: id, expiresAt: { $lte: new Date() } });
 };
 
 /**
@@ -711,6 +734,7 @@ module.exports = {
   updateUser,
   updatePassword,
   deleteItem,
+  deleteExpiredSessions,
   ensureAnotherActiveAdmin,
   findAuthUserById,
   checkOwner,

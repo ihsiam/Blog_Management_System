@@ -2,6 +2,7 @@ const mongoose = require("mongoose");
 const commentServices = require("../comments");
 const articleServices = require("../articles");
 const UserServices = require("../user");
+const storageService = require("../storage");
 const { notFound, badRequest } = require("../../utils/error");
 const defaults = require("../../config/defaults");
 const {
@@ -22,6 +23,7 @@ const ARTICLE_AUTHOR_TTL_SECONDS = 300;
 const deleteArticle = async (id) => {
   const session = await mongoose.startSession();
   let deleted;
+  let cover;
 
   try {
     await session.withTransaction(async () => {
@@ -29,12 +31,17 @@ const deleteArticle = async (id) => {
 
       if (!article) throw notFound();
 
+      cover = article.cover_image_url;
+
       await commentServices.deleteMany({ article: article.id }, session);
       deleted = await articleServices.deleteItem(id, session);
     });
   } finally {
     await session.endSession();
   }
+
+  // remove the file only after the database delete is committed
+  await storageService.removeArticleCover(cover);
 
   await deleteCache(`article:${id}:author`);
   await deleteCachePattern(`article:${id}:expand:*`);
@@ -187,30 +194,48 @@ const getArticleAuthor = async (articleID) => {
  * @param {string} id
  */
 const deleteUser = async (id) => {
-  // check user exists
-  const user = await UserServices.findUserById(id);
+  const session = await mongoose.startSession();
+  let articles = [];
 
-  if (!user) {
-    throw notFound();
+  try {
+    // everything is removed together or nothing is
+    await session.withTransaction(async () => {
+      // check user exists
+      const user = await UserServices.findUserById(id, session);
+
+      if (!user) {
+        throw notFound();
+      }
+
+      // the system must always keep one active administrator
+      await UserServices.ensureAnotherActiveAdmin(id, session);
+
+      // get all articles (IDs and covers) by user
+      articles = await articleServices.findArticlesByUser(id, session);
+
+      // delete comments on user's articles, with their replies
+      await commentServices.deleteWithReplies(
+        { article_id: { $in: articles.map((article) => article.id) } },
+        session,
+      );
+
+      // delete user's own comments, with replies from other users
+      await commentServices.deleteWithReplies({ author_id: id }, session);
+
+      // delete user's articles
+      await articleServices.deleteMany({ author_id: id }, session);
+
+      // delete user with sessions, OTPs and reset tokens
+      await UserServices.deleteItem(id, session);
+    });
+  } finally {
+    await session.endSession();
   }
 
-  // the system must always keep one active administrator
-  await UserServices.ensureAnotherActiveAdmin(id);
-
-  // get all article IDs by user
-  const articleIds = await articleServices.findArticlesByUser(id);
-
-  // delete comments on user's articles
-  await commentServices.deleteMany({ article_id: { $in: articleIds } });
-
-  // delete user's own comments
-  await commentServices.deleteMany({ author_id: id });
-
-  // delete user's articles
-  await articleServices.deleteMany({ author_id: id });
-
-  // delete user
-  await UserServices.deleteItem(id);
+  // remove cover files only after the database delete is committed
+  await Promise.all(
+    articles.map((article) => storageService.removeArticleCover(article.cover)),
+  );
 
   await deleteCachePattern("article:list:*");
   await deleteCachePattern("article:count:*");

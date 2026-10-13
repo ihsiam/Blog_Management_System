@@ -329,6 +329,7 @@ const updateItemPatch = async (id, { title, body, category, file }) => {
 
   if (category !== undefined) await validateCategory(category);
 
+  const previousCover = article.cover_image_url;
   const cover = file
     ? await storageService.uploadArticleCover(file)
     : undefined;
@@ -345,6 +346,9 @@ const updateItemPatch = async (id, { title, body, category, file }) => {
   });
 
   await article.save();
+
+  // the replaced cover is no longer referenced
+  if (cover) await storageService.removeArticleCover(previousCover);
 
   await invalidateArticleResource(id);
   await invalidatePublishedArticleLists();
@@ -436,14 +440,21 @@ const findArticleById = async (id, session) => {
 };
 
 /**
- * Finds all article IDs by a user.
+ * Finds the IDs and cover URLs of all articles by a user.
  *
  * @param {string} id - User ID
- * @returns {Promise<Array<string>>}
+ * @param {ClientSession} [session] - Optional MongoDB session
+ * @returns {Promise<Array<{id: ObjectId, cover: string}>>}
  */
-const findArticlesByUser = async (id) => {
-  const articles = await Article.find({ author_id: id }).select("_id");
-  return articles.map((article) => article._id);
+const findArticlesByUser = async (id, session) => {
+  const query = Article.find({ author_id: id }).select("_id cover_image_url");
+  if (session) query.session(session);
+
+  const articles = await query;
+  return articles.map((article) => ({
+    id: article._id,
+    cover: article.cover_image_url,
+  }));
 };
 
 /**

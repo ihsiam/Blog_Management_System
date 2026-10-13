@@ -137,6 +137,9 @@ const systemAdmin = async ({ name, email, password }) => {
 const createSession = async ({ user, deviceInfo }) => {
   const sessionId = new mongoose.Types.ObjectId();
 
+  // drop this user's expired sessions so they do not pile up
+  await userServices.deleteExpiredSessions(user.id);
+
   const payload = {
     id: user.id,
     role: user.role,

@@ -1,3 +1,4 @@
+const mongoose = require("mongoose");
 const defaults = require("../../config/defaults");
 const Comment = require("../../model/Comment");
 const { notFound } = require("../../utils/error");
@@ -312,6 +313,62 @@ const updateStatus = async ({ id, status }) => {
 };
 
 /**
+ * Collects the given comment IDs plus the IDs of all their nested replies.
+ *
+ * Walks the reply tree one level per query instead of one query per comment.
+ *
+ * @param {Array<ObjectId>} rootIds - IDs of the top comments
+ * @param {ClientSession} [session] - Optional MongoDB session
+ * @returns {Promise<Array<string>>} Root and reply IDs
+ */
+const collectCommentTreeIds = async (rootIds, session) => {
+  const ids = new Set(rootIds.map((rootId) => rootId.toString()));
+  let level = rootIds;
+
+  while (level.length) {
+    const query = Comment.find({ parent_comment_id: { $in: level } }).select(
+      "_id",
+    );
+    if (session) query.session(session);
+
+    // eslint-disable-next-line no-await-in-loop
+    const children = await query;
+
+    level = children
+      .map((child) => child._id)
+      .filter((childId) => !ids.has(childId.toString()));
+    level.forEach((childId) => ids.add(childId.toString()));
+  }
+
+  return [...ids];
+};
+
+/**
+ * Deletes the comments matching a filter together with all nested replies.
+ *
+ * @param {Object} filter - MongoDB filter selecting the top comments
+ * @param {ClientSession} [session] - Optional MongoDB session
+ * @returns {Promise<number>} Number of deleted comments
+ */
+const deleteWithReplies = async (filter, session) => {
+  const query = Comment.find(filter).select("_id");
+  if (session) query.session(session);
+
+  const roots = await query;
+  const ids = await collectCommentTreeIds(
+    roots.map((root) => root._id),
+    session,
+  );
+
+  const result = await Comment.deleteMany(
+    { _id: { $in: ids } },
+    session ? { session } : undefined,
+  );
+
+  return result.deletedCount;
+};
+
+/**
  * Deletes a comment and all of its nested replies.
  *
  * @param {string} id - Comment ID
@@ -319,42 +376,27 @@ const updateStatus = async ({ id, status }) => {
  * @throws {Error} NotFound if comment does not exist
  */
 const deleteItem = async (id) => {
-  const comment = await Comment.findById(id);
+  const session = await mongoose.startSession();
+  let articleId;
 
-  if (!comment) {
-    throw notFound();
+  try {
+    // comment and replies are removed together or not at all
+    await session.withTransaction(async () => {
+      const comment = await Comment.findById(id).session(session);
+
+      if (!comment) {
+        throw notFound();
+      }
+
+      articleId = comment.article_id;
+
+      await deleteWithReplies({ _id: comment._id }, session);
+    });
+  } finally {
+    await session.endSession();
   }
 
-  const collectNestedCommentIds = async (parentId, visited = new Set()) => {
-    const children = await Comment.find(
-      { parent_comment_id: parentId },
-      { _id: 1 },
-    );
-
-    const childIds = children
-      .map((child) => child._id.toString())
-      .filter((childId) => !visited.has(childId));
-
-    childIds.forEach((childId) => visited.add(childId));
-
-    if (!childIds.length) {
-      return [];
-    }
-
-    const nestedChildIds = await Promise.all(
-      childIds.map((childId) => collectNestedCommentIds(childId, visited)),
-    );
-
-    return [...childIds, ...nestedChildIds.flat()];
-  };
-
-  const idsToDelete = new Set([id.toString()]);
-  const nestedIds = await collectNestedCommentIds(id.toString(), idsToDelete);
-
-  nestedIds.forEach((nestedId) => idsToDelete.add(nestedId));
-
-  await Comment.deleteMany({ _id: { $in: [...idsToDelete] } });
-  await invalidateArticleCommentCaches(comment.article_id);
+  await invalidateArticleCommentCaches(articleId);
 
   return true;
 };
@@ -414,4 +456,5 @@ module.exports = {
   checkOwner,
   deleteItem,
   deleteMany,
+  deleteWithReplies,
 };
