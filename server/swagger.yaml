@@ -3,68 +3,55 @@ info:
   version: "1.0.0"
   title: "Blog Management System API"
   description: |
-    The Blog Management System API is a backend REST API that enables users to register, verify
-    their email via a one-time password (OTP), and authenticate using JWT-based authentication
-    (short-lived access tokens and device-scoped refresh tokens delivered via an HttpOnly, Secure
-    cookie). The system supports multi-device sessions, allowing a user to be signed in on several
-    devices at once and to log out from the current device, all devices, or a specific device, as
-    well as view their active sessions.
+    This is a REST API for a blog system. Users can sign up, verify their email with a one-time
+    password (OTP), and sign in. The API uses JWT access tokens. The refresh token is kept in a
+    secure HttpOnly cookie. Users can sign in on many devices at once, log out from one device or
+    all devices, and see their active sessions.
 
-    The API supports two authenticated roles: registered users, who can create, update, and delete
-    their own articles and comment or reply on articles, and administrators, who additionally manage
-    users, categories, and system-wide content moderation. Unauthenticated guests have read-only
-    access to published articles, article details, active categories, and public comments.
+    There are two signed-in roles. Registered users can write, edit, and delete their own articles,
+    and they can comment and reply on articles. Administrators can also manage users, categories,
+    and comments. Guests can only read published articles, active categories, and public comments.
 
-    Blog content is organized around three core resources: articles, categories, and comments.
-    Every article belongs to exactly one category, and categories support classification as well as
-    filtering, searching, and sorting on article listings; categories are never permanently deleted,
-    only toggled between active and unavailable. Article cover images are uploaded as files and
-    stored in cloud object storage, with allowed types of JPG, JPEG, PNG, and WebP up to 5 MB.
-    Comments support nested, threaded replies, and deleting a comment also deletes all of its direct
-    and nested replies.
+    Every article belongs to one category. Categories are never deleted. They can only be switched
+    between active and unavailable. Cover images must be JPG, JPEG, PNG, or WebP files up to 5 MB.
+    Comments can have replies, and deleting a comment also deletes all of its replies.
 
-    Password recovery follows an OTP-based flow: a reset OTP is emailed to the user, and on
-    verification a short-lived (5-minute), single-use reset token is issued via an HttpOnly, Secure
-    cookie rather than a URL or request body, which is then required to complete the password reset.
-    Sensitive endpoints (sign-in, password reset, and OTP-related routes) are rate-limited to 5
-    requests per minute, and all passwords are hashed with bcrypt.
+    To reset a password, the user receives an OTP by email. After the OTP is verified, the API sets
+    a reset token cookie. The token is valid for 5 minutes and can be used only once. OTPs expire
+    after 5 minutes and allow up to 5 attempts. Sign-up, sign-in, admin setup, and the password
+    reset and OTP routes are limited to 5 requests per minute for each IP address.
 
-    The API provides advanced querying capabilities such as pagination, filtering, sorting, and
-    searching to efficiently retrieve blog data.
+    List endpoints support pagination, filtering, sorting, and search.
 
-    The application follows production-grade backend practices including caching (Redis), structured
-    logging with centralized aggregation (Winston and the ELK stack), automated testing, and
-    comprehensive error handling. For scalable and reliable deployment, the system is containerized
-    using Docker and supports load balancing, MongoDB replication, and CI/CD pipelines.
   contact:
     name: Md Ismile Hosen Siam
-    email: siam679ihs@gmail.com
+    email: ismile.20cse034@gstu.edu.bd
 
 servers:
-  - description: dev
+  - description: Local development server
     url: http://localhost:3000/api/v1
 
 tags:
   - name: Auth
-    description: Auth endpoints
+    description: Sign-up, email verification, sign-in, tokens, password reset, and sessions.
   - name: Article
-    description: Article endpoints
+    description: Articles, article status, authors, and article comments.
   - name: Category
-    description: Category endpoints
+    description: Article categories.
   - name: Comment
-    description: Comment endpoints
+    description: Managing and moderating comments.
   - name: User
-    description: User endpoints
+    description: User management, profiles, and password change.
 
 paths:
-  # ==================================================
-  # Authentication Routes
-  # ==================================================
+  # ---------- Auth routes ----------
   "/auth/setup-admin":
     post:
       operationId: setupAdmin
-      summary: Setup initial admin
-      description: Create the initial admin account. This endpoint should only succeed once.
+      summary: Set up the first admin
+      description: >
+        Create the first administrator account and sign in with it. This works only once. After
+        that, it returns 403. Limited to 5 requests per minute.
       tags: [Auth]
       requestBody:
         required: true
@@ -74,64 +61,44 @@ paths:
               $ref: "#/components/schemas/CreateUserRequest"
       responses:
         "201":
-          description: Admin account created
+          description: Administrator created and signed in. The refresh token is set in the refreshToken cookie.
+          headers:
+            Set-Cookie:
+              $ref: "#/components/headers/SetRefreshTokenCookie"
           content:
             application/json:
               schema:
-                type: object
-                properties:
-                  code:
-                    type: integer
-                    format: int32
-                    example: 201
-                  message:
-                    type: string
-                    example: System administrator created successfully.
-                  data:
-                    type: object
+                allOf:
+                  - $ref: "#/components/schemas/SuccessResponse"
+                  - type: object
                     properties:
-                      accessToken:
-                        type: string
-                        example: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
-                  links:
-                    type: object
-                    properties:
-                      sign-in:
-                        type: string
-                        format: uri
-                        example: "/auth/sign-in"
+                      message:
+                        example: Administrator account created successfully.
+                      data:
+                        $ref: "#/components/schemas/AccessToken"
+                      links:
+                        $ref: "#/components/schemas/SignInLinks"
         "400":
           $ref: "#/components/responses/BadRequest"
-        "409":
-          description: Admin already configured
+        "403":
+          description: The administrator has already been set up.
           content:
             application/json:
               schema:
-                type: object
-                properties:
-                  code:
-                    type: integer
-                    format: int32
-                    example: 409
-                  error:
-                    type: string
-                    example: Conflict
-                  correlationId:
-                    type: string
-                    example: "1781953113407"
-                  message:
-                    type: string
-                    example: System administrator already configured.
+                $ref: "#/components/schemas/ErrorResponse"
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
         "500":
           $ref: "#/components/responses/ServerError"
 
   "/auth/sign-up":
     post:
       operationId: signUp
-      summary: Create user account
+      summary: Register a user account
       description: >
-        Register a new user account and send a verification OTP to the user's email.
-        Rejects with 400 if the email is already registered.
+        Create a new account with the status pending and send a verification OTP to the email.
+        The email is saved in lowercase with extra spaces removed. If the email is already
+        registered, the request is rejected. Limited to 5 requests per minute.
       tags: [Auth]
       requestBody:
         required: true
@@ -141,48 +108,37 @@ paths:
               $ref: "#/components/schemas/CreateUserRequest"
       responses:
         "201":
-          description: Sign-up successful
+          description: Account created and verification OTP sent.
           content:
             application/json:
               schema:
-                type: object
-                properties:
-                  code:
-                    type: integer
-                    format: int32
-                    example: 201
-                  message:
-                    type: string
-                    example: Account created successfully. Please check your email for a verification code.
-                  data:
-                    allOf:
-                      - $ref: "#/components/schemas/UserCreateUpdateResponse"
-                      - type: object
-                        properties:
-                          status:
-                            type: string
-                            enum: [pending, active, blocked]
-                            example: pending
-                  links:
-                    type: object
+                allOf:
+                  - $ref: "#/components/schemas/SuccessResponse"
+                  - type: object
                     properties:
-                      self:
-                        type: string
-                        format: uri
-                        example: "/auth/sign-up"
+                      message:
+                        example: Account created successfully. Please check your email to verify your account.
+                      data:
+                        $ref: "#/components/schemas/SignUpUser"
+                      links:
+                        $ref: "#/components/schemas/UserLinks"
         "400":
           $ref: "#/components/responses/BadRequest"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
         "500":
           $ref: "#/components/responses/ServerError"
 
   "/auth/verify-email-otp":
     post:
       operationId: verifyEmailOtp
-      summary: Verify email
+      summary: Verify an email address
       description: >
-        Verify a user's email address using the OTP sent during registration. To prevent
-        account enumeration, an unknown email and an invalid or expired OTP return the
-        same generic error. Rate limited to 5 requests per minute.
+        Verify the user's email with the OTP sent at sign-up and activate the account. To protect
+        user privacy, an unknown email, a wrong OTP, an expired OTP, and an OTP with no attempts
+        left all return the same 400 error. Limited to 5 requests per minute.
       tags: [Auth]
       requestBody:
         required: true
@@ -192,46 +148,20 @@ paths:
               $ref: "#/components/schemas/OtpVerificationRequest"
       responses:
         "200":
-          description: Email verified successfully
+          description: Email verified successfully.
           content:
             application/json:
               schema:
-                type: object
-                properties:
-                  code:
-                    type: integer
-                    format: int32
-                    example: 200
-                  message:
-                    type: string
-                    example: Email verified successfully.
-                  links:
-                    type: object
+                allOf:
+                  - $ref: "#/components/schemas/SuccessResponse"
+                  - type: object
                     properties:
-                      sign-in:
-                        type: string
-                        format: uri
-                        example: "/auth/sign-in"
+                      message:
+                        example: Email verified successfully.
+                      links:
+                        $ref: "#/components/schemas/SignInLinks"
         "400":
-          description: Invalid or expired OTP
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  code:
-                    type: integer
-                    format: int32
-                    example: 400
-                  error:
-                    type: string
-                    example: Bad Request
-                  correlationId:
-                    type: string
-                    example: "1781953113407"
-                  message:
-                    type: string
-                    example: Invalid or expired OTP.
+          $ref: "#/components/responses/BadRequest"
         "429":
           $ref: "#/components/responses/TooManyRequests"
         "500":
@@ -240,12 +170,11 @@ paths:
   "/auth/resend-verification-otp":
     post:
       operationId: resendVerificationOtp
-      summary: Resend verification OTP
+      summary: Resend the verification OTP
       description: >
-        Resend a new OTP for email verification. To prevent account enumeration, this
-        endpoint always responds with the same generic success message regardless of
-        whether the email is registered or already verified. Rate limited to 5 requests
-        per minute.
+        Send a new verification OTP. The old OTP stops working. To protect user privacy, the
+        response is always the same, whether or not the email is registered or already verified.
+        Limited to 5 requests per minute.
       tags: [Auth]
       requestBody:
         required: true
@@ -255,19 +184,16 @@ paths:
               $ref: "#/components/schemas/EmailRequest"
       responses:
         "200":
-          description: Verification OTP request accepted
+          description: Request accepted.
           content:
             application/json:
               schema:
-                type: object
-                properties:
-                  code:
-                    type: integer
-                    format: int32
-                    example: 200
-                  message:
-                    type: string
-                    example: If an account with that email exists, a verification code has been sent.
+                allOf:
+                  - $ref: "#/components/schemas/SuccessResponse"
+                  - type: object
+                    properties:
+                      message:
+                        example: If an account with this email exists, a verification code has been sent.
         "400":
           $ref: "#/components/responses/BadRequest"
         "429":
@@ -278,12 +204,10 @@ paths:
   "/auth/forgot-password":
     post:
       operationId: forgotPassword
-      summary: Forgot password
+      summary: Request a password reset OTP
       description: >
-        Request a password reset OTP to be sent to the user's registered email address.
-        To prevent account enumeration, this endpoint always responds with the same
-        generic success message regardless of whether the email is registered. Rate
-        limited to 5 requests per minute.
+        Send a password reset OTP to a registered email. If the email is not registered, it
+        returns 404. Limited to 5 requests per minute.
       tags: [Auth]
       requestBody:
         required: true
@@ -293,21 +217,20 @@ paths:
               $ref: "#/components/schemas/EmailRequest"
       responses:
         "200":
-          description: Password reset OTP request accepted
+          description: Password reset OTP sent.
           content:
             application/json:
               schema:
-                type: object
-                properties:
-                  code:
-                    type: integer
-                    format: int32
-                    example: 200
-                  message:
-                    type: string
-                    example: If an account with that email exists, a password reset code has been sent.
+                allOf:
+                  - $ref: "#/components/schemas/SuccessResponse"
+                  - type: object
+                    properties:
+                      message:
+                        example: A password reset code has been sent to your email.
         "400":
           $ref: "#/components/responses/BadRequest"
+        "404":
+          $ref: "#/components/responses/NotFound"
         "429":
           $ref: "#/components/responses/TooManyRequests"
         "500":
@@ -316,13 +239,13 @@ paths:
   "/auth/verify-reset-otp":
     post:
       operationId: verifyResetOtp
-      summary: Verify password reset OTP
+      summary: Verify the password reset OTP
       description: >
-        Verify the OTP sent for password reset. On success, a short-lived reset token
-        (5-minute validity, single-use) is issued as an HttpOnly, Secure cookie for use
-        with PATCH /auth/reset-password. The token is not returned in the response body.
-        To prevent account enumeration, an unknown email and an invalid or expired OTP
-        return the same generic error. Rate limited to 5 requests per minute.
+        Verify the OTP sent for a password reset. If it is correct, a reset token is set in the
+        resetToken cookie (HttpOnly and Secure). The token is valid for 5 minutes and can be used
+        only once. The token is not returned in the
+        response body. An unknown email, a wrong OTP, an expired OTP, and an OTP with no attempts
+        left (5 attempts) all return the same 400 error. Limited to 5 requests per minute.
       tags: [Auth]
       requestBody:
         required: true
@@ -332,39 +255,21 @@ paths:
               $ref: "#/components/schemas/OtpVerificationRequest"
       responses:
         "200":
-          description: OTP verified, reset token issued
+          description: OTP verified. The reset token cookie is set.
+          headers:
+            Set-Cookie:
+              $ref: "#/components/headers/SetResetTokenCookie"
           content:
             application/json:
               schema:
-                type: object
-                properties:
-                  code:
-                    type: integer
-                    format: int32
-                    example: 200
-                  message:
-                    type: string
-                    example: OTP verified. You may now reset your password.
+                allOf:
+                  - $ref: "#/components/schemas/SuccessResponse"
+                  - type: object
+                    properties:
+                      message:
+                        example: OTP verified. You can now reset your password.
         "400":
-          description: Invalid or expired OTP
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  code:
-                    type: integer
-                    format: int32
-                    example: 400
-                  error:
-                    type: string
-                    example: Bad Request
-                  correlationId:
-                    type: string
-                    example: "1781953113407"
-                  message:
-                    type: string
-                    example: Invalid or expired OTP.
+          $ref: "#/components/responses/BadRequest"
         "429":
           $ref: "#/components/responses/TooManyRequests"
         "500":
@@ -373,11 +278,11 @@ paths:
   "/auth/reset-password":
     patch:
       operationId: resetPassword
-      summary: Reset password
+      summary: Reset the password
       description: >
-        Reset the user's password using the short-lived reset token issued by
-        POST /auth/verify-reset-otp. The reset token is read from an HttpOnly, Secure
-        cookie, not from the request body or URL. Rate limited to 5 requests per minute.
+        Set a new password using the reset token from POST /auth/verify-reset-otp. The token is
+        read from the resetToken cookie, not from the request body or URL. All sessions of the
+        user are logged out. Limited to 5 requests per minute.
       tags: [Auth]
       security:
         - resetTokenCookie: []
@@ -386,36 +291,21 @@ paths:
         content:
           application/json:
             schema:
-              type: object
-              properties:
-                password:
-                  type: string
-                  format: password
-                  minLength: 8
-                  example: newPassword1234
-              required: [password]
+              $ref: "#/components/schemas/ResetPasswordRequest"
       responses:
         "200":
-          description: Password reset successful
+          description: Password reset successfully. The resetToken cookie is cleared.
           content:
             application/json:
               schema:
-                type: object
-                properties:
-                  code:
-                    type: integer
-                    format: int32
-                    example: 200
-                  message:
-                    type: string
-                    example: Password reset successful.
-                  links:
-                    type: object
+                allOf:
+                  - $ref: "#/components/schemas/SuccessResponse"
+                  - type: object
                     properties:
-                      sign-in:
-                        type: string
-                        format: uri
-                        example: "/auth/sign-in"
+                      message:
+                        example: Password reset successfully.
+                      links:
+                        $ref: "#/components/schemas/SignInLinks"
         "400":
           $ref: "#/components/responses/BadRequest"
         "401":
@@ -430,53 +320,35 @@ paths:
       operationId: signIn
       summary: Sign in
       description: >
-        Authenticate a user and return an access token; also sets a refreshToken HttpOnly
-        cookie and creates a new session for this device. Rate limited to 5 requests per minute.
+        Sign in a user and return an access token. A new session is created for this device, and
+        its refresh token is set in the refreshToken HttpOnly cookie. Only active accounts can
+        sign in. Limited to 5 requests per minute.
       tags: [Auth]
       requestBody:
         required: true
         content:
           application/json:
             schema:
-              type: object
-              properties:
-                email:
-                  type: string
-                  format: email
-                  example: example@gmail.com
-                password:
-                  type: string
-                  format: password
-                  example: password1234
-              required: [email, password]
+              $ref: "#/components/schemas/SignInRequest"
       responses:
         "200":
-          description: Login successful
+          description: Signed in successfully.
+          headers:
+            Set-Cookie:
+              $ref: "#/components/headers/SetRefreshTokenCookie"
           content:
             application/json:
               schema:
-                type: object
-                properties:
-                  code:
-                    type: integer
-                    format: int32
-                    example: 200
-                  message:
-                    type: string
-                    example: Login successful.
-                  data:
-                    type: object
+                allOf:
+                  - $ref: "#/components/schemas/SuccessResponse"
+                  - type: object
                     properties:
-                      accessToken:
-                        type: string
-                        example: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
-                  links:
-                    type: object
-                    properties:
-                      self:
-                        type: string
-                        format: uri
-                        example: "/auth/sign-in"
+                      message:
+                        example: Signed in successfully.
+                      data:
+                        $ref: "#/components/schemas/AccessToken"
+                      links:
+                        $ref: "#/components/schemas/SessionLinks"
         "400":
           $ref: "#/components/responses/BadRequest"
         "401":
@@ -491,34 +363,28 @@ paths:
   "/auth/refresh":
     post:
       operationId: refreshToken
-      summary: Refresh access token
+      summary: Refresh the access token
       description: >
-        Refresh the access token using the refreshToken cookie.
-        The refresh token is expected to be stored in an HttpOnly cookie.
+        Get a new access token for the device session in the refreshToken cookie. The refresh
+        token itself does not change and stays valid for the whole session (30 days). It returns
+        401 if the token is missing, invalid, or expired, or if the session was revoked.
       tags: [Auth]
       security:
         - refreshCookie: []
       responses:
         "200":
-          description: Token refreshed
+          description: Token refreshed.
           content:
             application/json:
               schema:
-                type: object
-                properties:
-                  code:
-                    type: integer
-                    format: int32
-                    example: 200
-                  message:
-                    type: string
-                    example: Token refreshed successfully.
-                  data:
-                    type: object
+                allOf:
+                  - $ref: "#/components/schemas/SuccessResponse"
+                  - type: object
                     properties:
-                      accessToken:
-                        type: string
-                        example: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+                      message:
+                        example: Token refreshed successfully.
+                      data:
+                        $ref: "#/components/schemas/AccessToken"
         "401":
           $ref: "#/components/responses/Unauthorized"
         "403":
@@ -529,61 +395,58 @@ paths:
   "/auth/logout":
     post:
       operationId: logout
-      summary: Logout
+      summary: Log out the current device
       description: >
-        Logout the current device and invalidate its session only. Other active sessions
-        on other devices remain unaffected. Requires both a valid access token and the
-        refreshToken cookie together (not either/or), since the session being invalidated
-        is identified from the refresh token itself.
+        End the session of the current device only. Other sessions stay active. You need both a
+        valid access token and the refreshToken cookie of the same user, because the session to
+        end is found from the refresh token.
       tags: [Auth]
       security:
         - bearerAuth: []
           refreshCookie: []
       responses:
         "200":
-          description: Logged out successfully
+          description: Logged out. The refreshToken cookie is cleared.
           content:
             application/json:
               schema:
-                type: object
-                properties:
-                  code:
-                    type: integer
-                    format: int32
-                    example: 200
-                  message:
-                    type: string
-                    example: Logged out successfully.
+                allOf:
+                  - $ref: "#/components/schemas/SuccessResponse"
+                  - type: object
+                    properties:
+                      message:
+                        example: Logged out successfully.
         "401":
           $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
         "500":
           $ref: "#/components/responses/ServerError"
 
   "/auth/logout-all":
     post:
       operationId: logoutAll
-      summary: Logout from all devices
-      description: Invalidate all active sessions for the authenticated user across every device.
+      summary: Log out from all devices
+      description: End all sessions of the signed-in user on every device.
       tags: [Auth]
       security:
         - bearerAuth: []
       responses:
         "200":
-          description: Logged out from all devices
+          description: Logged out from all devices. The refreshToken cookie is cleared.
           content:
             application/json:
               schema:
-                type: object
-                properties:
-                  code:
-                    type: integer
-                    format: int32
-                    example: 200
-                  message:
-                    type: string
-                    example: Logged out from all devices successfully.
+                allOf:
+                  - $ref: "#/components/schemas/SuccessResponse"
+                  - type: object
+                    properties:
+                      message:
+                        example: Logged out from all devices successfully.
         "401":
           $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
         "500":
           $ref: "#/components/responses/ServerError"
 
@@ -591,54 +454,50 @@ paths:
     get:
       operationId: listSessions
       summary: List active sessions
-      description: Retrieve the authenticated user's currently active login sessions/devices.
+      description: >
+        Get the active sessions of the signed-in user. The isCurrent field shows which session
+        belongs to the access token.
       tags: [Auth]
       security:
         - bearerAuth: []
       responses:
         "200":
-          description: Return a list of active sessions
+          description: List of active sessions.
           content:
             application/json:
               schema:
-                type: object
-                properties:
-                  code:
-                    type: integer
-                    format: int32
-                    example: 200
-                  message:
-                    type: string
-                    example: Data retrieved.
-                  data:
-                    type: array
-                    items:
-                      $ref: "#/components/schemas/Session"
+                allOf:
+                  - $ref: "#/components/schemas/SuccessResponse"
+                  - type: object
+                    properties:
+                      message:
+                        example: Data retrieved successfully.
+                      data:
+                        type: array
+                        items:
+                          $ref: "#/components/schemas/Session"
         "401":
           $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
         "500":
           $ref: "#/components/responses/ServerError"
 
   "/auth/sessions/{sessionId}":
     delete:
       operationId: deleteSession
-      summary: Logout specific device
+      summary: Log out a specific device
       description: >
-        Invalidate a single named session/device while leaving other sessions active.
-        The session must belong to the requesting user.
+        End one session and keep the other sessions active. The session must belong to the user
+        making the request.
       tags: [Auth]
       security:
         - bearerAuth: []
       parameters:
-        - in: path
-          name: sessionId
-          required: true
-          schema:
-            type: string
-            example: 665f1a2b3c4d5e6f70910203
+        - $ref: "#/components/parameters/sessionIdPathParam"
       responses:
         "204":
-          description: Session logged out successfully
+          description: Session ended.
         "400":
           $ref: "#/components/responses/BadRequest"
         "401":
@@ -650,14 +509,12 @@ paths:
         "500":
           $ref: "#/components/responses/ServerError"
 
-  # ==================================================
-  # Article Routes
-  # ==================================================
+  # ---------- Article routes ----------
   "/articles":
     get:
       operationId: listArticles
       summary: List published articles
-      description: Retrieve published articles visible to the public.
+      description: Get published articles. Anyone can use this endpoint. It supports pagination, sorting, title search, and category filter.
       tags: [Article]
       parameters:
         - $ref: "#/components/parameters/pageParam"
@@ -668,62 +525,22 @@ paths:
         - $ref: "#/components/parameters/categoryParam"
       responses:
         "200":
-          description: Return a list of articles
+          description: List of published articles.
           content:
             application/json:
               schema:
-                type: object
-                properties:
-                  code:
-                    type: integer
-                    format: int32
-                    example: 200
-                  message:
-                    type: string
-                    example: Data retrieved.
-                  data:
-                    type: array
-                    items:
-                      allOf:
-                        - type: object
-                          properties:
-                            id:
-                              type: string
-                              example: 507f1f77bcf86cd799439011
-                            title:
-                              type: string
-                              example: First article
-                            cover:
-                              type: string
-                              format: uri
-                              example: "https://s.aws.com/myfirstblog/123.jpg"
-                            author:
-                              $ref: "#/components/schemas/AuthorDetails"
-                            category:
-                              $ref: "#/components/schemas/CategoryDetails"
-                            link:
-                              type: string
-                              format: uri
-                              example: "/articles/507f1f77bcf86cd799439011"
-                          required: [id, title, author, category, link]
-                        - $ref: "#/components/schemas/Timestamp"
-                  pagination:
-                    $ref: "#/components/schemas/Pagination"
-                  links:
-                    type: object
+                allOf:
+                  - $ref: "#/components/schemas/SuccessResponse"
+                  - type: object
                     properties:
-                      self:
-                        type: string
-                        format: uri
-                        example: "/articles?page=2&limit=2&sortType=desc&sortBy=createdAt&search=&category="
-                      next:
-                        type: string
-                        format: uri
-                        example: "/articles?page=3&limit=2&sortType=desc&sortBy=createdAt&search=&category="
-                      prev:
-                        type: string
-                        format: uri
-                        example: "/articles?page=1&limit=2&sortType=desc&sortBy=createdAt&search=&category="
+                      data:
+                        type: array
+                        items:
+                          $ref: "#/components/schemas/ArticleListItem"
+                      pagination:
+                        $ref: "#/components/schemas/Pagination"
+                      links:
+                        $ref: "#/components/schemas/ArticleListLinks"
         "400":
           $ref: "#/components/responses/BadRequest"
         "500":
@@ -731,11 +548,11 @@ paths:
 
     post:
       operationId: createArticle
-      summary: Create article
+      summary: Create an article
       description: >
-        Create an article. The referenced category must exist and be active.
-        New articles are published by default; an administrator may change the
-        status at any time via PATCH /articles/{id}/status. Requires authentication.
+        Create an article with a cover image. The category must exist and be active. New articles
+        are published right away. The cover file must be a JPG, JPEG, PNG, or WebP image up to
+        5 MB.
       tags: [Article]
       security:
         - bearerAuth: []
@@ -747,7 +564,20 @@ paths:
               $ref: "#/components/schemas/CreateArticleRequest"
       responses:
         "201":
-          $ref: "#/components/responses/ArticleCreated"
+          description: Article created.
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/SuccessResponse"
+                  - type: object
+                    properties:
+                      message:
+                        example: Article created successfully.
+                      data:
+                        $ref: "#/components/schemas/Article"
+                      links:
+                        $ref: "#/components/schemas/ArticleSelfLinks"
         "400":
           $ref: "#/components/responses/BadRequest"
         "401":
@@ -760,10 +590,8 @@ paths:
   "/articles/admin/all":
     get:
       operationId: listAllArticles
-      summary: List all articles
-      description: >
-        Retrieve all articles, including draft and published articles. Only
-        administrators can perform this action.
+      summary: List all articles (admin)
+      description: Get both published and draft articles. Only administrators can do this.
       tags: [Article]
       security:
         - bearerAuth: []
@@ -777,66 +605,22 @@ paths:
         - $ref: "#/components/parameters/articleStatusParam"
       responses:
         "200":
-          description: Return a list of all articles
+          description: List of all articles.
           content:
             application/json:
               schema:
-                type: object
-                properties:
-                  code:
-                    type: integer
-                    format: int32
-                    example: 200
-                  message:
-                    type: string
-                    example: Data retrieved.
-                  data:
-                    type: array
-                    items:
-                      allOf:
-                        - type: object
-                          properties:
-                            id:
-                              type: string
-                              example: 507f1f77bcf86cd799439011
-                            title:
-                              type: string
-                              example: First article
-                            cover:
-                              type: string
-                              format: uri
-                              example: "https://s.aws.com/myfirstblog/123.jpg"
-                            status:
-                              type: string
-                              enum: [draft, published]
-                              example: draft
-                            author:
-                              $ref: "#/components/schemas/AuthorDetails"
-                            category:
-                              $ref: "#/components/schemas/CategoryDetails"
-                            link:
-                              type: string
-                              format: uri
-                              example: "/articles/507f1f77bcf86cd799439011"
-                          required: [id, title, status, author, category, link]
-                        - $ref: "#/components/schemas/Timestamp"
-                  pagination:
-                    $ref: "#/components/schemas/Pagination"
-                  links:
-                    type: object
+                allOf:
+                  - $ref: "#/components/schemas/SuccessResponse"
+                  - type: object
                     properties:
-                      self:
-                        type: string
-                        format: uri
-                        example: "/articles/admin/all?page=2&limit=2&sortType=asc&sortBy=updatedAt&search=&status=&category="
-                      next:
-                        type: string
-                        format: uri
-                        example: "/articles/admin/all?page=3&limit=2&sortType=asc&sortBy=updatedAt&search=&status=&category="
-                      prev:
-                        type: string
-                        format: uri
-                        example: "/articles/admin/all?page=1&limit=2&sortType=asc&sortBy=updatedAt&search=&status=&category="
+                      data:
+                        type: array
+                        items:
+                          $ref: "#/components/schemas/AdminArticleListItem"
+                      pagination:
+                        $ref: "#/components/schemas/Pagination"
+                      links:
+                        $ref: "#/components/schemas/AdminArticleListLinks"
         "400":
           $ref: "#/components/responses/BadRequest"
         "401":
@@ -849,103 +633,36 @@ paths:
   "/articles/{id}":
     get:
       operationId: getArticle
-      summary: Get article
+      summary: Get an article
       description: >
-        Published articles are visible to anyone. A draft article is only visible
-        to its author or an administrator; for all other callers it responds as
-        if the article does not exist.
+        Anyone can view a published article. A draft article can only be viewed by its author or
+        an administrator. For everyone else, the response is the same as if the article does not
+        exist. An invalid bearer token is rejected with 401, even though signing in is optional.
       tags: [Article]
       security:
         - {}
         - bearerAuth: []
       parameters:
         - $ref: "#/components/parameters/idPathParam"
-        - in: query
-          name: expand
-          description: >
-            Related resources to include in the response. Comments 
-            are included only when explicitly requested here.
-          required: false
-          schema:
-            type: array
-            items:
-              type: string
-              enum: [comments]
-          style: form
-          explode: false
-          example: "comments"
+        - $ref: "#/components/parameters/articleExpandParam"
       responses:
         "200":
-          description: Retrieved an article
+          description: The article.
           content:
             application/json:
               schema:
-                type: object
-                properties:
-                  code:
-                    type: integer
-                    format: int32
-                    example: 200
-                  message:
-                    type: string
-                    example: Data retrieved.
-                  data:
-                    allOf:
-                      - type: object
-                        properties:
-                          id:
-                            type: string
-                            example: 507f1f77bcf86cd799439011
-                          title:
-                            type: string
-                            example: first article
-                          body:
-                            type: string
-                            example: first article body
-                          cover:
-                            type: string
-                            format: uri
-                            example: https://s.aws.com/myfirstblog/123.jpg
-                        required: [id, title, body]
-                      - $ref: "#/components/schemas/Timestamp"
-                      - type: object
-                        properties:
-                          author:
-                            $ref: "#/components/schemas/AuthorDetails"
-                          category:
-                            $ref: "#/components/schemas/CategoryDetails"
-                          comments:
-                            type: array
-                            items:
-                              allOf:
-                                - type: object
-                                  properties:
-                                    id:
-                                      type: string
-                                      example: 507f1f77bcf86cd799439011
-                                    body:
-                                      type: string
-                                      example: this is a comment
-                                    author:
-                                      $ref: "#/components/schemas/AuthorDetails"
-                                - $ref: "#/components/schemas/Timestamp"
-                  links:
-                    type: object
+                allOf:
+                  - $ref: "#/components/schemas/SuccessResponse"
+                  - type: object
                     properties:
-                      self:
-                        type: string
-                        format: uri
-                        example: "/articles/507f1f77bcf86cd799439011"
-                      author:
-                        type: string
-                        format: uri
-                        example: "/articles/507f1f77bcf86cd799439011/author"
-                      comments:
-                        type: string
-                        format: uri
-                        example: "/articles/507f1f77bcf86cd799439011/comments"
+                      data:
+                        $ref: "#/components/schemas/ArticleDetails"
+                      links:
+                        $ref: "#/components/schemas/ArticleLinks"
         "400":
           $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
         "404":
           $ref: "#/components/responses/NotFound"
         "500":
@@ -953,11 +670,11 @@ paths:
 
     patch:
       operationId: updateArticle
-      summary: Update article
+      summary: Update an article
       description: >
-        Partially update an article. Only the article owner can perform this action.
-        If a category is provided, it must exist and be active. To change the
-        publish status, use PATCH /articles/{id}/status instead.
+        Update some fields of an article. Only the article owner can do this. Administrators
+        cannot edit other users' articles. If you send a category, it must exist and be active. A
+        new cover replaces the old image. Sending status here returns 400.
       tags: [Article]
       security:
         - bearerAuth: []
@@ -971,7 +688,20 @@ paths:
               $ref: "#/components/schemas/PatchArticleRequest"
       responses:
         "200":
-          $ref: "#/components/responses/ArticleUpdated"
+          description: Article updated.
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/SuccessResponse"
+                  - type: object
+                    properties:
+                      message:
+                        example: Article updated successfully.
+                      data:
+                        $ref: "#/components/schemas/Article"
+                      links:
+                        $ref: "#/components/schemas/ArticleSelfLinks"
         "400":
           $ref: "#/components/responses/BadRequest"
         "401":
@@ -985,10 +715,10 @@ paths:
 
     delete:
       operationId: deleteArticle
-      summary: Delete article
+      summary: Delete an article
       description: >
-        Delete an article. Only the article owner or an admin should be allowed
-        to perform this action.
+        Delete an article with its comments and cover image. Only the article owner or an
+        administrator can do this.
       tags: [Article]
       security:
         - bearerAuth: []
@@ -996,7 +726,7 @@ paths:
         - $ref: "#/components/parameters/idPathParam"
       responses:
         "204":
-          description: Article deleted successfully
+          description: Article deleted.
         "400":
           $ref: "#/components/responses/BadRequest"
         "401":
@@ -1011,11 +741,10 @@ paths:
   "/articles/{id}/status":
     patch:
       operationId: updateArticleStatus
-      summary: Update article status
+      summary: Update an article's status (admin)
       description: >
-        Change an article's status between draft and published. Can be used at any
-        time, for example to unpublish an already-published article. Only
-        administrators can perform this action.
+        Change an article's status between draft and published, for example to unpublish an
+        article. Only administrators can do this.
       tags: [Article]
       security:
         - bearerAuth: []
@@ -1029,7 +758,20 @@ paths:
               $ref: "#/components/schemas/ArticleStatusRequest"
       responses:
         "200":
-          $ref: "#/components/responses/ArticleUpdated"
+          description: Article status updated.
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/SuccessResponse"
+                  - type: object
+                    properties:
+                      message:
+                        example: Article status updated successfully.
+                      data:
+                        $ref: "#/components/schemas/Article"
+                      links:
+                        $ref: "#/components/schemas/ArticleSelfLinks"
         "400":
           $ref: "#/components/responses/BadRequest"
         "401":
@@ -1044,39 +786,25 @@ paths:
   "/articles/{id}/author":
     get:
       operationId: getArticleAuthor
-      summary: Get article author
-      description: Retrieve author details for an article.
+      summary: Get the article author
+      description: Get the public details of the author of a published article. A draft article returns 404.
       tags: [Article]
       parameters:
         - $ref: "#/components/parameters/idPathParam"
       responses:
         "200":
-          description: Get author details of an article
+          description: The article author.
           content:
             application/json:
               schema:
-                type: object
-                properties:
-                  code:
-                    type: integer
-                    format: int32
-                    example: 200
-                  message:
-                    type: string
-                    example: Data retrieved.
-                  data:
-                    $ref: "#/components/schemas/AuthorDetails"
-                  links:
-                    type: object
+                allOf:
+                  - $ref: "#/components/schemas/SuccessResponse"
+                  - type: object
                     properties:
-                      self:
-                        type: string
-                        format: uri
-                        example: "/articles/507f1f77bcf86cd799439011/author"
-                      article:
-                        type: string
-                        format: uri
-                        example: "/articles/507f1f77bcf86cd799439011"
+                      data:
+                        $ref: "#/components/schemas/AuthorDetails"
+                      links:
+                        $ref: "#/components/schemas/ArticleAuthorLinks"
         "400":
           $ref: "#/components/responses/BadRequest"
         "404":
@@ -1089,8 +817,8 @@ paths:
       operationId: listArticleComments
       summary: List article comments
       description: >
-        Retrieve public comments for a specific article as a nested tree, with each
-        comment including its replies. Pagination applies at the top level only.
+        Get the public comments of a published article as a tree, where each comment includes its
+        replies. Pagination applies to top-level comments only.
       tags: [Article]
       parameters:
         - $ref: "#/components/parameters/idPathParam"
@@ -1098,36 +826,22 @@ paths:
         - $ref: "#/components/parameters/limitParam"
       responses:
         "200":
-          description: Return a nested tree of comments
+          description: List of comments with their replies.
           content:
             application/json:
               schema:
-                type: object
-                properties:
-                  code:
-                    type: integer
-                    format: int32
-                    example: 200
-                  message:
-                    type: string
-                    example: Data retrieved.
-                  data:
-                    type: array
-                    items:
-                      $ref: "#/components/schemas/CommentTreeNode"
-                  pagination:
-                    $ref: "#/components/schemas/Pagination"
-                  links:
-                    type: object
+                allOf:
+                  - $ref: "#/components/schemas/SuccessResponse"
+                  - type: object
                     properties:
-                      self:
-                        type: string
-                        format: uri
-                        example: "/articles/507f1f77bcf86cd799439011/comments?page=&limit="
-                      article:
-                        type: string
-                        format: uri
-                        example: "/articles/507f1f77bcf86cd799439011"
+                      data:
+                        type: array
+                        items:
+                          $ref: "#/components/schemas/CommentTreeNode"
+                      pagination:
+                        $ref: "#/components/schemas/Pagination"
+                      links:
+                        $ref: "#/components/schemas/ArticleCommentListLinks"
         "400":
           $ref: "#/components/responses/BadRequest"
         "404":
@@ -1137,8 +851,8 @@ paths:
 
     post:
       operationId: createArticleComment
-      summary: Create article comment
-      description: Create a top-level comment for a specific article. Requires authentication.
+      summary: Comment on an article
+      description: Add a top-level comment to a published article.
       tags: [Article]
       security:
         - bearerAuth: []
@@ -1149,35 +863,23 @@ paths:
         content:
           application/json:
             schema:
-              $ref: "#/components/schemas/CreateArticleCommentRequest"
+              $ref: "#/components/schemas/CommentBodyRequest"
       responses:
         "201":
-          description: Comment posted
+          description: Comment posted.
           content:
             application/json:
               schema:
-                type: object
-                properties:
-                  code:
-                    type: integer
-                    format: int32
-                    example: 201
-                  message:
-                    type: string
-                    example: Comment posted.
-                  data:
-                    $ref: "#/components/schemas/Comment"
-                  links:
-                    type: object
+                allOf:
+                  - $ref: "#/components/schemas/SuccessResponse"
+                  - type: object
                     properties:
-                      self:
-                        type: string
-                        format: uri
-                        example: "/articles/507f1f77bcf86cd799439011/comments"
-                      article:
-                        type: string
-                        format: uri
-                        example: "/articles/507f1f77bcf86cd799439011"
+                      message:
+                        example: Comment posted successfully.
+                      data:
+                        $ref: "#/components/schemas/Comment"
+                      links:
+                        $ref: "#/components/schemas/ArticleCommentLinks"
         "400":
           $ref: "#/components/responses/BadRequest"
         "401":
@@ -1194,63 +896,36 @@ paths:
       operationId: createCommentReply
       summary: Reply to a comment
       description: >
-        Create a threaded reply to an existing comment on an article. The parent comment
-        ID is taken from the URL, not the request body. Requires authentication.
+        Add a reply to a visible comment on a published article. The parent comment ID comes from
+        the URL, not from the request body. Replying to a hidden comment returns 404.
       tags: [Article]
       security:
         - bearerAuth: []
       parameters:
-        - in: path
-          name: articleId
-          required: true
-          schema:
-            type: string
-            example: 507f1f77bcf86cd799439011
-        - in: path
-          name: commentId
-          required: true
-          schema:
-            type: string
-            example: 507f191e810c19729de860ea
+        - $ref: "#/components/parameters/articleIdPathParam"
+        - $ref: "#/components/parameters/commentIdPathParam"
       requestBody:
         required: true
         content:
           application/json:
             schema:
-              $ref: "#/components/schemas/CreateArticleCommentRequest"
+              $ref: "#/components/schemas/CommentBodyRequest"
       responses:
         "201":
-          description: Reply posted
+          description: Reply posted.
           content:
             application/json:
               schema:
-                type: object
-                properties:
-                  code:
-                    type: integer
-                    format: int32
-                    example: 201
-                  message:
-                    type: string
-                    example: Reply posted.
-                  data:
-                    allOf:
-                      - $ref: "#/components/schemas/Comment"
-                      - type: object
-                        properties:
-                          parentCommentId:
-                            example: 507f191e810c19729de860ea
-                  links:
-                    type: object
+                allOf:
+                  - $ref: "#/components/schemas/SuccessResponse"
+                  - type: object
                     properties:
-                      self:
-                        type: string
-                        format: uri
-                        example: "/articles/507f1f77bcf86cd799439011/comments/507f191e810c19729de860ea/replies"
-                      article:
-                        type: string
-                        format: uri
-                        example: "/articles/507f1f77bcf86cd799439011"
+                      message:
+                        example: Reply posted successfully.
+                      data:
+                        $ref: "#/components/schemas/Comment"
+                      links:
+                        $ref: "#/components/schemas/CommentReplyLinks"
         "400":
           $ref: "#/components/responses/BadRequest"
         "401":
@@ -1262,68 +937,55 @@ paths:
         "500":
           $ref: "#/components/responses/ServerError"
 
-  # ==================================================
-  # Category Routes
-  # ==================================================
+  # ---------- Category routes ----------
   "/categories":
     get:
       operationId: listCategories
       summary: List categories
       description: >
-        Retrieve active categories, for browsing and for filtering, searching, or
-        sorting articles.
+        Get categories for browsing, or for filtering, searching, and sorting articles. Public
+        users see only active categories. Administrators see all categories and can filter by
+        status. An invalid bearer token is rejected with 401, even though signing in is optional.
       tags: [Category]
+      security:
+        - {}
+        - bearerAuth: []
       parameters:
         - $ref: "#/components/parameters/pageParam"
         - $ref: "#/components/parameters/limitParam"
         - $ref: "#/components/parameters/sortTypeParam"
         - $ref: "#/components/parameters/categorySortByParam"
         - $ref: "#/components/parameters/categorySearchParam"
+        - $ref: "#/components/parameters/categoryStatusParam"
       responses:
         "200":
-          description: Return a list of categories
+          description: List of categories.
           content:
             application/json:
               schema:
-                type: object
-                properties:
-                  code:
-                    type: integer
-                    format: int32
-                    example: 200
-                  message:
-                    type: string
-                    example: Data retrieved.
-                  data:
-                    type: array
-                    items:
-                      $ref: "#/components/schemas/Category"
-                  pagination:
-                    $ref: "#/components/schemas/Pagination"
-                  links:
-                    type: object
+                allOf:
+                  - $ref: "#/components/schemas/SuccessResponse"
+                  - type: object
                     properties:
-                      self:
-                        type: string
-                        format: uri
-                        example: "/categories?page=2&limit=10&sortType=desc&sortBy=createdAt&search="
-                      next:
-                        type: string
-                        format: uri
-                        example: "/categories?page=3&limit=10&sortType=desc&sortBy=createdAt&search="
-                      prev:
-                        type: string
-                        format: uri
-                        example: "/categories?page=1&limit=10&sortType=desc&sortBy=createdAt&search="
+                      data:
+                        type: array
+                        items:
+                          $ref: "#/components/schemas/CategoryListItem"
+                      pagination:
+                        $ref: "#/components/schemas/Pagination"
+                      links:
+                        $ref: "#/components/schemas/CategoryListLinks"
         "400":
           $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
         "500":
           $ref: "#/components/responses/ServerError"
 
     post:
       operationId: createCategory
-      summary: Create category
-      description: Create a new article category. Only administrators can perform this action.
+      summary: Create a category (admin)
+      description: Create a new active category. The name must be unique. Only administrators can do this.
       tags: [Category]
       security:
         - bearerAuth: []
@@ -1335,28 +997,20 @@ paths:
               $ref: "#/components/schemas/CreateCategoryRequest"
       responses:
         "201":
-          description: Category created
+          description: Category created.
           content:
             application/json:
               schema:
-                type: object
-                properties:
-                  code:
-                    type: integer
-                    format: int32
-                    example: 201
-                  message:
-                    type: string
-                    example: Category created.
-                  data:
-                    $ref: "#/components/schemas/Category"
-                  links:
-                    type: object
+                allOf:
+                  - $ref: "#/components/schemas/SuccessResponse"
+                  - type: object
                     properties:
-                      self:
-                        type: string
-                        format: uri
-                        example: "/categories/665f1a2b3c4d5e6f70910203"
+                      message:
+                        example: Category created successfully.
+                      data:
+                        $ref: "#/components/schemas/Category"
+                      links:
+                        $ref: "#/components/schemas/CategoryLinks"
         "400":
           $ref: "#/components/responses/BadRequest"
         "401":
@@ -1364,62 +1018,42 @@ paths:
         "403":
           $ref: "#/components/responses/Forbidden"
         "409":
-          description: Category name already exists
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  code:
-                    type: integer
-                    format: int32
-                    example: 409
-                  error:
-                    type: string
-                    example: Conflict
-                  correlationId:
-                    type: string
-                    example: "1781953113407"
-                  message:
-                    type: string
-                    example: A category with this name already exists.
+          $ref: "#/components/responses/Conflict"
         "500":
           $ref: "#/components/responses/ServerError"
 
   "/categories/{id}":
     get:
       operationId: getCategory
-      summary: Get category
-      description: Retrieve a single category. Public users can view only active categories.
+      summary: Get a category
+      description: >
+        Get one category. Public users can only get active categories. Administrators can also
+        get unavailable ones. An invalid bearer token is rejected with 401, even though signing
+        in is optional.
       tags: [Category]
+      security:
+        - {}
+        - bearerAuth: []
       parameters:
         - $ref: "#/components/parameters/idPathParam"
       responses:
         "200":
-          description: Retrieved a category
+          description: The category.
           content:
             application/json:
               schema:
-                type: object
-                properties:
-                  code:
-                    type: integer
-                    format: int32
-                    example: 200
-                  message:
-                    type: string
-                    example: Data retrieved.
-                  data:
-                    $ref: "#/components/schemas/Category"
-                  links:
-                    type: object
+                allOf:
+                  - $ref: "#/components/schemas/SuccessResponse"
+                  - type: object
                     properties:
-                      self:
-                        type: string
-                        format: uri
-                        example: "/categories/665f1a2b3c4d5e6f70910203"
+                      data:
+                        $ref: "#/components/schemas/Category"
+                      links:
+                        $ref: "#/components/schemas/CategoryLinks"
         "400":
           $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
         "404":
           $ref: "#/components/responses/NotFound"
         "500":
@@ -1427,8 +1061,10 @@ paths:
 
     patch:
       operationId: updateCategory
-      summary: Update category
-      description: Update category details. Only administrators can perform this action.
+      summary: Update a category (admin)
+      description: >
+        Update the name or description of a category. Send at least one field. The name must stay
+        unique. Only administrators can do this.
       tags: [Category]
       security:
         - bearerAuth: []
@@ -1442,28 +1078,20 @@ paths:
               $ref: "#/components/schemas/UpdateCategoryRequest"
       responses:
         "200":
-          description: Category updated
+          description: Category updated.
           content:
             application/json:
               schema:
-                type: object
-                properties:
-                  code:
-                    type: integer
-                    format: int32
-                    example: 200
-                  message:
-                    type: string
-                    example: Successfully updated category.
-                  data:
-                    $ref: "#/components/schemas/Category"
-                  links:
-                    type: object
+                allOf:
+                  - $ref: "#/components/schemas/SuccessResponse"
+                  - type: object
                     properties:
-                      self:
-                        type: string
-                        format: uri
-                        example: "/categories/665f1a2b3c4d5e6f70910203"
+                      message:
+                        example: Category updated successfully.
+                      data:
+                        $ref: "#/components/schemas/Category"
+                      links:
+                        $ref: "#/components/schemas/CategoryLinks"
         "400":
           $ref: "#/components/responses/BadRequest"
         "401":
@@ -1473,37 +1101,18 @@ paths:
         "404":
           $ref: "#/components/responses/NotFound"
         "409":
-          description: Category name already exists
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  code:
-                    type: integer
-                    format: int32
-                    example: 409
-                  error:
-                    type: string
-                    example: Conflict
-                  correlationId:
-                    type: string
-                    example: "1781953113407"
-                  message:
-                    type: string
-                    example: A category with this name already exists.
+          $ref: "#/components/responses/Conflict"
         "500":
           $ref: "#/components/responses/ServerError"
 
   "/categories/{id}/status":
     patch:
       operationId: updateCategoryStatus
-      summary: Update category status
+      summary: Update a category's status (admin)
       description: >
-        Mark a category as active or unavailable. Categories cannot be permanently
-        deleted. Unavailable categories are hidden from public listings but remain
-        valid on articles that already reference them. Only administrators can
-        perform this action.
+        Mark a category as active or unavailable. Categories cannot be deleted. Unavailable
+        categories are hidden from public lists, but articles that already use them stay valid.
+        Only administrators can do this.
       tags: [Category]
       security:
         - bearerAuth: []
@@ -1517,28 +1126,20 @@ paths:
               $ref: "#/components/schemas/CategoryStatusRequest"
       responses:
         "200":
-          description: Category status updated
+          description: Category status updated.
           content:
             application/json:
               schema:
-                type: object
-                properties:
-                  code:
-                    type: integer
-                    format: int32
-                    example: 200
-                  message:
-                    type: string
-                    example: Category status updated.
-                  data:
-                    $ref: "#/components/schemas/Category"
-                  links:
-                    type: object
+                allOf:
+                  - $ref: "#/components/schemas/SuccessResponse"
+                  - type: object
                     properties:
-                      self:
-                        type: string
-                        format: uri
-                        example: "/categories/665f1a2b3c4d5e6f70910203"
+                      message:
+                        example: Category status updated successfully.
+                      data:
+                        $ref: "#/components/schemas/Category"
+                      links:
+                        $ref: "#/components/schemas/CategoryLinks"
         "400":
           $ref: "#/components/responses/BadRequest"
         "401":
@@ -1550,16 +1151,15 @@ paths:
         "500":
           $ref: "#/components/responses/ServerError"
 
-  # ==================================================
-  # Comment Routes
-  # ==================================================
+  # ---------- Comment routes ----------
   "/comments":
     get:
       operationId: listComments
-      summary: List comments
+      summary: List all comments (admin)
       description: >
-        Retrieve all comments, including hidden ones. Only administrators can
-        perform this action. Can be filtered by article ID.
+        Get all comments, including hidden ones, as they are stored. You can filter by article and status. If the articleId
+        filter points to an article that does not exist, it returns 404. Only administrators can
+        do this.
       tags: [Comment]
       security:
         - bearerAuth: []
@@ -1572,57 +1172,40 @@ paths:
         - $ref: "#/components/parameters/commentStatusParam"
       responses:
         "200":
-          description: Return a list of comments
+          description: List of comments.
           content:
             application/json:
               schema:
-                type: object
-                properties:
-                  code:
-                    type: integer
-                    format: int32
-                    example: 200
-                  message:
-                    type: string
-                    example: Data retrieved.
-                  data:
-                    type: array
-                    items:
-                      $ref: "#/components/schemas/Comment"
-                  pagination:
-                    $ref: "#/components/schemas/Pagination"
-                  links:
-                    type: object
+                allOf:
+                  - $ref: "#/components/schemas/SuccessResponse"
+                  - type: object
                     properties:
-                      self:
-                        type: string
-                        format: uri
-                        example: "/comments?page=2&limit=1&sortType=desc&sortBy=createdAt&articleId=&status="
-                      next:
-                        type: string
-                        format: uri
-                        example: "/comments?page=3&limit=1&sortType=desc&sortBy=createdAt&articleId=&status="
-                      prev:
-                        type: string
-                        format: uri
-                        example: "/comments?page=1&limit=1&sortType=desc&sortBy=createdAt&articleId=&status="
+                      data:
+                        type: array
+                        items:
+                          $ref: "#/components/schemas/StoredComment"
+                      pagination:
+                        $ref: "#/components/schemas/Pagination"
+                      links:
+                        $ref: "#/components/schemas/CommentListLinks"
         "400":
           $ref: "#/components/responses/BadRequest"
         "401":
           $ref: "#/components/responses/Unauthorized"
         "403":
           $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
         "500":
           $ref: "#/components/responses/ServerError"
 
   "/comments/{id}":
     patch:
       operationId: updateComment
-      summary: Update comment
+      summary: Update a comment
       description: >
-        Update a comment or reply's body text. Only the comment or reply owner
-        can perform this action. To change comment visibility, use
-        PATCH /comments/{id}/status instead.
+        Update the text of a comment or reply. Only the comment owner can do this. Administrators
+        cannot edit other users' comments.
       tags: [Comment]
       security:
         - bearerAuth: []
@@ -1633,31 +1216,23 @@ paths:
         content:
           application/json:
             schema:
-              $ref: "#/components/schemas/UpdateCommentRequest"
+              $ref: "#/components/schemas/CommentBodyRequest"
       responses:
         "200":
-          description: Comment updated
+          description: Comment updated.
           content:
             application/json:
               schema:
-                type: object
-                properties:
-                  code:
-                    type: integer
-                    format: int32
-                    example: 200
-                  message:
-                    type: string
-                    example: Comment updated.
-                  data:
-                    $ref: "#/components/schemas/Comment"
-                  links:
-                    type: object
+                allOf:
+                  - $ref: "#/components/schemas/SuccessResponse"
+                  - type: object
                     properties:
-                      self:
-                        type: string
-                        format: uri
-                        example: "/comments/507f1f77bcf86cd799439011"
+                      message:
+                        example: Comment updated successfully.
+                      data:
+                        $ref: "#/components/schemas/StoredComment"
+                      links:
+                        $ref: "#/components/schemas/CommentLinks"
         "400":
           $ref: "#/components/responses/BadRequest"
         "401":
@@ -1671,11 +1246,10 @@ paths:
 
     delete:
       operationId: deleteComment
-      summary: Delete comment
+      summary: Delete a comment
       description: >
-        Delete a comment. Only the comment owner or an admin should be allowed to
-        perform this action. Deleting a comment also deletes all of its direct
-        and nested replies.
+        Delete a comment together with all of its replies, including nested replies. The delete
+        is all-or-nothing. Only the comment owner or an administrator can do this.
       tags: [Comment]
       security:
         - bearerAuth: []
@@ -1683,7 +1257,7 @@ paths:
         - $ref: "#/components/parameters/idPathParam"
       responses:
         "204":
-          description: Comment deleted successfully
+          description: Comment and its replies deleted.
         "400":
           $ref: "#/components/responses/BadRequest"
         "401":
@@ -1698,8 +1272,8 @@ paths:
   "/comments/{id}/status":
     patch:
       operationId: updateCommentStatus
-      summary: Update comment status
-      description: Hide or show a comment. Only administrators can perform this action.
+      summary: Update a comment's status (admin)
+      description: Hide or show a comment. Only administrators can do this.
       tags: [Comment]
       security:
         - bearerAuth: []
@@ -1713,28 +1287,20 @@ paths:
               $ref: "#/components/schemas/CommentStatusRequest"
       responses:
         "200":
-          description: Comment status updated
+          description: Comment status updated.
           content:
             application/json:
               schema:
-                type: object
-                properties:
-                  code:
-                    type: integer
-                    format: int32
-                    example: 200
-                  message:
-                    type: string
-                    example: Comment status updated.
-                  data:
-                    $ref: "#/components/schemas/Comment"
-                  links:
-                    type: object
+                allOf:
+                  - $ref: "#/components/schemas/SuccessResponse"
+                  - type: object
                     properties:
-                      self:
-                        type: string
-                        format: uri
-                        example: "/comments/507f1f77bcf86cd799439011"
+                      message:
+                        example: Comment status updated successfully.
+                      data:
+                        $ref: "#/components/schemas/StoredComment"
+                      links:
+                        $ref: "#/components/schemas/CommentLinks"
         "400":
           $ref: "#/components/responses/BadRequest"
         "401":
@@ -1746,14 +1312,12 @@ paths:
         "500":
           $ref: "#/components/responses/ServerError"
 
-  # ==================================================
-  # User Routes
-  # ==================================================
+  # ---------- User routes ----------
   "/users":
     get:
       operationId: listUsers
-      summary: List users
-      description: Administrative endpoint to retrieve users.
+      summary: List users (admin)
+      description: Get users with filtering, sorting, and pagination. Only administrators can do this.
       tags: [User]
       security:
         - bearerAuth: []
@@ -1761,46 +1325,28 @@ paths:
         - $ref: "#/components/parameters/pageParam"
         - $ref: "#/components/parameters/limitParam"
         - $ref: "#/components/parameters/sortTypeParam"
-        - $ref: "#/components/parameters/basicSortByParam"
+        - $ref: "#/components/parameters/userSortByParam"
         - $ref: "#/components/parameters/nameParam"
         - $ref: "#/components/parameters/emailParam"
         - $ref: "#/components/parameters/userStatusParam"
       responses:
         "200":
-          description: Return a list of users
+          description: List of users.
           content:
             application/json:
               schema:
-                type: object
-                properties:
-                  code:
-                    type: integer
-                    format: int32
-                    example: 200
-                  message:
-                    type: string
-                    example: Data retrieved.
-                  data:
-                    type: array
-                    items:
-                      $ref: "#/components/schemas/User"
-                  pagination:
-                    $ref: "#/components/schemas/Pagination"
-                  links:
-                    type: object
+                allOf:
+                  - $ref: "#/components/schemas/SuccessResponse"
+                  - type: object
                     properties:
-                      self:
-                        type: string
-                        format: uri
-                        example: "/users?page=2&limit=1&sortType=desc&sortBy=createdAt&name=&email=&status="
-                      next:
-                        type: string
-                        format: uri
-                        example: "/users?page=3&limit=1&sortType=desc&sortBy=createdAt&name=&email=&status="
-                      prev:
-                        type: string
-                        format: uri
-                        example: "/users?page=1&limit=1&sortType=desc&sortBy=createdAt&name=&email=&status="
+                      data:
+                        type: array
+                        items:
+                          $ref: "#/components/schemas/User"
+                      pagination:
+                        $ref: "#/components/schemas/Pagination"
+                      links:
+                        $ref: "#/components/schemas/UserListLinks"
         "400":
           $ref: "#/components/responses/BadRequest"
         "401":
@@ -1812,8 +1358,10 @@ paths:
 
     post:
       operationId: createUser
-      summary: Create user
-      description: Administrative endpoint to create a user. The account status is set to active automatically.
+      summary: Create a user (admin)
+      description: >
+        Create a user account with the given role. The account is active right away. If the email
+        is already registered, the request is rejected. Only administrators can do this.
       tags: [User]
       security:
         - bearerAuth: []
@@ -1825,26 +1373,18 @@ paths:
               $ref: "#/components/schemas/AdminCreateUserRequest"
       responses:
         "201":
-          description: Account created
+          description: Account created.
           content:
             application/json:
               schema:
-                type: object
-                properties:
-                  code:
-                    type: integer
-                    format: int32
-                    example: 201
-                  message:
-                    type: string
-                    example: Account created.
-                  data:
-                    allOf:
-                      - $ref: "#/components/schemas/User"
-                      - type: object
-                        properties:
-                          status:
-                            example: active
+                allOf:
+                  - $ref: "#/components/schemas/SuccessResponse"
+                  - type: object
+                    properties:
+                      message:
+                        example: Account created successfully.
+                      data:
+                        $ref: "#/components/schemas/User"
         "400":
           $ref: "#/components/responses/BadRequest"
         "401":
@@ -1852,33 +1392,18 @@ paths:
         "403":
           $ref: "#/components/responses/Forbidden"
         "409":
-          description: Email already registered
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  code:
-                    type: integer
-                    format: int32
-                    example: 409
-                  error:
-                    type: string
-                    example: Conflict
-                  correlationId:
-                    type: string
-                    example: "1781953113407"
-                  message:
-                    type: string
-                    example: An account with this email already exists.
+          $ref: "#/components/responses/Conflict"
         "500":
           $ref: "#/components/responses/ServerError"
 
   "/users/{id}/change-password":
     patch:
       operationId: changePassword
-      summary: Change password
-      description: Change a user's password.
+      summary: Change a password
+      description: >
+        Change the password of the signed-in user. Only the account owner can do this. A wrong
+        oldPassword returns 400. After a successful change, all other sessions are logged out and
+        the current session stays active.
       tags: [User]
       security:
         - bearerAuth: []
@@ -1889,33 +1414,19 @@ paths:
         content:
           application/json:
             schema:
-              type: object
-              properties:
-                oldPassword:
-                  type: string
-                  format: password
-                  example: password1234
-                newPassword:
-                  type: string
-                  format: password
-                  minLength: 8
-                  example: password1234
-              required: [oldPassword, newPassword]
+              $ref: "#/components/schemas/ChangePasswordRequest"
       responses:
         "200":
-          description: Password updated
+          description: Password updated.
           content:
             application/json:
               schema:
-                type: object
-                properties:
-                  code:
-                    type: integer
-                    format: int32
-                    example: 200
-                  message:
-                    type: string
-                    example: Password updated successfully.
+                allOf:
+                  - $ref: "#/components/schemas/SuccessResponse"
+                  - type: object
+                    properties:
+                      message:
+                        example: Password updated successfully.
         "400":
           $ref: "#/components/responses/BadRequest"
         "401":
@@ -1930,80 +1441,26 @@ paths:
   "/users/{id}":
     get:
       operationId: getUser
-      summary: Get user
-      description: Retrieve a single user. Usually restricted to admins or the user themselves.
+      summary: Get a user
+      description: Get one user. A user can get their own details. An administrator can get any user.
       tags: [User]
       security:
         - bearerAuth: []
       parameters:
         - $ref: "#/components/parameters/idPathParam"
-        - in: query
-          name: expand
-          description: >
-            Related resources to include in the response. articles and comments
-            are included only when explicitly requested here.
-          required: false
-          schema:
-            type: array
-            items:
-              type: string
-              enum: [articles, comments]
-          style: form
-          explode: false
-          example: "articles,comments"
+        - $ref: "#/components/parameters/userExpandParam"
       responses:
         "200":
-          description: Retrieved a user
+          description: The user.
           content:
             application/json:
               schema:
-                type: object
-                properties:
-                  code:
-                    type: integer
-                    format: int32
-                    example: 200
-                  message:
-                    type: string
-                    example: Data retrieved.
-                  data:
-                    allOf:
-                      - $ref: "#/components/schemas/User"
-                      - type: object
-                        properties:
-                          articles:
-                            type: array
-                            items:
-                              type: object
-                              properties:
-                                id:
-                                  type: string
-                                  example: 507f1f77bcf86cd799439011
-                                title:
-                                  type: string
-                                  example: first article
-                                status:
-                                  type: string
-                                  enum: [draft, published]
-                                  example: published
-                          comments:
-                            type: array
-                            items:
-                              type: object
-                              properties:
-                                id:
-                                  type: string
-                                  example: 507f1f77bcf86cd799439011
-                                body:
-                                  type: string
-                                  example: this is a comment
-                                status:
-                                  type: string
-                                  enum: [public, hidden]
-                                  example: public
-                                article:
-                                  type: string
-                                  example: 507f1f77bcf86cd799439011
+                allOf:
+                  - $ref: "#/components/schemas/SuccessResponse"
+                  - type: object
+                    properties:
+                      data:
+                        $ref: "#/components/schemas/UserDetails"
         "400":
           $ref: "#/components/responses/BadRequest"
         "401":
@@ -2017,11 +1474,13 @@ paths:
 
     patch:
       operationId: updateUser
-      summary: Update user
+      summary: Update a user (admin)
       description: >
-        Administrative endpoint to update a user's info. Account status may only be
-        changed between active and blocked; accounts move out of pending automatically
-        via email verification.
+        Update a user's name, role, or account status. The status can only change between active
+        and blocked. Accounts leave pending when the email is verified. It returns 409 if the
+        status change is not allowed, if an administrator tries to block or demote their own
+        account, or if the change would remove the last active administrator. Only administrators
+        can do this.
       tags: [User]
       security:
         - bearerAuth: []
@@ -2035,46 +1494,18 @@ paths:
               $ref: "#/components/schemas/UpdateUserRequest"
       responses:
         "200":
-          description: Account updated
+          description: Account updated.
           content:
             application/json:
               schema:
-                type: object
-                properties:
-                  code:
-                    type: integer
-                    format: int32
-                    example: 200
-                  message:
-                    type: string
-                    example: Account updated.
-                  data:
-                    $ref: "#/components/schemas/User"
-        "400":
-          $ref: "#/components/responses/BadRequest"
-        "401":
-          $ref: "#/components/responses/Unauthorized"
-        "403":
-          $ref: "#/components/responses/Forbidden"
-        "404":
-          $ref: "#/components/responses/NotFound"
-        "500":
-          $ref: "#/components/responses/ServerError"
-
-    delete:
-      operationId: deleteUser
-      summary: Delete user
-      description: >
-        Administrative endpoint to delete a user. The system will not allow
-        deletion of the last active administrator.
-      tags: [User]
-      security:
-        - bearerAuth: []
-      parameters:
-        - $ref: "#/components/parameters/idPathParam"
-      responses:
-        "204":
-          description: Account deleted successfully
+                allOf:
+                  - $ref: "#/components/schemas/SuccessResponse"
+                  - type: object
+                    properties:
+                      message:
+                        example: Account updated successfully.
+                      data:
+                        $ref: "#/components/schemas/User"
         "400":
           $ref: "#/components/responses/BadRequest"
         "401":
@@ -2084,25 +1515,36 @@ paths:
         "404":
           $ref: "#/components/responses/NotFound"
         "409":
-          description: Cannot delete the last active administrator
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  code:
-                    type: integer
-                    format: int32
-                    example: 409
-                  error:
-                    type: string
-                    example: Conflict
-                  correlationId:
-                    type: string
-                    example: "1781953113407"
-                  message:
-                    type: string
-                    example: Cannot delete the last active administrator.
+          $ref: "#/components/responses/Conflict"
+        "500":
+          $ref: "#/components/responses/ServerError"
+
+    delete:
+      operationId: deleteUser
+      summary: Delete a user (admin)
+      description: >
+        Delete a user together with their sessions, OTPs, reset tokens, and articles (including
+        cover images). Also delete every comment they wrote and every comment on their articles,
+        including replies from other users. It returns 409 if an administrator tries to delete
+        their own account or the last active administrator. Only administrators can do this.
+      tags: [User]
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/idPathParam"
+      responses:
+        "204":
+          description: Account and related data deleted.
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
         "500":
           $ref: "#/components/responses/ServerError"
 
@@ -2123,77 +1565,358 @@ components:
       in: cookie
       name: resetToken
 
+  headers:
+    SetRefreshTokenCookie:
+      description: The refreshToken cookie. It holds the refresh token for the device and is HttpOnly, Secure, and SameSite=Strict.
+      schema:
+        type: string
+        example: refreshToken=eyJhbGciOiJIUzI1NiIs...; HttpOnly; Secure; SameSite=Strict
+    SetResetTokenCookie:
+      description: The resetToken cookie. It holds the single-use password reset token and is HttpOnly, Secure, and SameSite=Strict.
+      schema:
+        type: string
+        example: resetToken=3f9c0a...; HttpOnly; Secure; SameSite=Strict
+
   schemas:
-    Article:
-      allOf:
-        - type: object
-          properties:
-            id:
-              type: string
-              example: 507f1f77bcf86cd799439011
-            title:
-              type: string
-              example: first article
-            body:
-              type: string
-              example: first article body
-            cover:
-              type: string
-              format: uri
-              example: https://s.aws.com/myfirstblog/123.jpg
-            status:
-              type: string
-              enum: [draft, published]
-              default: published
-              example: published
-          required: [id, title, body, status]
-        - $ref: "#/components/schemas/Timestamp"
+    # ---------- Shared building blocks ----------
+    SuccessResponse:
+      type: object
+      properties:
+        code:
+          type: integer
+          format: int32
+          example: 200
+        message:
+          type: string
+          example: Data retrieved successfully.
+      required: [code, message]
 
-    Category:
-      allOf:
-        - type: object
-          properties:
-            id:
-              type: string
-              example: 665f1a2b3c4d5e6f70910203
-            name:
-              type: string
-              example: Technology
-            description:
-              type: string
-              nullable: true
-              example: Articles about software and tech trends
-            status:
-              type: string
-              enum: [active, unavailable]
-              example: active
-          required: [id, name, status]
-        - $ref: "#/components/schemas/Timestamp"
+    ErrorResponse:
+      type: object
+      properties:
+        code:
+          type: integer
+          format: int32
+          example: 400
+        error:
+          type: string
+          example: Bad request
+        correlationId:
+          type: string
+          example: 2b6d4a52-6c6e-4ac4-8f3e-2f6f4d6e9a11
+        message:
+          type: string
+          example: Invalid input.
+        data:
+          description: Extra details about the error. For 400 errors, this is a list of fields with problems.
+      required: [code, error, message]
 
-    User:
-      allOf:
-        - type: object
-          properties:
-            id:
-              type: string
-              example: 507f1f77bcf86cd799439011
-            name:
-              type: string
-              example: Md Ismile Hosen Siam
-            email:
-              type: string
-              format: email
-              example: example@gmail.com
-            role:
-              type: string
-              enum: [admin, user]
-              example: user
-            status:
-              type: string
-              enum: [pending, active, blocked]
-              example: pending
-          required: [id, name, email, role, status]
-        - $ref: "#/components/schemas/Timestamp"
+    ValidationErrorItem:
+      type: object
+      properties:
+        field:
+          type: string
+          example: title
+        message:
+          type: string
+          example: Title is required.
+        in:
+          type: string
+          enum: [params, query, body, file]
+          example: body
+      required: [field, message, in]
+
+    Timestamp:
+      type: object
+      properties:
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+      required: [createdAt, updatedAt]
+
+    Pagination:
+      type: object
+      properties:
+        page:
+          type: integer
+          format: int32
+          example: 2
+        limit:
+          type: integer
+          format: int32
+          example: 10
+        totalItems:
+          type: integer
+          format: int32
+          example: 200
+        totalPage:
+          type: integer
+          format: int32
+          example: 20
+        next:
+          type: integer
+          format: int32
+          description: Only present when there is a next page.
+          example: 3
+        prev:
+          type: integer
+          format: int32
+          description: Only present when there is a previous page.
+          example: 1
+      required: [page, limit, totalPage, totalItems]
+
+    AuthorDetails:
+      type: object
+      properties:
+        id:
+          type: string
+          example: 507f1f77bcf86cd799439011
+        name:
+          type: string
+          example: Md Ismile Hosen Siam
+      required: [id, name]
+
+    CategoryDetails:
+      type: object
+      properties:
+        id:
+          type: string
+          example: 665f1a2b3c4d5e6f70910203
+        name:
+          type: string
+          example: Technology
+      required: [id, name]
+
+    # ---------- Links ----------
+    SignInLinks:
+      type: object
+      properties:
+        sign-in:
+          type: string
+          format: uri-reference
+          example: /api/v1/auth/sign-in
+
+    SessionLinks:
+      type: object
+      properties:
+        self:
+          type: string
+          format: uri-reference
+          example: /api/v1/auth/sessions
+
+    UserLinks:
+      type: object
+      properties:
+        self:
+          type: string
+          format: uri-reference
+          example: /api/v1/users/507f1f77bcf86cd799439011
+
+    ArticleLinks:
+      type: object
+      properties:
+        self:
+          type: string
+          format: uri-reference
+          example: /api/v1/articles/507f1f77bcf86cd799439011
+        author:
+          type: string
+          format: uri-reference
+          example: /api/v1/articles/507f1f77bcf86cd799439011/author
+        comments:
+          type: string
+          format: uri-reference
+          example: /api/v1/articles/507f1f77bcf86cd799439011/comments
+
+    ArticleSelfLinks:
+      type: object
+      properties:
+        self:
+          type: string
+          format: uri-reference
+          example: /api/v1/articles/507f1f77bcf86cd799439011
+
+    ArticleAuthorLinks:
+      type: object
+      properties:
+        self:
+          type: string
+          format: uri-reference
+          example: /api/v1/articles/507f1f77bcf86cd799439011/author
+        article:
+          type: string
+          format: uri-reference
+          example: /api/v1/articles/507f1f77bcf86cd799439011
+
+    ArticleCommentLinks:
+      type: object
+      properties:
+        self:
+          type: string
+          format: uri-reference
+          example: /api/v1/articles/507f1f77bcf86cd799439011/comments
+        article:
+          type: string
+          format: uri-reference
+          example: /api/v1/articles/507f1f77bcf86cd799439011
+
+    CommentReplyLinks:
+      type: object
+      properties:
+        self:
+          type: string
+          format: uri-reference
+          example: /api/v1/articles/507f1f77bcf86cd799439011/comments/507f191e810c19729de860ea/replies
+        article:
+          type: string
+          format: uri-reference
+          example: /api/v1/articles/507f1f77bcf86cd799439011
+
+    CategoryLinks:
+      type: object
+      properties:
+        self:
+          type: string
+          format: uri-reference
+          example: /api/v1/categories/665f1a2b3c4d5e6f70910203
+
+    CommentLinks:
+      type: object
+      properties:
+        self:
+          type: string
+          format: uri-reference
+          example: /api/v1/comments/507f191e810c19729de860ea
+
+    ArticleListLinks:
+      type: object
+      properties:
+        self:
+          type: string
+          format: uri-reference
+          example: /api/v1/articles?page=2&limit=10&sortType=desc&sortBy=createdAt
+        next:
+          type: string
+          format: uri-reference
+          description: Only present when there is a next page.
+          example: /api/v1/articles?page=3&limit=10&sortType=desc&sortBy=createdAt
+        prev:
+          type: string
+          format: uri-reference
+          description: Only present when there is a previous page.
+          example: /api/v1/articles?page=1&limit=10&sortType=desc&sortBy=createdAt
+      required: [self]
+
+    AdminArticleListLinks:
+      type: object
+      properties:
+        self:
+          type: string
+          format: uri-reference
+          example: /api/v1/articles/admin/all?page=2&limit=10&sortType=desc&sortBy=createdAt
+        next:
+          type: string
+          format: uri-reference
+          description: Only present when there is a next page.
+          example: /api/v1/articles/admin/all?page=3&limit=10&sortType=desc&sortBy=createdAt
+        prev:
+          type: string
+          format: uri-reference
+          description: Only present when there is a previous page.
+          example: /api/v1/articles/admin/all?page=1&limit=10&sortType=desc&sortBy=createdAt
+      required: [self]
+
+    ArticleCommentListLinks:
+      type: object
+      properties:
+        self:
+          type: string
+          format: uri-reference
+          example: /api/v1/articles/507f1f77bcf86cd799439011/comments?page=2&limit=10
+        next:
+          type: string
+          format: uri-reference
+          description: Only present when there is a next page.
+          example: /api/v1/articles/507f1f77bcf86cd799439011/comments?page=3&limit=10
+        prev:
+          type: string
+          format: uri-reference
+          description: Only present when there is a previous page.
+          example: /api/v1/articles/507f1f77bcf86cd799439011/comments?page=1&limit=10
+        article:
+          type: string
+          format: uri-reference
+          example: /api/v1/articles/507f1f77bcf86cd799439011
+      required: [self]
+
+    CategoryListLinks:
+      type: object
+      properties:
+        self:
+          type: string
+          format: uri-reference
+          example: /api/v1/categories?page=2&limit=10&sortType=desc&sortBy=createdAt
+        next:
+          type: string
+          format: uri-reference
+          description: Only present when there is a next page.
+          example: /api/v1/categories?page=3&limit=10&sortType=desc&sortBy=createdAt
+        prev:
+          type: string
+          format: uri-reference
+          description: Only present when there is a previous page.
+          example: /api/v1/categories?page=1&limit=10&sortType=desc&sortBy=createdAt
+      required: [self]
+
+    CommentListLinks:
+      type: object
+      properties:
+        self:
+          type: string
+          format: uri-reference
+          example: /api/v1/comments?page=2&limit=10&sortType=desc&sortBy=createdAt
+        next:
+          type: string
+          format: uri-reference
+          description: Only present when there is a next page.
+          example: /api/v1/comments?page=3&limit=10&sortType=desc&sortBy=createdAt
+        prev:
+          type: string
+          format: uri-reference
+          description: Only present when there is a previous page.
+          example: /api/v1/comments?page=1&limit=10&sortType=desc&sortBy=createdAt
+      required: [self]
+
+    UserListLinks:
+      type: object
+      properties:
+        self:
+          type: string
+          format: uri-reference
+          example: /api/v1/users?page=2&limit=10&sortType=desc&sortBy=createdAt
+        next:
+          type: string
+          format: uri-reference
+          description: Only present when there is a next page.
+          example: /api/v1/users?page=3&limit=10&sortType=desc&sortBy=createdAt
+        prev:
+          type: string
+          format: uri-reference
+          description: Only present when there is a previous page.
+          example: /api/v1/users?page=1&limit=10&sortType=desc&sortBy=createdAt
+      required: [self]
+
+    # ---------- Auth ----------
+    AccessToken:
+      type: object
+      properties:
+        accessToken:
+          type: string
+          example: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+      required: [accessToken]
 
     CreateUserRequest:
       type: object
@@ -2209,31 +1932,11 @@ components:
           type: string
           format: password
           minLength: 8
+          description: Must be at least 8 characters and no more than 72 bytes.
           example: password1234
       required: [name, email, password]
 
-    AdminCreateUserRequest:
-      type: object
-      properties:
-        name:
-          type: string
-          example: Md Ismile Hosen Siam
-        email:
-          type: string
-          format: email
-          example: example@gmail.com
-        password:
-          type: string
-          format: password
-          minLength: 8
-          example: password1234
-        role:
-          type: string
-          enum: [user, admin]
-          example: user
-      required: [name, email, password, role]
-
-    UserCreateUpdateResponse:
+    SignUpUser:
       allOf:
         - type: object
           properties:
@@ -2247,194 +1950,25 @@ components:
               type: string
               format: email
               example: example@gmail.com
-        - $ref: "#/components/schemas/Timestamp"
-
-    CreateArticleRequest:
-      type: object
-      properties:
-        title:
-          type: string
-          example: first article
-        body:
-          type: string
-          example: first article body
-        category:
-          type: string
-          example: 665f1a2b3c4d5e6f70910203
-          description: Category ID
-        cover:
-          type: string
-          format: binary
-          description: Cover image file (JPG, JPEG, PNG, or WebP; max 5 MB)
-      required: [title, body, category, cover]
-
-    PatchArticleRequest:
-      type: object
-      properties:
-        title:
-          type: string
-          example: updated title
-        body:
-          type: string
-          example: updated body
-        category:
-          type: string
-          example: 665f1a2b3c4d5e6f70910203
-          description: Category ID
-        cover:
-          type: string
-          format: binary
-          description: Cover image file (JPG, JPEG, PNG, or WebP; max 5 MB)
-
-    ArticleStatusRequest:
-      type: object
-      properties:
-        status:
-          type: string
-          enum: [draft, published]
-          example: published
-      required: [status]
-
-    CreateCategoryRequest:
-      type: object
-      properties:
-        name:
-          type: string
-          example: Technology
-        description:
-          type: string
-          nullable: true
-          example: Articles about software and tech trends
-      required: [name]
-
-    UpdateCategoryRequest:
-      type: object
-      properties:
-        name:
-          type: string
-          example: Technology
-        description:
-          type: string
-          nullable: true
-          example: Articles about software and tech trends
-      required: [name]
-
-    CategoryStatusRequest:
-      type: object
-      properties:
-        status:
-          type: string
-          enum: [active, unavailable]
-          example: unavailable
-      required: [status]
-
-    CategoryDetails:
-      type: object
-      properties:
-        id:
-          type: string
-          example: 665f1a2b3c4d5e6f70910203
-        name:
-          type: string
-          example: Technology
-      required: [id, name]
-
-    Comment:
-      allOf:
-        - type: object
-          properties:
-            id:
-              type: string
-              example: 507f1f77bcf86cd799439011
-            body:
-              type: string
-              example: first comment
             status:
               type: string
-              enum: [hidden, public]
-              example: public
-            article:
-              type: string
-              example: 507f1f77bcf86cd799439011
-            author:
-              $ref: "#/components/schemas/AuthorDetails"
-            parentCommentId:
-              type: string
-              nullable: true
-              example: null
-          required: [id, body, status, article, author]
+              enum: [pending, active, blocked]
+              example: pending
+          required: [id, name, email, status]
         - $ref: "#/components/schemas/Timestamp"
 
-    CommentTreeNode:
-      allOf:
-        - type: object
-          properties:
-            id:
-              type: string
-              example: 507f1f77bcf86cd799439011
-            body:
-              type: string
-              example: this is a comment
-            author:
-              $ref: "#/components/schemas/AuthorDetails"
-            replies:
-              type: array
-              items:
-                $ref: "#/components/schemas/CommentTreeNode"
-              example:
-                - id: 507f191e810c19729de860ea
-                  body: Great point, I agree!
-                  author:
-                    id: 507f1f77bcf86cd799439012
-                    name: Jane Doe
-                  replies: []
-                  createdAt: "2026-09-20T10:15:00.000Z"
-                  updatedAt: "2026-09-20T10:15:00.000Z"
-          required: [id, body, author, replies]
-        - $ref: "#/components/schemas/Timestamp"
-
-    CreateArticleCommentRequest:
+    SignInRequest:
       type: object
       properties:
-        body:
+        email:
           type: string
-          example: this is a comment
-      required: [body]
-
-    UpdateCommentRequest:
-      type: object
-      properties:
-        body:
+          format: email
+          example: example@gmail.com
+        password:
           type: string
-          example: this is a comment
-      required: [body]
-
-    CommentStatusRequest:
-      type: object
-      properties:
-        status:
-          type: string
-          enum: [public, hidden]
-          example: hidden
-      required: [status]
-
-    UpdateUserRequest:
-      type: object
-      properties:
-        name:
-          type: string
-          example: Md Ismile Hosen Siam
-        role:
-          type: string
-          enum: [user, admin]
-          example: user
-        status:
-          type: string
-          enum: [active, blocked]
-          description: >
-            Accounts move out of pending automatically via email verification;
-            administrators may only block an active user or unblock a blocked one.
-          example: active
+          format: password
+          example: password1234
+      required: [email, password]
 
     OtpVerificationRequest:
       type: object
@@ -2457,6 +1991,17 @@ components:
           example: example@gmail.com
       required: [email]
 
+    ResetPasswordRequest:
+      type: object
+      properties:
+        password:
+          type: string
+          format: password
+          minLength: 8
+          description: Must be at least 8 characters and no more than 72 bytes.
+          example: newPassword1234
+      required: [password]
+
     Session:
       type: object
       properties:
@@ -2465,7 +2010,7 @@ components:
           example: 665f1a2b3c4d5e6f70910203
         deviceInfo:
           type: string
-          example: Chrome on Windows 11
+          example: Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/126.0
         isCurrent:
           type: boolean
           example: true
@@ -2477,180 +2022,539 @@ components:
           format: date-time
       required: [id, deviceInfo, isCurrent, createdAt, expiresAt]
 
-    Timestamp:
-      type: object
-      properties:
-        createdAt:
-          type: string
-          format: date-time
-        updatedAt:
-          type: string
-          format: date-time
-      required: [createdAt, updatedAt]
+    # ---------- Articles ----------
+    Article:
+      allOf:
+        - type: object
+          properties:
+            id:
+              type: string
+              example: 507f1f77bcf86cd799439011
+            title:
+              type: string
+              example: My first article
+            body:
+              type: string
+              example: This is the body of my first article.
+            cover:
+              type: string
+              format: uri-reference
+              description: Relative URL of the cover image.
+              example: /uploads/articles/1767225600000-cover.jpg
+            status:
+              type: string
+              enum: [draft, published]
+              example: published
+            author:
+              $ref: "#/components/schemas/AuthorDetails"
+            category:
+              $ref: "#/components/schemas/CategoryDetails"
+          required: [id, title, body, cover, status, author, category]
+        - $ref: "#/components/schemas/Timestamp"
 
-    AuthorDetails:
+    ArticleListItem:
+      allOf:
+        - type: object
+          properties:
+            id:
+              type: string
+              example: 507f1f77bcf86cd799439011
+            title:
+              type: string
+              example: My first article
+            cover:
+              type: string
+              format: uri-reference
+              example: /uploads/articles/1767225600000-cover.jpg
+            author:
+              $ref: "#/components/schemas/AuthorDetails"
+            link:
+              type: string
+              format: uri-reference
+              example: /api/v1/articles/507f1f77bcf86cd799439011
+          required: [id, title, cover, author, link]
+        - $ref: "#/components/schemas/Timestamp"
+
+    AdminArticleListItem:
+      allOf:
+        - $ref: "#/components/schemas/ArticleListItem"
+        - type: object
+          properties:
+            status:
+              type: string
+              enum: [draft, published]
+              example: draft
+          required: [status]
+
+    ArticleComment:
+      allOf:
+        - type: object
+          properties:
+            id:
+              type: string
+              example: 507f191e810c19729de860ea
+            body:
+              type: string
+              example: Great article, thanks for sharing.
+            author:
+              $ref: "#/components/schemas/AuthorDetails"
+          required: [id, body, author]
+        - $ref: "#/components/schemas/Timestamp"
+
+    ArticleDetails:
+      allOf:
+        - type: object
+          properties:
+            id:
+              type: string
+              example: 507f1f77bcf86cd799439011
+            title:
+              type: string
+              example: My first article
+            body:
+              type: string
+              example: This is the body of my first article.
+            cover:
+              type: string
+              format: uri-reference
+              example: /uploads/articles/1767225600000-cover.jpg
+            author:
+              $ref: "#/components/schemas/AuthorDetails"
+            category:
+              $ref: "#/components/schemas/CategoryDetails"
+            comments:
+              type: array
+              description: Public comments as a flat list. Only present when expand=comments is used.
+              items:
+                $ref: "#/components/schemas/ArticleComment"
+          required: [id, title, body, cover, author, category]
+        - $ref: "#/components/schemas/Timestamp"
+
+    CreateArticleRequest:
       type: object
       properties:
-        id:
+        title:
           type: string
-          example: 507f1f77bcf86cd799439011
+          example: My first article
+        body:
+          type: string
+          example: This is the body of my first article.
+        category:
+          type: string
+          description: ID of an active category.
+          example: 665f1a2b3c4d5e6f70910203
+        cover:
+          type: string
+          format: binary
+          description: Cover image file. Allowed types are JPG, JPEG, PNG, and WebP. The maximum size is 5 MB.
+      required: [title, body, category, cover]
+
+    PatchArticleRequest:
+      type: object
+      properties:
+        title:
+          type: string
+          example: Updated article title
+        body:
+          type: string
+          example: Updated article body.
+        category:
+          type: string
+          description: ID of an active category.
+          example: 665f1a2b3c4d5e6f70910203
+        cover:
+          type: string
+          format: binary
+          description: New cover image file. Allowed types are JPG, JPEG, PNG, and WebP. The maximum size is 5 MB.
+
+    ArticleStatusRequest:
+      type: object
+      properties:
+        status:
+          type: string
+          enum: [draft, published]
+          example: draft
+      required: [status]
+
+    # ---------- Categories ----------
+    Category:
+      allOf:
+        - type: object
+          properties:
+            id:
+              type: string
+              example: 665f1a2b3c4d5e6f70910203
+            name:
+              type: string
+              example: Technology
+            description:
+              type: string
+              nullable: true
+              example: Articles about software and tech trends.
+            status:
+              type: string
+              enum: [active, unavailable]
+              example: active
+          required: [id, name, status]
+        - $ref: "#/components/schemas/Timestamp"
+
+    CategoryListItem:
+      allOf:
+        - $ref: "#/components/schemas/Category"
+        - type: object
+          properties:
+            link:
+              type: string
+              format: uri-reference
+              example: /api/v1/categories/665f1a2b3c4d5e6f70910203
+          required: [link]
+
+    CreateCategoryRequest:
+      type: object
+      properties:
+        name:
+          type: string
+          example: Technology
+        description:
+          type: string
+          nullable: true
+          example: Articles about software and tech trends.
+      required: [name]
+
+    UpdateCategoryRequest:
+      type: object
+      description: Send at least one field.
+      minProperties: 1
+      properties:
+        name:
+          type: string
+          example: Technology
+        description:
+          type: string
+          nullable: true
+          example: Articles about software and tech trends.
+
+    CategoryStatusRequest:
+      type: object
+      properties:
+        status:
+          type: string
+          enum: [active, unavailable]
+          example: unavailable
+      required: [status]
+
+    # ---------- Comments ----------
+    Comment:
+      allOf:
+        - type: object
+          properties:
+            id:
+              type: string
+              example: 507f191e810c19729de860ea
+            body:
+              type: string
+              example: Great article, thanks for sharing.
+            status:
+              type: string
+              enum: [public, hidden]
+              example: public
+            article:
+              type: string
+              description: ID of the article.
+              example: 507f1f77bcf86cd799439011
+            author:
+              $ref: "#/components/schemas/AuthorDetails"
+            parentCommentId:
+              type: string
+              nullable: true
+              description: ID of the parent comment. It is null for top-level comments.
+              example: null
+          required: [id, body, status, article, author, parentCommentId]
+        - $ref: "#/components/schemas/Timestamp"
+
+    CommentTreeNode:
+      allOf:
+        - type: object
+          properties:
+            id:
+              type: string
+              example: 507f191e810c19729de860ea
+            body:
+              type: string
+              example: Great article, thanks for sharing.
+            status:
+              type: string
+              enum: [public]
+              example: public
+            article:
+              type: string
+              description: ID of the article.
+              example: 507f1f77bcf86cd799439011
+            author:
+              $ref: "#/components/schemas/AuthorDetails"
+            replies:
+              type: array
+              items:
+                $ref: "#/components/schemas/CommentTreeNode"
+          required: [id, body, status, article, author, replies]
+        - $ref: "#/components/schemas/Timestamp"
+
+    StoredComment:
+      allOf:
+        - type: object
+          properties:
+            id:
+              type: string
+              example: 507f191e810c19729de860ea
+            body:
+              type: string
+              example: Great article, thanks for sharing.
+            status:
+              type: string
+              enum: [public, hidden]
+              example: public
+            article_id:
+              type: string
+              example: 507f1f77bcf86cd799439011
+            author_id:
+              type: string
+              example: 507f1f77bcf86cd799439012
+            parent_comment_id:
+              type: string
+              nullable: true
+              example: null
+          required: [id, body, status, article_id, author_id, parent_comment_id]
+        - $ref: "#/components/schemas/Timestamp"
+
+    CommentBodyRequest:
+      type: object
+      properties:
+        body:
+          type: string
+          example: Great article, thanks for sharing.
+      required: [body]
+
+    CommentStatusRequest:
+      type: object
+      properties:
+        status:
+          type: string
+          enum: [public, hidden]
+          example: hidden
+      required: [status]
+
+    # ---------- Users ----------
+    User:
+      allOf:
+        - type: object
+          properties:
+            id:
+              type: string
+              example: 507f1f77bcf86cd799439011
+            name:
+              type: string
+              example: Md Ismile Hosen Siam
+            email:
+              type: string
+              format: email
+              example: example@gmail.com
+            role:
+              type: string
+              enum: [user, admin]
+              example: user
+            account_status:
+              type: string
+              enum: [pending, active, blocked]
+              example: active
+          required: [id, name, email, role, account_status]
+        - $ref: "#/components/schemas/Timestamp"
+
+    UserDetails:
+      allOf:
+        - $ref: "#/components/schemas/User"
+        - type: object
+          properties:
+            articles:
+              type: array
+              description: Only present when expand=articles is used.
+              items:
+                type: object
+                properties:
+                  id:
+                    type: string
+                    example: 507f1f77bcf86cd799439011
+                  title:
+                    type: string
+                    example: My first article
+                  status:
+                    type: string
+                    enum: [draft, published]
+                    example: published
+            comments:
+              type: array
+              description: Only present when expand=comments is used.
+              items:
+                type: object
+                properties:
+                  id:
+                    type: string
+                    example: 507f191e810c19729de860ea
+                  body:
+                    type: string
+                    example: Great article, thanks for sharing.
+                  status:
+                    type: string
+                    enum: [public, hidden]
+                    example: public
+                  article_id:
+                    type: string
+                    example: 507f1f77bcf86cd799439011
+
+    AdminCreateUserRequest:
+      type: object
+      properties:
         name:
           type: string
           example: Md Ismile Hosen Siam
-      required: [id, name]
+        email:
+          type: string
+          format: email
+          example: example@gmail.com
+        password:
+          type: string
+          format: password
+          minLength: 8
+          description: Must be at least 8 characters and no more than 72 bytes.
+          example: password1234
+        role:
+          type: string
+          enum: [user, admin]
+          example: user
+      required: [name, email, password, role]
 
-    Pagination:
+    UpdateUserRequest:
       type: object
       properties:
-        page:
-          type: integer
-          format: int32
-          example: 2
-        limit:
-          type: integer
-          format: int32
-          example: 10
-        next:
-          type: integer
-          format: int32
-          example: 3
-        prev:
-          type: integer
-          format: int32
-          example: 1
-        totalPage:
-          type: integer
-          format: int32
-          example: 20
-        totalItems:
-          type: integer
-          format: int32
-          example: 200
-      required: [page, limit, totalPage, totalItems]
+        name:
+          type: string
+          example: Md Ismile Hosen Siam
+        role:
+          type: string
+          enum: [user, admin]
+          example: user
+        status:
+          type: string
+          enum: [active, blocked]
+          description: >
+            Administrators can only block an active user or unblock a blocked user. Accounts leave
+            pending automatically when the email is verified.
+          example: blocked
+
+    ChangePasswordRequest:
+      type: object
+      properties:
+        oldPassword:
+          type: string
+          format: password
+          example: password1234
+        newPassword:
+          type: string
+          format: password
+          minLength: 8
+          description: Must be at least 8 characters and no more than 72 bytes.
+          example: newPassword1234
+      required: [oldPassword, newPassword]
 
   responses:
     BadRequest:
-      description: Bad request
+      description: >
+        The request is not valid. The data field lists the fields with problems. It is null when
+        there are no field details, for example for an invalid or expired OTP.
       content:
         application/json:
           schema:
-            type: object
-            properties:
-              code:
-                type: integer
-                format: int32
-                example: 400
-              error:
-                type: string
-                example: Bad Request
-              correlationId:
-                type: string
-                example: "1781953113407"
-              message:
-                type: string
-                example: Validation failed.
-              data:
-                type: array
-                items:
-                  type: object
-                  properties:
-                    field:
-                      type: string
-                      example: field name
-                    message:
-                      type: string
-                      example: invalid input
-                    in:
-                      type: string
-                      enum: [path, query, header, cookie, body]
-                      example: body
-
-    ServerError:
-      description: Internal server error
-      content:
-        application/json:
-          schema:
-            type: object
-            properties:
-              code:
-                type: integer
-                format: int32
-                example: 500
-              error:
-                type: string
-                example: Internal Server Error
-              correlationId:
-                type: string
-                example: "1781953113407"
-              message:
-                type: string
-                example: We are sorry for the inconvenience. Please try again later.
+            allOf:
+              - $ref: "#/components/schemas/ErrorResponse"
+              - type: object
+                properties:
+                  code:
+                    example: 400
+                  error:
+                    example: Bad request
+                  data:
+                    type: array
+                    nullable: true
+                    items:
+                      $ref: "#/components/schemas/ValidationErrorItem"
 
     Unauthorized:
-      description: Unauthorized
+      description: The credentials are missing, invalid, or expired, or the session was revoked.
       content:
         application/json:
           schema:
-            type: object
-            properties:
-              code:
-                type: integer
-                format: int32
-                example: 401
-              error:
-                type: string
-                example: Unauthorized
-              correlationId:
-                type: string
-                example: "1781953113407"
-              message:
-                type: string
-                example: Unauthorized.
+            allOf:
+              - $ref: "#/components/schemas/ErrorResponse"
+              - type: object
+                properties:
+                  code:
+                    example: 401
+                  error:
+                    example: Unauthorized
+                  message:
+                    example: Authorization token is missing.
 
     Forbidden:
-      description: Forbidden
+      description: The account is not active, or the user is not allowed to do this.
       content:
         application/json:
           schema:
-            type: object
-            properties:
-              code:
-                type: integer
-                format: int32
-                example: 403
-              error:
-                type: string
-                example: Forbidden
-              correlationId:
-                type: string
-                example: "1781953113407"
-              message:
-                type: string
-                example: You do not have permission.
+            allOf:
+              - $ref: "#/components/schemas/ErrorResponse"
+              - type: object
+                properties:
+                  code:
+                    example: 403
+                  error:
+                    example: Forbidden
+                  message:
+                    example: You are not allowed to access this resource.
 
     NotFound:
-      description: Resource not found
+      description: The resource was not found.
       content:
         application/json:
           schema:
-            type: object
-            properties:
-              code:
-                type: integer
-                format: int32
-                example: 404
-              error:
-                type: string
-                example: Not Found
-              correlationId:
-                type: string
-                example: "1781953113407"
-              message:
-                type: string
-                example: Requested resource not found.
+            allOf:
+              - $ref: "#/components/schemas/ErrorResponse"
+              - type: object
+                properties:
+                  code:
+                    example: 404
+                  error:
+                    example: Not found
+                  message:
+                    example: The requested resource was not found.
+
+    Conflict:
+      description: >
+        The request conflicts with existing data, for example a duplicate value or a rule that
+        protects the system. See the operation description for details.
+      content:
+        application/json:
+          schema:
+            allOf:
+              - $ref: "#/components/schemas/ErrorResponse"
+              - type: object
+                properties:
+                  code:
+                    example: 409
+                  error:
+                    example: Conflict
+                  message:
+                    example: This value already exists.
 
     TooManyRequests:
-      description: Too many requests
+      description: Too many requests. The limit is 5 requests per minute for each IP address.
       content:
         application/json:
           schema:
@@ -2662,103 +2566,58 @@ components:
                 example: 429
               error:
                 type: string
-                example: Too Many Requests
-              correlationId:
-                type: string
-                example: "1781953113407"
+                example: Too many requests
               message:
                 type: string
-                example: Too many requests. Please try again later.
+                example: Too many attempts. Please try again later.
+            required: [code, error, message]
 
-    ArticleCreated:
-      description: Article created
+    ServerError:
+      description: Something went wrong on the server.
       content:
         application/json:
           schema:
-            type: object
-            properties:
-              code:
-                type: integer
-                format: int32
-                example: 201
-              message:
-                type: string
-                example: Article created.
-              data:
-                allOf:
-                  - $ref: "#/components/schemas/Article"
-                  - type: object
-                    properties:
-                      author:
-                        $ref: "#/components/schemas/AuthorDetails"
-                      category:
-                        $ref: "#/components/schemas/CategoryDetails"
-              links:
-                type: object
+            allOf:
+              - $ref: "#/components/schemas/ErrorResponse"
+              - type: object
                 properties:
-                  self:
-                    type: string
-                    format: uri
-                    example: "/articles/507f1f77bcf86cd799439011"
-
-    ArticleUpdated:
-      description: Article updated
-      content:
-        application/json:
-          schema:
-            type: object
-            properties:
-              code:
-                type: integer
-                format: int32
-                example: 200
-              message:
-                type: string
-                example: Successfully updated article data.
-              data:
-                allOf:
-                  - $ref: "#/components/schemas/Article"
-                  - type: object
-                    properties:
-                      author:
-                        $ref: "#/components/schemas/AuthorDetails"
-                      category:
-                        $ref: "#/components/schemas/CategoryDetails"
-              links:
-                type: object
-                properties:
-                  self:
-                    type: string
-                    format: uri
-                    example: "/articles/507f1f77bcf86cd799439011"
+                  code:
+                    example: 500
+                  error:
+                    example: Internal server error
+                  message:
+                    example: Something went wrong. Please try again later.
 
   parameters:
     pageParam:
       in: query
       name: page
-      description: Current page number
+      description: Page number to return.
       required: false
       schema:
         type: integer
         format: int32
+        minimum: 1
         default: 1
         example: 2
 
     limitParam:
       in: query
       name: limit
-      description: Number of items to return
+      description: Number of items per page.
       required: false
       schema:
         type: integer
         format: int32
+        minimum: 1
+        maximum: 100
         default: 10
         example: 10
 
     sortTypeParam:
       in: query
       name: sortType
-      description: Sort in ascending or descending order
+      description: Sort order. Use asc for ascending or desc for descending.
       required: false
       schema:
         type: string
@@ -2769,18 +2628,18 @@ components:
     sortByParam:
       in: query
       name: sortBy
-      description: Sort by updatedAt, createdAt or title
+      description: Field to sort articles by. Use createdAt, updatedAt, or title.
       required: false
       schema:
         type: string
-        enum: [updatedAt, createdAt, title]
+        enum: [createdAt, updatedAt, title]
         default: createdAt
         example: createdAt
 
     basicSortByParam:
       in: query
       name: sortBy
-      description: Sort by createdAt or updatedAt
+      description: Field to sort by. Use createdAt or updatedAt.
       required: false
       schema:
         type: string
@@ -2791,7 +2650,7 @@ components:
     categorySortByParam:
       in: query
       name: sortBy
-      description: Sort by createdAt or name
+      description: Field to sort categories by. Use createdAt or name.
       required: false
       schema:
         type: string
@@ -2799,28 +2658,41 @@ components:
         default: createdAt
         example: createdAt
 
-    searchParam:
+    userSortByParam:
       in: query
-      name: search
-      description: Search article by title
+      name: sortBy
+      description: Field to sort users by. Use createdAt, updatedAt, email, or name.
       required: false
       schema:
         type: string
+        enum: [createdAt, updatedAt, email, name]
+        default: createdAt
+        example: createdAt
+
+    searchParam:
+      in: query
+      name: search
+      description: Search articles by title. Not case-sensitive. Maximum 100 characters.
+      required: false
+      schema:
+        type: string
+        maxLength: 100
         example: title
 
     categorySearchParam:
       in: query
       name: search
-      description: Search categories by name
+      description: Search categories by name. Not case-sensitive. Maximum 100 characters.
       required: false
       schema:
         type: string
+        maxLength: 100
         example: Technology
 
     categoryParam:
       in: query
       name: category
-      description: Filter articles by category ID
+      description: Filter articles by category ID.
       required: false
       schema:
         type: string
@@ -2829,17 +2701,27 @@ components:
     articleStatusParam:
       in: query
       name: status
-      description: Filter articles by publication status
+      description: Filter articles by status.
       required: false
       schema:
         type: string
         enum: [draft, published]
         example: draft
 
+    categoryStatusParam:
+      in: query
+      name: status
+      description: Filter categories by status. This works for administrators only. Public users always get active categories.
+      required: false
+      schema:
+        type: string
+        enum: [active, unavailable]
+        example: unavailable
+
     commentStatusParam:
       in: query
       name: status
-      description: Filter comments by visibility status
+      description: Filter comments by status.
       required: false
       schema:
         type: string
@@ -2849,7 +2731,7 @@ components:
     userStatusParam:
       in: query
       name: status
-      description: Filter users by account status
+      description: Filter users by account status.
       required: false
       schema:
         type: string
@@ -2859,7 +2741,7 @@ components:
     articleIdFilterParam:
       in: query
       name: articleId
-      description: Filter comments by article ID
+      description: Filter comments by article ID.
       required: false
       schema:
         type: string
@@ -2868,26 +2750,73 @@ components:
     nameParam:
       in: query
       name: name
-      description: Filter users by name
+      description: Filter users by name. Not case-sensitive. Maximum 100 characters.
       required: false
       schema:
         type: string
+        maxLength: 100
         example: Siam
 
     emailParam:
       in: query
       name: email
-      description: Filter users by email
+      description: Filter users by email. Not case-sensitive. Maximum 100 characters.
       required: false
       schema:
         type: string
-        format: email
-        example: test@gmail.com
+        maxLength: 100
+        example: example@gmail.com
+
+    articleExpandParam:
+      in: query
+      name: expand
+      description: Extra data to include in the response, as a comma-separated list. Only comments is supported.
+      required: false
+      schema:
+        type: string
+        example: comments
+
+    userExpandParam:
+      in: query
+      name: expand
+      description: Extra data to include in the response, as a comma-separated list. Supported values are articles and comments.
+      required: false
+      schema:
+        type: string
+        example: articles,comments
 
     idPathParam:
       in: path
       name: id
+      description: ID of the resource.
       required: true
       schema:
         type: string
         example: 507f1f77bcf86cd799439011
+
+    sessionIdPathParam:
+      in: path
+      name: sessionId
+      description: ID of the session. You can get it from GET /auth/sessions.
+      required: true
+      schema:
+        type: string
+        example: 665f1a2b3c4d5e6f70910203
+
+    articleIdPathParam:
+      in: path
+      name: articleId
+      description: ID of the article.
+      required: true
+      schema:
+        type: string
+        example: 507f1f77bcf86cd799439011
+
+    commentIdPathParam:
+      in: path
+      name: commentId
+      description: ID of the parent comment.
+      required: true
+      schema:
+        type: string
+        example: 507f191e810c19729de860ea
