@@ -1,10 +1,21 @@
 const mongoose = require("mongoose");
 const defaults = require("../../config/defaults");
+const { COMMENT_STATUS } = require("../../config/constants");
 const Comment = require("../../model/Comment");
 const { notFound } = require("../../utils/error");
 const { getCache, setCache, deleteCachePattern } = require("../../utils/cache");
+const { mapComment } = require("../../utils/mappers");
 
 const ARTICLE_COMMENTS_TTL_SECONDS = 60;
+
+/**
+ * Populates the author name on a comment document.
+ *
+ * @param {Object} comment - Comment document
+ * @returns {Promise<Object>} The same document with `author_id` populated
+ */
+const populateAuthor = (comment) =>
+  comment.populate({ path: "author_id", select: "name" });
 
 /**
  * Drops public comment lists and article payloads that embed comments.
@@ -23,29 +34,30 @@ const invalidateArticleCommentCaches = async (articleId) => {
 };
 
 /**
- * Fetch comments for a specific article.
+ * Fetch comments for a specific article as a nested tree.
  *
- * - Supports pagination
+ * - Supports pagination of top-level comments
  * - Filters by status (optional)
  * - Populates author details
  *
  * @param {Object} params
- * @param {string} params.articleID - Article ID
+ * @param {string} params.articleId - Article ID
  * @param {number} [params.page] - Page number
  * @param {number} [params.limit] - Items per page
  * @param {string} [params.status] - Comment status filter
  *
- * @returns {Promise<Array<Object>>} List of comments
+ * @returns {Promise<Array<Object>>} List of top-level comments with replies
  */
 const getCommentsByArticle = async ({
-  articleID,
+  articleId,
   page = defaults.page,
   limit = defaults.limit,
   status,
 }) => {
-  const commentsCacheKey = `article:${articleID}:comments:${page}:${limit}`;
+  const cacheable = status === COMMENT_STATUS.PUBLIC;
+  const commentsCacheKey = `article:${articleId}:comments:${page}:${limit}`;
 
-  if (status === "public") {
+  if (cacheable) {
     const cached = await getCache(commentsCacheKey);
     if (cached !== null) {
       return cached;
@@ -53,7 +65,7 @@ const getCommentsByArticle = async ({
   }
 
   // build filter
-  const filter = { article_id: articleID };
+  const filter = { article_id: articleId };
 
   if (status) {
     filter.status = status;
@@ -63,46 +75,31 @@ const getCommentsByArticle = async ({
     .populate({ path: "author_id", select: "name" })
     .sort({ createdAt: 1 });
 
-  const nodes = comments.map((comment) => {
-    const object = comment.toObject();
-    const {
-      author_id: authorId,
-      article_id: articleId,
-      status: commentStatus,
-      parent_comment_id: parentCommentId,
-      ...rest
-    } = object;
+  const nodes = comments.map((comment) => ({
+    ...mapComment(comment),
+    replies: [],
+  }));
 
-    return {
-      ...rest,
-      parentCommentId: parentCommentId || null,
-      author: authorId ? { id: authorId.id, name: authorId.name } : null,
-      status: commentStatus,
-      article: articleId,
-      replies: [],
-    };
-  });
-  const nodeMap = new Map(nodes.map((comment) => [comment.id, comment]));
+  // keys are strings so parent lookups match ObjectId values
+  const nodeMap = new Map(nodes.map((node) => [node.id.toString(), node]));
   const roots = [];
 
-  nodes.forEach((comment) => {
-    if (comment.parentCommentId) {
-      const parent = nodeMap.get(comment.parentCommentId.toString());
-      if (parent) parent.replies.push(comment);
+  nodes.forEach((node) => {
+    if (node.parentCommentId) {
+      const parent = nodeMap.get(node.parentCommentId.toString());
+      if (parent) parent.replies.push(node);
     } else {
-      roots.push(comment);
+      roots.push(node);
     }
   });
 
-  const stripInternalFields = (comment) => {
-    const rest = { ...comment };
+  const stripInternalFields = (node) => {
+    const rest = { ...node };
     delete rest.parentCommentId;
 
     return {
       ...rest,
-      replies: Array.isArray(comment.replies)
-        ? comment.replies.map(stripInternalFields)
-        : [],
+      replies: rest.replies.map(stripInternalFields),
     };
   };
 
@@ -110,7 +107,7 @@ const getCommentsByArticle = async ({
     .slice(page * limit - limit, page * limit)
     .map(stripInternalFields);
 
-  if (status === "public") {
+  if (cacheable) {
     await setCache(commentsCacheKey, result, ARTICLE_COMMENTS_TTL_SECONDS);
   }
 
@@ -128,7 +125,7 @@ const getCommentsByArticle = async ({
  * @param {number} [params.page]
  * @param {number} [params.limit]
  * @param {string} [params.sortKey]
- * @param {string} [params.postId]
+ * @param {string} [params.articleId]
  * @param {string} [params.status]
  *
  * @returns {Promise<Array<Object>>}
@@ -137,14 +134,14 @@ const getAllComments = async ({
   page = defaults.page,
   limit = defaults.limit,
   sortKey,
-  postId,
+  articleId,
   status,
 }) => {
   // build filter
   const filter = {};
 
-  if (postId) {
-    filter.article_id = postId;
+  if (articleId) {
+    filter.article_id = articleId;
   }
 
   if (status) {
@@ -152,26 +149,29 @@ const getAllComments = async ({
   }
 
   const comments = await Comment.find(filter)
+    .populate({ path: "author_id", select: "name" })
     .sort(sortKey)
     .skip(page * limit - limit)
     .limit(limit);
 
-  return comments.map((c) => c.toObject());
+  return comments.map(mapComment);
 };
 
 /**
  * Count comments based on filter.
  *
  * @param {Object} params
- * @param {string} [params.article] - Article ID filter
+ * @param {string} [params.articleId] - Article ID filter
  * @param {string} [params.status] - Comment status filter
+ * @param {boolean} [params.topLevel] - Count only top-level comments
  *
  * @returns {Promise<number>} Total count
  */
-const count = async ({ article, status, topLevel = false }) => {
-  const countCacheKey = `article:${article}:comments:count:${topLevel}`;
+const count = async ({ articleId, status, topLevel = false }) => {
+  const cacheable = articleId && status === COMMENT_STATUS.PUBLIC;
+  const countCacheKey = `article:${articleId}:comments:count:${topLevel}`;
 
-  if (article && status === "public") {
+  if (cacheable) {
     const cached = await getCache(countCacheKey);
     if (cached !== null) {
       return cached;
@@ -181,8 +181,8 @@ const count = async ({ article, status, topLevel = false }) => {
   // build filter
   const filter = {};
 
-  if (article) {
-    filter.article_id = article;
+  if (articleId) {
+    filter.article_id = articleId;
   }
 
   if (status) {
@@ -194,7 +194,7 @@ const count = async ({ article, status, topLevel = false }) => {
 
   const total = await Comment.countDocuments(filter);
 
-  if (article && status === "public") {
+  if (cacheable) {
     await setCache(countCacheKey, total, ARTICLE_COMMENTS_TTL_SECONDS);
   }
 
@@ -205,15 +205,16 @@ const count = async ({ article, status, topLevel = false }) => {
  * Creates a new comment.
  *
  * @param {Object} params
- * @param {string} params.articleID - Article ID
+ * @param {string} params.articleId - Article ID
  * @param {string} params.body - Comment content
  * @param {string} [params.status] - Comment status
  * @param {string} params.author - User ID
+ * @param {string} [params.parentCommentId] - Parent comment ID for replies
  *
  * @returns {Promise<Object>} Created comment
  */
 const create = async ({
-  articleID,
+  articleId,
   body,
   status = defaults.commentStatus,
   author,
@@ -223,8 +224,8 @@ const create = async ({
     // replies are only allowed on visible comments of the same article
     const parentComment = await Comment.findOne({
       _id: parentCommentId,
-      article_id: articleID,
-      status: defaults.commentStatus,
+      article_id: articleId,
+      status: COMMENT_STATUS.PUBLIC,
     });
 
     if (!parentComment) throw notFound("Comment not found");
@@ -233,30 +234,17 @@ const create = async ({
   const comment = new Comment({
     body,
     status,
-    article_id: articleID,
+    article_id: articleId,
     author_id: author,
     parent_comment_id: parentCommentId,
   });
 
   await comment.save();
-  await comment.populate({ path: "author_id", select: "name" });
+  await populateAuthor(comment);
 
-  await invalidateArticleCommentCaches(articleID);
+  await invalidateArticleCommentCaches(articleId);
 
-  const object = comment.toObject();
-  const {
-    author_id: authorId,
-    article_id: articleId,
-    parent_comment_id: parentCommentDbId,
-    ...rest
-  } = object;
-
-  return {
-    ...rest,
-    article: articleId,
-    author: authorId ? { id: authorId.id, name: authorId.name } : null,
-    parentCommentId: parentCommentDbId || null,
-  };
+  return mapComment(comment);
 };
 
 /**
@@ -283,10 +271,11 @@ const updateComment = async ({ id, body, status }) => {
   if (status !== undefined) comment.status = status;
 
   await comment.save();
+  await populateAuthor(comment);
 
   await invalidateArticleCommentCaches(comment.article_id);
 
-  return comment.toObject();
+  return mapComment(comment);
 };
 
 /**
@@ -296,6 +285,7 @@ const updateComment = async ({ id, body, status }) => {
  * @param {string} params.id - Comment ID
  * @param {string} params.status - Comment visibility status
  * @returns {Promise<Object>} Updated comment
+ * @throws {Error} NotFound if comment does not exist
  */
 const updateStatus = async ({ id, status }) => {
   const comment = await Comment.findById(id);
@@ -305,11 +295,13 @@ const updateStatus = async ({ id, status }) => {
   }
 
   comment.status = status;
+
   await comment.save();
+  await populateAuthor(comment);
 
   await invalidateArticleCommentCaches(comment.article_id);
 
-  return comment.toObject();
+  return mapComment(comment);
 };
 
 /**
@@ -405,22 +397,12 @@ const deleteItem = async (id) => {
  * Deletes multiple comments based on filter.
  *
  * @param {Object} filter - MongoDB filter
+ * @param {ClientSession} [session] - Optional MongoDB session
  * @returns {Promise<boolean>} Success flag
  */
 const deleteMany = async (filter, session) => {
-  const mappedFilter = { ...filter };
-
-  if (mappedFilter.article !== undefined) {
-    mappedFilter.article_id = mappedFilter.article;
-    delete mappedFilter.article;
-  }
-  if (mappedFilter.author !== undefined) {
-    mappedFilter.author_id = mappedFilter.author;
-    delete mappedFilter.author;
-  }
-
   const result = await Comment.deleteMany(
-    mappedFilter,
+    filter,
     session ? { session } : undefined,
   );
   return !!result;

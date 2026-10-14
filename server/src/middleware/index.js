@@ -4,7 +4,7 @@ const cors = require("cors");
 const cookieParser = require("cookie-parser");
 const swaggerUI = require("swagger-ui-express");
 const YAML = require("yamljs");
-const morgan = require("morgan");
+
 const path = require("path");
 
 const swaggerDocs = YAML.load(path.join(__dirname, "../../swagger.yaml"));
@@ -17,7 +17,7 @@ const swaggerDocs = YAML.load(path.join(__dirname, "../../swagger.yaml"));
  * - JSON body parsing
  * - CORS configuration (supports credentials)
  * - Cookie parsing support
- * - HTTP request logging
+
  * - Static upload serving during development
  * - Swagger API documentation setup
  *
@@ -45,9 +45,6 @@ const applyMiddleware = (app) => {
 
   // Parse cookies from incoming requests.
   app.use(cookieParser());
-
-  // HTTP request logging for debugging and monitoring.
-  app.use(morgan("dev"));
 
   // API documentation endpoint.
   app.use("/docs", swaggerUI.serve, swaggerUI.setup(swaggerDocs));

@@ -2,6 +2,7 @@ const authServices = require("../../../../lib/authentication");
 const { badRequest } = require("../../../../utils/error");
 const emailService = require("../../../../lib/email");
 const { validation } = require("../../../../utils");
+const { mapSignUpUser } = require("../../../../utils/mappers");
 
 /**
  * Registers a user and sends an email verification code.
@@ -87,14 +88,7 @@ const register = async (req, res, next) => {
       code: 201,
       message:
         "Account created successfully. Please check your email to activate your account.",
-      data: {
-        id: user.id,
-        name: user.name,
-        email: user.email,
-        status: user.account_status,
-        createdAt: user.createdAt,
-        updatedAt: user.updatedAt,
-      },
+      data: mapSignUpUser(user),
       links: {
         self: "/api/v1/auth/sign-up",
       },

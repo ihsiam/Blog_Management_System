@@ -3,8 +3,6 @@ const query = require("./query");
 const error = require("./error");
 const hashing = require("./hashing");
 const validation = require("./validation");
-const upload = require("./multer");
-const { createTransporter } = require("./nodemailer");
 
 module.exports = {
   query,
@@ -12,6 +10,4 @@ module.exports = {
   error,
   hashing,
   validation,
-  upload,
-  createTransporter,
 };

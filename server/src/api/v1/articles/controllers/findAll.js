@@ -3,31 +3,32 @@ const articleServices = require("../../../../lib/articles");
 const { query } = require("../../../../utils");
 const defaults = require("../../../../config/defaults");
 const { badRequest } = require("../../../../utils/error");
+const { ARTICLE_STATUS } = require("../../../../config/constants");
+const { mapArticle } = require("../../../../utils/mappers");
 
 /**
- * Retrieves a paginated list of articles for admin panel.
+ * Retrieves a paginated list of published articles.
  *
- * Admin can:
- * - View all article statuses (published, draft)
- * - Filter by status
- * - Use pagination, sorting, and search
+ * - Pagination (page, limit)
+ * - Sorting (sortBy, sortType)
+ * - Search filtering
+ * - Only "published" articles are returned
  *
  * @param {import("express").Request} req - Express request object
  * @param {Object} req.query - Query parameters
- * @param {string} [req.query.page] - Page number
- * @param {string} [req.query.limit] - Items per page
+ * @param {string} [req.query.page] - Page number (defaults to system default)
+ * @param {string} [req.query.limit] - Items per page (defaults to system default)
  * @param {string} [req.query.sortType] - Sort order ("asc" | "desc")
  * @param {string} [req.query.sortBy] - Field to sort by
  * @param {string} [req.query.search] - Search keyword
- * @param {string} [req.query.status] - Article status filter (optional)
- * @param {string} [req.query.category] - Category ID filter (optional)
+ * @param {string} [req.query.category] - Category ID filter
  *
- * @param {import("express").Response} res
- * @param {Function} next
+ * @param {import("express").Response} res - Express response object
+ * @param {Function} next - Express error handler middleware
  *
  * @returns {Promise<void>} Sends paginated article list response
  */
-const getAllByAdmin = async (req, res, next) => {
+const findAll = async (req, res, next) => {
   try {
     /**
      * Extract query params with fallback defaults
@@ -37,13 +38,7 @@ const getAllByAdmin = async (req, res, next) => {
     const sortType = req.query.sortType || defaults.sortType;
     const sortBy = req.query.sortBy || defaults.sortBy;
     const searchTerm = req.query.search || defaults.searchTerm;
-
-    /**
-     * Admin can optionally filter by status
-     * If not provided → allow all statuses
-     */
-    const status = req.query.status || null;
-    const category = req.query.category || null;
+    const { category } = req.query;
 
     /**
      * Collect validation errors
@@ -51,7 +46,7 @@ const getAllByAdmin = async (req, res, next) => {
     const errors = [];
 
     /**
-     * Validate page
+     * Validate page number
      */
     if (!Number.isInteger(page) || page < 1) {
       errors.push({ field: "page", message: "invalid input", in: "query" });
@@ -62,29 +57,6 @@ const getAllByAdmin = async (req, res, next) => {
      */
     if (!Number.isInteger(limit) || limit < 1 || limit > defaults.maxLimit) {
       errors.push({ field: "limit", message: "invalid input", in: "query" });
-    }
-
-    /**
-     * Validate sort type
-     */
-    if (!["asc", "desc"].includes(sortType)) {
-      errors.push({
-        field: "sort_type",
-        message: "invalid input",
-        in: "query",
-      });
-    }
-
-    /**
-     * Validate sort field
-     */
-    if (!["title", "createdAt", "updatedAt"].includes(sortBy)) {
-      errors.push({ field: "sort_by", message: "invalid input", in: "query" });
-    }
-
-    // validate status
-    if (status && !["published", "draft"].includes(status)) {
-      errors.push({ field: "status", message: "invalid input", in: "query" });
     }
 
     if (
@@ -103,6 +75,24 @@ const getAllByAdmin = async (req, res, next) => {
     }
 
     /**
+     * Validate sort type
+     */
+    if (!["asc", "desc"].includes(sortType)) {
+      errors.push({
+        field: "sortType",
+        message: "invalid input",
+        in: "query",
+      });
+    }
+
+    /**
+     * Validate sort field
+     */
+    if (!["title", "createdAt", "updatedAt"].includes(sortBy)) {
+      errors.push({ field: "sortBy", message: "invalid input", in: "query" });
+    }
+
+    /**
      * Throw validation error if any exist
      */
     if (errors.length) {
@@ -110,7 +100,7 @@ const getAllByAdmin = async (req, res, next) => {
     }
 
     /**
-     * Fetch articles (admin has full visibility)
+     * Fetch only published articles
      */
     const articles = await articleServices.findAll({
       page,
@@ -118,43 +108,35 @@ const getAllByAdmin = async (req, res, next) => {
       sortBy,
       sortType,
       searchTerm,
-      status,
+      status: ARTICLE_STATUS.PUBLISHED,
       category,
     });
 
     /**
-     * Count total articles (respecting optional status filter)
+     * Count only published articles
      */
     const totalItems = await articleServices.count({
       searchTerm,
-      status,
+      status: ARTICLE_STATUS.PUBLISHED,
       category,
     });
 
     /**
-     * Transform response data
+     * Transform response data (DTO layer)
      */
     const data = query.transformData({
-      items: articles,
-      selection: [
-        "id",
-        "title",
-        "cover",
-        "author",
-        "status",
-        "createdAt",
-        "updatedAt",
-      ],
+      items: articles.map(mapArticle),
+      selection: ["id", "title", "cover", "author", "createdAt", "updatedAt"],
       path: "/api/v1/articles",
     });
 
     /**
-     * Pagination metadata
+     * Generate pagination metadata
      */
     const pagination = query.getPagination(page, limit, totalItems);
 
     /**
-     * HATEOAS navigation links
+     * Generate HATEOAS navigation links
      */
     const links = query.hateOAS({
       url: req.url,
@@ -180,4 +162,4 @@ const getAllByAdmin = async (req, res, next) => {
   }
 };
 
-module.exports = getAllByAdmin;
+module.exports = findAll;

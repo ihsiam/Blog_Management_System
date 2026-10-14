@@ -1,13 +1,14 @@
 const { Schema, model } = require("mongoose");
 const schemaOptions = require("./schemaOptions");
+const { COMMENT_STATUS } = require("../config/constants");
 
 const CommentSchema = new Schema(
   {
     body: { type: String, required: true },
     status: {
       type: String,
-      enum: ["public", "hidden"],
-      default: "public",
+      enum: Object.values(COMMENT_STATUS),
+      default: COMMENT_STATUS.PUBLIC,
     },
     article_id: {
       type: Schema.Types.ObjectId,

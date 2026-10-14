@@ -1,4 +1,5 @@
 const { createClient } = require("redis");
+const logger = require("../utils/logger");
 
 /**
  * Shared Redis client instance.
@@ -43,13 +44,13 @@ const connectRedis = async (retries = 5, delayMs = 5000) => {
 
         // handle disconnects after initial successful connection
         client.on("end", () => {
-          console.log(
+          logger.warn(
             "Redis disconnected — client will attempt to reconnect automatically",
           );
         });
 
         client.on("error", (err) => {
-          console.error("Redis connection error:", err.message);
+          logger.error("Redis connection error", { message: err.message });
         });
       }
 
@@ -58,10 +59,10 @@ const connectRedis = async (retries = 5, delayMs = 5000) => {
         await client.connect();
       }
 
-      console.log("Redis connected successfully");
+      logger.info("Redis connected successfully");
       return;
     } catch (err) {
-      console.log(
+      logger.warn(
         `Redis connection attempt ${attempt}/${retries} failed: ${err.message}`,
       );
 

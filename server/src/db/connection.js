@@ -1,4 +1,5 @@
 const mongoose = require("mongoose");
+const logger = require("../utils/logger");
 
 const serverSelectionTimeoutMS =
   Number(process.env.MONGOOSE_SERVER_SELECTION_TIMEOUT_MS) || 5000;
@@ -29,10 +30,10 @@ const connectDB = async (retries = 5, delayMs = 5000) => {
       await mongoose.connect(DB_URL, {
         serverSelectionTimeoutMS,
       });
-      console.log("Database connected successfully");
+      logger.info("Database connected successfully");
       return;
     } catch (err) {
-      console.log(
+      logger.warn(
         `DB connection attempt ${attempt}/${retries} failed: ${err.message}`,
       );
 
@@ -50,13 +51,13 @@ const connectDB = async (retries = 5, delayMs = 5000) => {
 
 // handle disconnects after initial successful connection (e.g. during failover testing)
 mongoose.connection.on("disconnected", () => {
-  console.log(
+  logger.warn(
     "MongoDB disconnected — mongoose will attempt to reconnect automatically",
   );
 });
 
 mongoose.connection.on("error", (err) => {
-  console.error("MongoDB connection error:", err.message);
+  logger.error("MongoDB connection error", { message: err.message });
 });
 
 module.exports = connectDB;

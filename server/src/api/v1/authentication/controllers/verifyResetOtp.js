@@ -1,5 +1,6 @@
 const authServices = require("../../../../lib/authentication");
 const { badRequest } = require("../../../../utils/error");
+const { setResetTokenCookie } = require("../../../../utils/cookie");
 
 /**
  * Verifies a password reset OTP and stores the resulting reset token.
@@ -31,11 +32,7 @@ const verifyResetOtp = async (req, res, next) => {
       code: otp,
     });
 
-    res.cookie("resetToken", resetToken, {
-      httpOnly: true,
-      secure: true,
-      sameSite: "strict",
-    });
+    setResetTokenCookie(res, resetToken);
 
     return res.status(200).json({
       code: 200,

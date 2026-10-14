@@ -1,19 +1,16 @@
 const mongoose = require("mongoose");
-const articleServices = require("../../../../lib/articles");
+const categoryServices = require("../../../../lib/categories");
 const { badRequest } = require("../../../../utils/error");
+const { CATEGORY_STATUS } = require("../../../../config/constants");
 
 /**
- * Updates an article publication status.
+ * Updates category availability status.
  *
  * @param {import("express").Request} req - Express request object
- * @param {Object} req.params - Route parameters
- * @param {string} req.params.id - Article ID
- * @param {Object} req.body - Request body
- * @param {string} req.body.status - Article status
  * @param {import("express").Response} res - Express response object
  * @param {Function} next - Express error handler middleware
  *
- * @returns {Promise<void>} Sends the updated article response
+ * @returns {Promise<void>} Sends updated category response
  */
 const updateStatus = async (req, res, next) => {
   try {
@@ -24,20 +21,18 @@ const updateStatus = async (req, res, next) => {
     if (!id || !mongoose.Types.ObjectId.isValid(id)) {
       errors.push({ field: "id", message: "invalid input", in: "params" });
     }
-
-    if (!status || !["draft", "published"].includes(status)) {
+    if (!status || !Object.values(CATEGORY_STATUS).includes(status)) {
       errors.push({ field: "status", message: "invalid input", in: "body" });
     }
-
     if (errors.length) throw badRequest(errors, "invalid input");
 
-    const article = await articleServices.updateStatus(id, status);
+    const category = await categoryServices.updateStatus(id, status);
 
     return res.status(200).json({
       code: 200,
-      message: "Successfully updated article status",
-      data: article,
-      links: { self: `/api/v1/articles/${article.id}` },
+      message: "Category status updated",
+      data: category,
+      links: { self: `/api/v1/categories/${category.id}` },
     });
   } catch (err) {
     return next(err);

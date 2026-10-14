@@ -1,6 +1,7 @@
 const mongoose = require("mongoose");
-const serviceRegistry = require("../../../../lib/service registry");
+const serviceRegistry = require("../../../../lib/serviceRegistry");
 const { badRequest } = require("../../../../utils/error");
+const { mapAuthor } = require("../../../../utils/mappers");
 
 /**
  * Retrieves the author of a specific article.
@@ -17,10 +18,10 @@ const { badRequest } = require("../../../../utils/error");
 const getArticleAuthor = async (req, res, next) => {
   try {
     // extract article id from route params
-    const { id: articleID } = req.params;
+    const { id: articleId } = req.params;
 
     // validate article id
-    if (!articleID || !mongoose.Types.ObjectId.isValid(articleID)) {
+    if (!articleId || !mongoose.Types.ObjectId.isValid(articleId)) {
       return next(
         badRequest(
           [{ field: "id", message: "invalid input", in: "params" }],
@@ -30,13 +31,10 @@ const getArticleAuthor = async (req, res, next) => {
     }
 
     // fetch author
-    const user = await serviceRegistry.getArticleAuthor(articleID);
+    const user = await serviceRegistry.getArticleAuthor(articleId);
 
     // transform response data
-    const data = {
-      id: user.id,
-      name: user.name,
-    };
+    const data = mapAuthor(user);
 
     // response
     return res.status(200).json({
@@ -44,8 +42,8 @@ const getArticleAuthor = async (req, res, next) => {
       message: "Data retrieved",
       data,
       links: {
-        self: `/api/v1/articles/${articleID}/author`,
-        article: `/api/v1/articles/${articleID}`,
+        self: `/api/v1/articles/${articleId}/author`,
+        article: `/api/v1/articles/${articleId}`,
       },
     });
   } catch (e) {

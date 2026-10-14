@@ -1,4 +1,5 @@
-const userServices = require("../../../../lib/user");
+const sessionServices = require("../../../../lib/session");
+const { clearRefreshTokenCookie } = require("../../../../utils/cookie");
 
 /**
  * Logs the authenticated user out of all devices.
@@ -10,12 +11,8 @@ const userServices = require("../../../../lib/user");
  */
 const logoutAll = async (req, res, next) => {
   try {
-    await userServices.clearRefreshToken({ id: req.user.id });
-    res.clearCookie("refreshToken", {
-      httpOnly: true,
-      secure: true,
-      sameSite: "strict",
-    });
+    await sessionServices.clearRefreshToken({ id: req.user.id });
+    clearRefreshTokenCookie(res);
 
     return res.status(200).json({
       code: 200,

@@ -1,7 +1,8 @@
 const mongoose = require("mongoose");
 const defaults = require("../../../../config/defaults");
 const { badRequest } = require("../../../../utils/error");
-const serviceRegistry = require("../../../../lib/service registry");
+const serviceRegistry = require("../../../../lib/serviceRegistry");
+const { mapComment } = require("../../../../utils/mappers");
 
 /**
  * Creates a new comment on an article.
@@ -24,7 +25,7 @@ const serviceRegistry = require("../../../../lib/service registry");
 const postCommentOnArticle = async (req, res, next) => {
   try {
     // extract article id from route params
-    const { id: articleID } = req.params;
+    const { id: articleId } = req.params;
 
     // extract authenticated user id
     const author = req.user.id;
@@ -39,7 +40,7 @@ const postCommentOnArticle = async (req, res, next) => {
     const errors = [];
 
     // validate id
-    if (!articleID || !mongoose.Types.ObjectId.isValid(articleID)) {
+    if (!articleId || !mongoose.Types.ObjectId.isValid(articleId)) {
       errors.push({ field: "id", message: "invalid input", in: "params" });
     }
 
@@ -55,7 +56,7 @@ const postCommentOnArticle = async (req, res, next) => {
 
     // create comment via service layer
     const comment = await serviceRegistry.createComment({
-      articleID,
+      articleId,
       body,
       status,
       author,
@@ -64,11 +65,11 @@ const postCommentOnArticle = async (req, res, next) => {
     // response
     return res.status(201).json({
       code: 201,
-      message: "comment posted",
-      data: comment,
+      message: "Comment posted",
+      data: mapComment(comment),
       links: {
-        self: `/api/v1/articles/${articleID}/comments`,
-        article: `/api/v1/articles/${articleID}`,
+        self: `/api/v1/articles/${articleId}/comments`,
+        article: `/api/v1/articles/${articleId}`,
       },
     });
   } catch (e) {

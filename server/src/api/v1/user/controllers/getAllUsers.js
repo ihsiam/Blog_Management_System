@@ -1,7 +1,9 @@
 const defaults = require("../../../../config/defaults");
 const { badRequest } = require("../../../../utils/error");
+const { ACCOUNT_STATUS } = require("../../../../config/constants");
 const UserServices = require("../../../../lib/user");
 const { query } = require("../../../../utils");
+const { mapUser } = require("../../../../utils/mappers");
 
 /**
  * Retrieves a paginated list of users.
@@ -52,7 +54,7 @@ const getAllUsers = async (req, res, next) => {
     // sort type validation
     if (!["asc", "desc"].includes(sortType)) {
       errors.push({
-        field: "sort_type",
+        field: "sortType",
         message: "invalid input",
         in: "query",
       });
@@ -61,7 +63,7 @@ const getAllUsers = async (req, res, next) => {
     // sort by validation
     if (!["createdAt", "updatedAt", "email", "name"].includes(sortBy)) {
       errors.push({
-        field: "sort_by",
+        field: "sortBy",
         message: "invalid input",
         in: "query",
       });
@@ -80,7 +82,7 @@ const getAllUsers = async (req, res, next) => {
       }
     });
 
-    if (status && !["pending", "active", "blocked"].includes(status)) {
+    if (status && !Object.values(ACCOUNT_STATUS).includes(status)) {
       errors.push({
         field: "status",
         message: "invalid input",
@@ -113,7 +115,7 @@ const getAllUsers = async (req, res, next) => {
 
     // transform response data
     const data = query.transformData({
-      items: users,
+      items: users.map(mapUser),
       selection: [
         "id",
         "name",

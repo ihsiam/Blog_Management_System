@@ -1,5 +1,7 @@
 const tokenServices = require("../lib/token");
 const userServices = require("../lib/user");
+const sessionServices = require("../lib/session");
+const { ACCOUNT_STATUS } = require("../config/constants");
 
 /**
  * Loads an authenticated user when a valid bearer token is provided.
@@ -22,9 +24,9 @@ const authenticateOptional = async (req, _res, next) => {
     const user = await userServices.findAuthUserById(decoded.id);
 
     const hasSession =
-      user && (await userServices.hasActiveSession(user.id, decoded.sid));
+      user && (await sessionServices.hasActiveSession(user.id, decoded.sid));
 
-    if (hasSession && user.account_status === "active") {
+    if (hasSession && user.account_status === ACCOUNT_STATUS.ACTIVE) {
       req.user = {
         id: user.id,
         email: user.email,

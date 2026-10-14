@@ -1,5 +1,7 @@
 const articleServices = require("../../../../lib/articles");
 const { badRequest } = require("../../../../utils/error");
+const { ARTICLE_STATUS } = require("../../../../config/constants");
+const { mapArticle } = require("../../../../utils/mappers");
 
 /**
  * Creates a new article.
@@ -37,7 +39,7 @@ const create = async (req, res, next) => {
     /**
      * Prepare article payload with defaults
      */
-    const status = "published";
+    const status = ARTICLE_STATUS.PUBLISHED;
     const author = req.user?.id;
 
     if (!body || typeof body !== "string" || !body.trim()) {
@@ -72,7 +74,7 @@ const create = async (req, res, next) => {
     return res.status(201).json({
       code: 201,
       message: "Article created",
-      data: article,
+      data: mapArticle(article),
       links: {
         self: `/api/v1/articles/${article.id}`,
       },

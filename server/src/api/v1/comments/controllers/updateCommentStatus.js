@@ -1,6 +1,8 @@
 const mongoose = require("mongoose");
 const { badRequest } = require("../../../../utils/error");
+const { COMMENT_STATUS } = require("../../../../config/constants");
 const commentServices = require("../../../../lib/comments");
+const { mapComment } = require("../../../../utils/mappers");
 
 /**
  * Updates a comment visibility status.
@@ -25,7 +27,7 @@ const updateCommentStatus = async (req, res, next) => {
       errors.push({ field: "id", message: "invalid input", in: "params" });
     }
 
-    if (!status || !["public", "hidden"].includes(status)) {
+    if (!status || !Object.values(COMMENT_STATUS).includes(status)) {
       errors.push({ field: "status", message: "invalid input", in: "body" });
     }
 
@@ -37,8 +39,8 @@ const updateCommentStatus = async (req, res, next) => {
 
     return res.status(200).json({
       code: 200,
-      message: "comment status updated",
-      data: comment,
+      message: "Comment status updated",
+      data: mapComment(comment),
       links: {
         self: `/api/v1/comments/${comment.id}`,
       },

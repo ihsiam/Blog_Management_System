@@ -1,6 +1,7 @@
 const mongoose = require("mongoose");
 const { badRequest, unauthorized } = require("../../../../utils/error");
 const userServices = require("../../../../lib/user");
+const sessionServices = require("../../../../lib/session");
 const { hashing, validation } = require("../../../../utils");
 
 /**
@@ -101,7 +102,7 @@ const changePassword = async (req, res, next) => {
     });
 
     // revoke every other device session, keep the current one
-    await userServices.clearRefreshToken({
+    await sessionServices.clearRefreshToken({
       id,
       exceptSessionId: req.user.sessionId,
     });

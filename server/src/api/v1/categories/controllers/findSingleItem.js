@@ -1,6 +1,7 @@
 const mongoose = require("mongoose");
 const categoryServices = require("../../../../lib/categories");
 const { badRequest } = require("../../../../utils/error");
+const { ROLES } = require("../../../../config/constants");
 
 /**
  * Retrieves a single category by ID.
@@ -27,7 +28,7 @@ const findSingleItem = async (req, res, next) => {
 
     const category = await categoryServices.findSingleItem({
       id,
-      includeUnavailable: req.user?.role === "admin",
+      includeUnavailable: req.user?.role === ROLES.ADMIN,
     });
 
     return res.status(200).json({

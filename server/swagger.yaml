@@ -73,7 +73,7 @@ paths:
                   - type: object
                     properties:
                       message:
-                        example: Administrator account created successfully.
+                        example: System administrator created successfully
                       data:
                         $ref: "#/components/schemas/AccessToken"
                       links:
@@ -117,7 +117,7 @@ paths:
                   - type: object
                     properties:
                       message:
-                        example: Account created successfully. Please check your email to verify your account.
+                        example: Account created successfully. Please check your email to activate your account.
                       data:
                         $ref: "#/components/schemas/SignUpUser"
                       links:
@@ -267,7 +267,7 @@ paths:
                   - type: object
                     properties:
                       message:
-                        example: OTP verified. You can now reset your password.
+                        example: OTP verified. You may now reset your password.
         "400":
           $ref: "#/components/responses/BadRequest"
         "429":
@@ -294,7 +294,7 @@ paths:
               $ref: "#/components/schemas/ResetPasswordRequest"
       responses:
         "200":
-          description: Password reset successfully. The resetToken cookie is cleared.
+          description: Password reset successful. The resetToken cookie is cleared.
           content:
             application/json:
               schema:
@@ -303,7 +303,7 @@ paths:
                   - type: object
                     properties:
                       message:
-                        example: Password reset successfully.
+                        example: Password reset successful
                       links:
                         $ref: "#/components/schemas/SignInLinks"
         "400":
@@ -332,7 +332,7 @@ paths:
               $ref: "#/components/schemas/SignInRequest"
       responses:
         "200":
-          description: Signed in successfully.
+          description: Login successful.
           headers:
             Set-Cookie:
               $ref: "#/components/headers/SetRefreshTokenCookie"
@@ -344,7 +344,7 @@ paths:
                   - type: object
                     properties:
                       message:
-                        example: Signed in successfully.
+                        example: Login successful
                       data:
                         $ref: "#/components/schemas/AccessToken"
                       links:
@@ -382,7 +382,7 @@ paths:
                   - type: object
                     properties:
                       message:
-                        example: Token refreshed successfully.
+                        example: Token refreshed successfully
                       data:
                         $ref: "#/components/schemas/AccessToken"
         "401":
@@ -415,7 +415,7 @@ paths:
                   - type: object
                     properties:
                       message:
-                        example: Logged out successfully.
+                        example: Logged out successfully
         "401":
           $ref: "#/components/responses/Unauthorized"
         "403":
@@ -471,7 +471,7 @@ paths:
                   - type: object
                     properties:
                       message:
-                        example: Data retrieved successfully.
+                        example: Data retrieved
                       data:
                         type: array
                         items:
@@ -573,7 +573,7 @@ paths:
                   - type: object
                     properties:
                       message:
-                        example: Article created successfully.
+                        example: Article created
                       data:
                         $ref: "#/components/schemas/Article"
                       links:
@@ -697,7 +697,7 @@ paths:
                   - type: object
                     properties:
                       message:
-                        example: Article updated successfully.
+                        example: Successfully updated article data
                       data:
                         $ref: "#/components/schemas/Article"
                       links:
@@ -767,7 +767,7 @@ paths:
                   - type: object
                     properties:
                       message:
-                        example: Article status updated successfully.
+                        example: Successfully updated article status
                       data:
                         $ref: "#/components/schemas/Article"
                       links:
@@ -875,7 +875,7 @@ paths:
                   - type: object
                     properties:
                       message:
-                        example: Comment posted successfully.
+                        example: Comment posted
                       data:
                         $ref: "#/components/schemas/Comment"
                       links:
@@ -921,7 +921,7 @@ paths:
                   - type: object
                     properties:
                       message:
-                        example: Reply posted successfully.
+                        example: Reply posted
                       data:
                         $ref: "#/components/schemas/Comment"
                       links:
@@ -1006,7 +1006,7 @@ paths:
                   - type: object
                     properties:
                       message:
-                        example: Category created successfully.
+                        example: Category created
                       data:
                         $ref: "#/components/schemas/Category"
                       links:
@@ -1087,7 +1087,7 @@ paths:
                   - type: object
                     properties:
                       message:
-                        example: Category updated successfully.
+                        example: Successfully updated category
                       data:
                         $ref: "#/components/schemas/Category"
                       links:
@@ -1135,7 +1135,7 @@ paths:
                   - type: object
                     properties:
                       message:
-                        example: Category status updated successfully.
+                        example: Category status updated
                       data:
                         $ref: "#/components/schemas/Category"
                       links:
@@ -1157,7 +1157,7 @@ paths:
       operationId: listComments
       summary: List all comments (admin)
       description: >
-        Get all comments, including hidden ones, as they are stored. You can filter by article and status. If the articleId
+        Get all comments, including hidden ones, in the public Comment response shape. You can filter by article and status. If the articleId
         filter points to an article that does not exist, it returns 404. Only administrators can
         do this.
       tags: [Comment]
@@ -1183,7 +1183,7 @@ paths:
                       data:
                         type: array
                         items:
-                          $ref: "#/components/schemas/StoredComment"
+                          $ref: "#/components/schemas/Comment"
                       pagination:
                         $ref: "#/components/schemas/Pagination"
                       links:
@@ -1228,9 +1228,9 @@ paths:
                   - type: object
                     properties:
                       message:
-                        example: Comment updated successfully.
+                        example: Comment updated
                       data:
-                        $ref: "#/components/schemas/StoredComment"
+                        $ref: "#/components/schemas/Comment"
                       links:
                         $ref: "#/components/schemas/CommentLinks"
         "400":
@@ -1296,9 +1296,9 @@ paths:
                   - type: object
                     properties:
                       message:
-                        example: Comment status updated successfully.
+                        example: Comment status updated
                       data:
-                        $ref: "#/components/schemas/StoredComment"
+                        $ref: "#/components/schemas/Comment"
                       links:
                         $ref: "#/components/schemas/CommentLinks"
         "400":
@@ -1382,7 +1382,7 @@ paths:
                   - type: object
                     properties:
                       message:
-                        example: Account created successfully.
+                        example: Account created
                       data:
                         $ref: "#/components/schemas/User"
         "400":
@@ -1426,7 +1426,7 @@ paths:
                   - type: object
                     properties:
                       message:
-                        example: Password updated successfully.
+                        example: Password updated successfully
         "400":
           $ref: "#/components/responses/BadRequest"
         "401":
@@ -1503,7 +1503,7 @@ paths:
                   - type: object
                     properties:
                       message:
-                        example: Account updated successfully.
+                        example: Account updated
                       data:
                         $ref: "#/components/schemas/User"
         "400":
@@ -1570,12 +1570,12 @@ components:
       description: The refreshToken cookie. It holds the refresh token for the device and is HttpOnly, Secure, and SameSite=Strict.
       schema:
         type: string
-        example: refreshToken=eyJhbGciOiJIUzI1NiIs...; HttpOnly; Secure; SameSite=Strict
+        example: refreshToken=eyJhbGciOiJIUzI1NiIs...; Max-Age=2592000; HttpOnly; Secure; SameSite=Strict
     SetResetTokenCookie:
       description: The resetToken cookie. It holds the single-use password reset token and is HttpOnly, Secure, and SameSite=Strict.
       schema:
         type: string
-        example: resetToken=3f9c0a...; HttpOnly; Secure; SameSite=Strict
+        example: resetToken=3f9c0a...; Max-Age=300; HttpOnly; Secure; SameSite=Strict
 
   schemas:
     # ---------- Shared building blocks ----------
@@ -1588,7 +1588,7 @@ components:
           example: 200
         message:
           type: string
-          example: Data retrieved successfully.
+          example: Data retrieved
       required: [code, message]
 
     ErrorResponse:
@@ -1950,11 +1950,11 @@ components:
               type: string
               format: email
               example: example@gmail.com
-            status:
+            account_status:
               type: string
               enum: [pending, active, blocked]
               example: pending
-          required: [id, name, email, status]
+          required: [id, name, email, account_status]
         - $ref: "#/components/schemas/Timestamp"
 
     SignInRequest:
@@ -2297,33 +2297,6 @@ components:
               items:
                 $ref: "#/components/schemas/CommentTreeNode"
           required: [id, body, status, article, author, replies]
-        - $ref: "#/components/schemas/Timestamp"
-
-    StoredComment:
-      allOf:
-        - type: object
-          properties:
-            id:
-              type: string
-              example: 507f191e810c19729de860ea
-            body:
-              type: string
-              example: Great article, thanks for sharing.
-            status:
-              type: string
-              enum: [public, hidden]
-              example: public
-            article_id:
-              type: string
-              example: 507f1f77bcf86cd799439011
-            author_id:
-              type: string
-              example: 507f1f77bcf86cd799439012
-            parent_comment_id:
-              type: string
-              nullable: true
-              example: null
-          required: [id, body, status, article_id, author_id, parent_comment_id]
         - $ref: "#/components/schemas/Timestamp"
 
     CommentBodyRequest:

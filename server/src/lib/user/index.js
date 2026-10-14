@@ -1,17 +1,30 @@
-const mongoose = require("mongoose");
 const User = require("../../model/User");
-const Session = require("../../model/Session");
-const OTP = require("../../model/OTP");
-const PasswordResetToken = require("../../model/PasswordResetToken");
+const sessionServices = require("../session");
+const otpServices = require("../otp");
+const passwordResetServices = require("../passwordReset");
 const { badRequest, conflict, notFound } = require("../../utils/error");
 const { hashing, validation } = require("../../utils");
 const defaults = require("../../config/defaults");
 const {
-  deleteCache,
-  deleteCachePattern,
-  incrementCounter,
-} = require("../../utils/cache");
+  ROLES,
+  ACCOUNT_STATUS,
+  STATUS_TRANSITION,
+} = require("../../config/constants");
+const { deleteCachePattern } = require("../../utils/cache");
 const { escapeRegex } = require("../../utils/query");
+const { mapUser } = require("../../utils/mappers");
+
+/**
+ * Drops public article caches that embed the author name.
+ *
+ * @returns {Promise<void>}
+ */
+const invalidateAuthorCaches = async () => {
+  await deleteCachePattern("article:list:*");
+  await deleteCachePattern("article:*:author");
+  await deleteCachePattern("article:*:expand:*");
+  await deleteCachePattern("article:*:comments:*");
+};
 
 /**
  * Find user by email
@@ -55,24 +68,12 @@ const findUserById = async (id, session) => {
  * Check if user exists by email
  *
  * @param {string} email - User email
+ * @param {ClientSession} [session] - Optional MongoDB session
  * @returns {Promise<boolean>}
  */
 const userExist = async (email, session) => {
   const user = await findUserByEmail(email, session);
   return !!user;
-};
-
-/**
- * Check if any admin exists in system
- *
- * @returns {Promise<boolean>}
- */
-const adminExist = async (session) => {
-  const query = User.find({ role: "admin" });
-  if (session) query.session(session);
-
-  const admin = await query;
-  return !!admin.length;
 };
 
 /**
@@ -90,8 +91,8 @@ const createAdmin = async ({ name, email, password }, session) => {
     name,
     email: validation.normalizeEmail(email),
     password_hash: password,
-    role: "admin",
-    account_status: "active",
+    role: ROLES.ADMIN,
+    account_status: ACCOUNT_STATUS.ACTIVE,
   });
 
   await user.save({ session });
@@ -105,6 +106,7 @@ const createAdmin = async ({ name, email, password }, session) => {
  * @param {string} params.name
  * @param {string} params.email
  * @param {string} params.password
+ * @param {ClientSession} [session] - Optional MongoDB session
  * @returns {Promise<Object>} Created user
  */
 const createUser = async ({ name, email, password }, session) => {
@@ -125,9 +127,15 @@ const createUser = async ({ name, email, password }, session) => {
  * @param {string} params.name
  * @param {string} params.email
  * @param {string} params.password
+ * @param {string} [params.role]
  * @returns {Promise<Object>} Created user (sanitized)
  */
-const createUserByAdmin = async ({ name, email, password, role = "user" }) => {
+const createUserByAdmin = async ({
+  name,
+  email,
+  password,
+  role = ROLES.USER,
+}) => {
   const hasUser = await userExist(email);
 
   // if user exist with email
@@ -146,254 +154,12 @@ const createUserByAdmin = async ({ name, email, password, role = "user" }) => {
     email: validation.normalizeEmail(email),
     password_hash: hashPassword,
     role,
-    account_status: "active",
+    account_status: ACCOUNT_STATUS.ACTIVE,
   });
 
   await user.save();
 
-  const userData = user.toObject();
-
-  delete userData.password_hash;
-
-  return userData;
-};
-
-/**
- * Save refresh token as a new session
- *
- * The token is stored as a SHA-256 digest so the session can be found with
- * an indexed lookup (bcrypt would truncate JWTs at 72 bytes).
- *
- * @param {Object} params
- * @param {string} params.id - User ID
- * @param {string|ObjectId} params.sessionId - Pre-generated session ID embedded in the token
- * @param {string} params.refreshToken - Raw refresh token
- * @param {string} [params.deviceInfo] - Client device information
- * @param {ClientSession} [session] - Optional MongoDB session
- * @returns {Promise<void>}
- */
-const saveRefreshToken = async (
-  { id, sessionId, refreshToken, deviceInfo },
-  session,
-) => {
-  const refreshTokenHash = hashing.generateDigest(refreshToken);
-
-  const expiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
-
-  const sessionData = new Session({
-    _id: sessionId,
-    user_id: id,
-    refresh_token_hash: refreshTokenHash,
-    device_info: deviceInfo || "unknown",
-    expiresAt,
-  });
-
-  await sessionData.save({ session });
-};
-
-/**
- * Clear all refresh-token sessions of a user
- *
- * @param {Object} params
- * @param {string} params.id - User ID
- * @param {string} [params.exceptSessionId] - Session ID to keep (e.g. the current device)
- * @param {ClientSession} [session] - Optional MongoDB session
- * @returns {Promise<void>}
- */
-const clearRefreshToken = async ({ id, exceptSessionId }, session) => {
-  const filter = { user_id: id };
-
-  if (exceptSessionId) filter._id = { $ne: exceptSessionId };
-
-  await Session.deleteMany(filter, session ? { session } : undefined);
-};
-
-/**
- * Find a user's active session by session ID and raw refresh token.
- *
- * @param {Object} params
- * @param {string} params.id - User ID
- * @param {string} params.sessionId - Session ID taken from the verified token
- * @param {string} params.refreshToken - Raw refresh token
- * @param {ClientSession} [session] - Optional MongoDB session
- * @returns {Promise<Object|null>} Matching session or null
- */
-const findSessionByToken = async ({ id, sessionId, refreshToken }, session) => {
-  if (!refreshToken || !mongoose.isValidObjectId(sessionId)) return null;
-
-  const query = Session.findOne({
-    _id: sessionId,
-    user_id: id,
-    refresh_token_hash: hashing.generateDigest(refreshToken),
-    expiresAt: { $gt: new Date() },
-  });
-  if (session) query.session(session);
-
-  return query;
-};
-
-/**
- * Get a user's active sessions
- *
- * @param {string} id - User ID
- * @param {string} [currentSessionId] - Session ID of the calling device
- * @param {ClientSession} [session] - Optional MongoDB session
- * @returns {Promise<Array<Object>>}
- */
-const getActiveSessions = async (id, currentSessionId, session) => {
-  const query = Session.find({
-    user_id: id,
-    expiresAt: { $gt: new Date() },
-  }).sort({
-    createdAt: -1,
-  });
-  if (session) query.session(session);
-
-  const sessions = await query;
-
-  return sessions.map((item) => ({
-    id: item.id,
-    deviceInfo: item.device_info,
-    isCurrent: item.id === currentSessionId,
-    createdAt: item.createdAt,
-    expiresAt: item.expiresAt,
-  }));
-};
-
-/**
- * Check that a session is still active for a user
- *
- * @param {string} id - User ID
- * @param {string} sessionId - Session ID taken from the verified access token
- * @returns {Promise<boolean>}
- */
-const hasActiveSession = async (id, sessionId) => {
-  if (!mongoose.isValidObjectId(sessionId)) return false;
-
-  const exists = await Session.exists({
-    _id: sessionId,
-    user_id: id,
-    expiresAt: { $gt: new Date() },
-  });
-
-  return !!exists;
-};
-
-const deleteSession = async (userId, sessionId, session) => {
-  const query = Session.deleteOne({ _id: sessionId, user_id: userId });
-  if (session) query.session(session);
-
-  const result = await query;
-  return result.deletedCount > 0;
-};
-
-const OTP_TTL_SECONDS = 5 * 60;
-
-const otpAttemptsKey = (userId, purpose) => `otp:attempts:${purpose}:${userId}`;
-
-const createOtp = async (userId, purpose, codeHash, session) => {
-  await OTP.findOneAndUpdate(
-    { user_id: userId, purpose },
-    {
-      $set: {
-        code_hash: codeHash,
-        is_used: false,
-        expiresAt: new Date(Date.now() + OTP_TTL_SECONDS * 1000),
-      },
-    },
-    { upsert: true, new: true, session },
-  );
-
-  // a new code starts with a fresh attempt budget
-  await deleteCache(otpAttemptsKey(userId, purpose));
-};
-
-/**
- * Atomically consume one verification attempt of a valid OTP
- *
- * The attempt is counted in Redis before the code is compared, so concurrent
- * guesses cannot exceed `defaults.otpMaxAttempts`. A code that ran out of
- * attempts is no longer returned and must be requested again. When Redis is
- * unavailable the counter is skipped and only the IP rate limit applies.
- *
- * @param {string} userId - User ID
- * @param {string} purpose - OTP purpose
- * @param {ClientSession} [session] - Optional MongoDB session
- * @returns {Promise<Object|null>} OTP document or null
- */
-const claimOtpAttempt = async (userId, purpose, session) => {
-  const attempts = await incrementCounter(
-    otpAttemptsKey(userId, purpose),
-    OTP_TTL_SECONDS,
-  );
-
-  if (attempts !== null && attempts > defaults.otpMaxAttempts) {
-    return null;
-  }
-
-  const query = OTP.findOne({
-    user_id: userId,
-    purpose,
-    is_used: false,
-    expiresAt: { $gt: new Date() },
-  });
-  if (session) query.session(session);
-
-  return query;
-};
-
-const markOtpUsed = async (id, session) => {
-  const query = OTP.updateOne(
-    { _id: id, is_used: false },
-    { $set: { is_used: true } },
-  );
-  if (session) query.session(session);
-
-  const result = await query;
-  return result.modifiedCount > 0;
-};
-
-const savePasswordResetToken = async (userId, tokenHash, session) => {
-  await PasswordResetToken.findOneAndUpdate(
-    { user_id: userId },
-    {
-      $set: {
-        token_hash: tokenHash,
-        is_used: false,
-        expiresAt: new Date(Date.now() + 5 * 60 * 1000),
-      },
-    },
-    { upsert: true, new: true, session },
-  );
-};
-
-/**
- * Find an unused, unexpired password reset token by its raw value
- *
- * @param {string} token - Raw reset token
- * @param {ClientSession} [session] - Optional MongoDB session
- * @returns {Promise<Object|null>} Reset token document or null
- */
-const findPasswordResetToken = async (token, session) => {
-  const query = PasswordResetToken.findOne({
-    token_hash: hashing.generateDigest(token),
-    is_used: false,
-    expiresAt: { $gt: new Date() },
-  });
-  if (session) query.session(session);
-
-  return query;
-};
-
-const markPasswordResetTokenUsed = async (id, session) => {
-  const query = PasswordResetToken.updateOne(
-    { _id: id, is_used: false },
-    { $set: { is_used: true } },
-  );
-  if (session) query.session(session);
-
-  const result = await query;
-  return result.modifiedCount > 0;
+  return mapUser(user);
 };
 
 /**
@@ -514,12 +280,17 @@ const ensureAnotherActiveAdmin = async (id, session) => {
 
   if (!target) throw notFound();
 
-  if (target.role !== "admin" || target.account_status !== "active") return;
+  if (
+    target.role !== ROLES.ADMIN ||
+    target.account_status !== ACCOUNT_STATUS.ACTIVE
+  ) {
+    return;
+  }
 
   const othersQuery = User.countDocuments({
     _id: { $ne: id },
-    role: "admin",
-    account_status: "active",
+    role: ROLES.ADMIN,
+    account_status: ACCOUNT_STATUS.ACTIVE,
   });
   if (session) othersQuery.session(session);
 
@@ -548,7 +319,10 @@ const updateUser = async (
   const payload = {};
 
   // blocking or demoting must not remove the last active administrator
-  if ((role !== undefined && role !== "admin") || status === "blocked") {
+  if (
+    (role !== undefined && role !== ROLES.ADMIN) ||
+    status === ACCOUNT_STATUS.BLOCKED
+  ) {
     await ensureAnotherActiveAdmin(id);
   }
 
@@ -567,14 +341,17 @@ const updateUser = async (
 
     if (!currentUser) throw notFound();
 
+    // allowed moves follow the account state diagram
     const isEmailVerification =
-      statusTransition === "emailVerification" &&
-      currentUser.account_status === "pending" &&
-      status === "active";
+      statusTransition === STATUS_TRANSITION.EMAIL_VERIFICATION &&
+      currentUser.account_status === ACCOUNT_STATUS.PENDING &&
+      status === ACCOUNT_STATUS.ACTIVE;
     const isAdminTransition =
-      statusTransition === "admin" &&
-      ((currentUser.account_status === "active" && status === "blocked") ||
-        (currentUser.account_status === "blocked" && status === "active"));
+      statusTransition === STATUS_TRANSITION.ADMIN &&
+      ((currentUser.account_status === ACCOUNT_STATUS.ACTIVE &&
+        status === ACCOUNT_STATUS.BLOCKED) ||
+        (currentUser.account_status === ACCOUNT_STATUS.BLOCKED &&
+          status === ACCOUNT_STATUS.ACTIVE));
 
     if (!isEmailVerification && !isAdminTransition) {
       throw conflict("Account status transition is not allowed");
@@ -593,12 +370,7 @@ const updateUser = async (
       throw conflict("Account status transition is no longer valid");
     }
 
-    if (name !== undefined) {
-      await deleteCachePattern("article:list:*");
-      await deleteCachePattern("article:*:author");
-      await deleteCachePattern("article:*:expand:*");
-      await deleteCachePattern("article:*:comments:*");
-    }
+    if (name !== undefined) await invalidateAuthorCaches();
 
     return user.toObject();
   }
@@ -616,12 +388,7 @@ const updateUser = async (
   // if user not found
   if (!user) throw notFound();
 
-  if (name !== undefined) {
-    await deleteCachePattern("article:list:*");
-    await deleteCachePattern("article:*:author");
-    await deleteCachePattern("article:*:expand:*");
-    await deleteCachePattern("article:*:comments:*");
-  }
+  if (name !== undefined) await invalidateAuthorCaches();
 
   return user.toObject();
 };
@@ -632,6 +399,7 @@ const updateUser = async (
  * @param {Object} params
  * @param {string} params.id
  * @param {string} params.password
+ * @param {ClientSession} [session] - Optional MongoDB session
  * @returns {Promise<Object>}
  */
 const updatePassword = async ({ id, password }, session) => {
@@ -666,26 +434,15 @@ const updatePassword = async ({ id, password }, session) => {
  * @returns {Promise<boolean>}
  */
 const deleteItem = async (id, session) => {
-  const options = session ? { session } : undefined;
+  await sessionServices.clearRefreshToken({ id }, session);
+  await otpServices.deleteOtpsByUser(id, session);
+  await passwordResetServices.deletePasswordResetTokenByUser(id, session);
 
-  await Session.deleteMany({ user_id: id }, options);
-  await OTP.deleteMany({ user_id: id }, options);
-  await PasswordResetToken.deleteMany({ user_id: id }, options);
-
-  const result = await User.findByIdAndDelete(id, options);
+  const result = await User.findByIdAndDelete(
+    id,
+    session ? { session } : undefined,
+  );
   return !!result;
-};
-
-/**
- * Delete expired sessions of a user
- *
- * Keeps the sessions collection from growing without a TTL index.
- *
- * @param {string} id - User ID
- * @returns {Promise<void>}
- */
-const deleteExpiredSessions = async (id) => {
-  await Session.deleteMany({ user_id: id, expiresAt: { $lte: new Date() } });
 };
 
 /**
@@ -710,31 +467,17 @@ const checkOwner = async ({ resourceId, userId }) => {
 
 module.exports = {
   userExist,
-  adminExist,
   createAdmin,
   createUser,
   findUserByEmail,
   findUserById,
   createUserByAdmin,
-  saveRefreshToken,
-  clearRefreshToken,
-  findSessionByToken,
-  getActiveSessions,
-  hasActiveSession,
-  deleteSession,
-  createOtp,
-  claimOtpAttempt,
-  markOtpUsed,
-  savePasswordResetToken,
-  findPasswordResetToken,
-  markPasswordResetTokenUsed,
   getAllUsers,
   countTotal,
   getSingleUser,
   updateUser,
   updatePassword,
   deleteItem,
-  deleteExpiredSessions,
   ensureAnotherActiveAdmin,
   findAuthUserById,
   checkOwner,

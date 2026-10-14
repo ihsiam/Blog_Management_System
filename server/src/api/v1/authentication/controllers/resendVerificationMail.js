@@ -1,5 +1,6 @@
 const authServices = require("../../../../lib/authentication");
 const { badRequest } = require("../../../../utils/error");
+const { ACCOUNT_STATUS } = require("../../../../config/constants");
 const emailService = require("../../../../lib/email");
 const { validation } = require("../../../../utils");
 
@@ -47,7 +48,7 @@ const resendVerificationMail = async (req, res, next) => {
       email.trim(),
     );
 
-    if (user && user.account_status === "pending") {
+    if (user && user.account_status === ACCOUNT_STATUS.PENDING) {
       await emailService.sendMail({
         email: user.email,
         subject: "Verify your account",

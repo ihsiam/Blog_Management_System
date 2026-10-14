@@ -1,6 +1,7 @@
 const mongoose = require("mongoose");
 const { badRequest } = require("../../../../utils/error");
 const userServices = require("../../../../lib/user");
+const { mapUser } = require("../../../../utils/mappers");
 
 /**
  * Retrieves a single user by ID.
@@ -52,7 +53,7 @@ const getSingleUser = async (req, res, next) => {
     return res.status(200).json({
       code: 200,
       message: "Data retrieved",
-      data,
+      data: mapUser(data),
     });
   } catch (err) {
     return next(err);

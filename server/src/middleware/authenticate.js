@@ -1,5 +1,7 @@
 const tokenServices = require("../lib/token");
 const userServices = require("../lib/user");
+const sessionServices = require("../lib/session");
+const { ACCOUNT_STATUS } = require("../config/constants");
 const { unauthorized, forbidden } = require("../utils/error");
 
 /**
@@ -36,7 +38,7 @@ const authenticate = async (req, res, next) => {
     }
 
     // The access token is bound to the device session it was issued for.
-    const hasSession = await userServices.hasActiveSession(
+    const hasSession = await sessionServices.hasActiveSession(
       user.id,
       decoded.sid,
     );
@@ -46,7 +48,7 @@ const authenticate = async (req, res, next) => {
     }
 
     // Block inactive accounts even when the access token is otherwise valid.
-    if (user.account_status !== "active") {
+    if (user.account_status !== ACCOUNT_STATUS.ACTIVE) {
       return next(forbidden("Your account is not active"));
     }
 

@@ -1,5 +1,6 @@
 const { Schema, model } = require("mongoose");
 const schemaOptions = require("./schemaOptions");
+const { CATEGORY_STATUS } = require("../config/constants");
 
 const CategorySchema = new Schema(
   {
@@ -13,8 +14,8 @@ const CategorySchema = new Schema(
     },
     status: {
       type: String,
-      enum: ["active", "unavailable"],
-      default: "active",
+      enum: Object.values(CATEGORY_STATUS),
+      default: CATEGORY_STATUS.ACTIVE,
     },
   },
   schemaOptions,

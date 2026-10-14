@@ -1,6 +1,7 @@
 const mongoose = require("mongoose");
 const { badRequest } = require("../../../../utils/error");
 const commentServices = require("../../../../lib/comments");
+const { mapComment } = require("../../../../utils/mappers");
 
 /**
  * Updates the body of an existing comment.
@@ -53,8 +54,8 @@ const updateComment = async (req, res, next) => {
 
     return res.status(200).json({
       code: 200,
-      message: "comment updated",
-      data: comment,
+      message: "Comment updated",
+      data: mapComment(comment),
       links: {
         self: `/api/v1/comments/${comment.id}`,
       },

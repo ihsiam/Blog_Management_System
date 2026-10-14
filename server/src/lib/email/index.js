@@ -1,4 +1,5 @@
 const { createTransporter } = require("../../utils/nodemailer");
+const logger = require("../../utils/logger");
 
 let transporter;
 
@@ -36,15 +37,14 @@ const sendMail = async ({ email, subject, text }) => {
       text,
     });
 
-    console.log("EMAIL SENT:", {
-      to: email,
+    logger.info("Email sent", {
       subject,
       messageId: info.messageId,
     });
 
     return info;
   } catch (err) {
-    console.error("Failed to send email:", err);
+    logger.error("Failed to send email", { subject, message: err.message });
     throw new Error(`Email sending failed: ${err.message}`);
   }
 };

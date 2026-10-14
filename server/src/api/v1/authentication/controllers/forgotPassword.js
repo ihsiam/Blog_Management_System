@@ -1,4 +1,5 @@
 const { badRequest, notFound } = require("../../../../utils/error");
+const { ACCOUNT_STATUS } = require("../../../../config/constants");
 const authServices = require("../../../../lib/authentication");
 const emailService = require("../../../../lib/email");
 const { validation } = require("../../../../utils");
@@ -50,7 +51,7 @@ const forgotPassword = async (req, res, next) => {
       throw notFound("Email is not registered");
     }
 
-    if (user.account_status !== "blocked") {
+    if (user.account_status !== ACCOUNT_STATUS.BLOCKED) {
       await emailService.sendMail({
         email: user.email,
         subject: "Reset your password",

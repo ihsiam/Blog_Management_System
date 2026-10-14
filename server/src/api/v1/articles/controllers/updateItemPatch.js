@@ -1,6 +1,7 @@
 const mongoose = require("mongoose");
 const articleServices = require("../../../../lib/articles");
 const { badRequest } = require("../../../../utils/error");
+const { mapArticle } = require("../../../../utils/mappers");
 
 /**
  * Partially updates an article (PATCH).
@@ -83,7 +84,7 @@ const updateItemPatch = async (req, res, next) => {
     return res.status(200).json({
       code: 200,
       message: "Successfully updated article data",
-      data: article,
+      data: mapArticle(article),
       links: {
         self: `/api/v1/articles/${article.id}`,
       },

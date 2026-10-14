@@ -1,5 +1,5 @@
 const mongoose = require("mongoose");
-const userServices = require("../../../../lib/user");
+const sessionServices = require("../../../../lib/session");
 const { badRequest, notFound } = require("../../../../utils/error");
 
 /**
@@ -21,7 +21,7 @@ const deleteSession = async (req, res, next) => {
       throw badRequest(null, "Invalid session ID");
     }
 
-    const deleted = await userServices.deleteSession(req.user.id, sessionId);
+    const deleted = await sessionServices.deleteSession(req.user.id, sessionId);
     if (!deleted) throw notFound("Session not found");
 
     return res.status(204).send();

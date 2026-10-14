@@ -2,6 +2,14 @@ const mongoose = require("mongoose");
 const crypto = require("crypto");
 const SystemInfo = require("../../model/SystemInfo");
 const userServices = require("../user");
+const sessionServices = require("../session");
+const otpServices = require("../otp");
+const passwordResetServices = require("../passwordReset");
+const {
+  ACCOUNT_STATUS,
+  OTP_PURPOSE,
+  STATUS_TRANSITION,
+} = require("../../config/constants");
 const { badRequest, unauthorized, forbidden } = require("../../utils/error");
 const { hashing } = require("../../utils");
 const tokenServices = require("../token");
@@ -45,9 +53,9 @@ const register = async ({ name, email, password }) => {
 
       const codeHash = await hashing.generateHash(code);
 
-      await userServices.createOtp(
+      await otpServices.createOtp(
         user.id,
-        "email_verification",
+        OTP_PURPOSE.EMAIL_VERIFICATION,
         codeHash,
         session,
       );
@@ -138,7 +146,7 @@ const createSession = async ({ user, deviceInfo }) => {
   const sessionId = new mongoose.Types.ObjectId();
 
   // drop this user's expired sessions so they do not pile up
-  await userServices.deleteExpiredSessions(user.id);
+  await sessionServices.deleteExpiredSessions(user.id);
 
   const payload = {
     id: user.id,
@@ -150,7 +158,7 @@ const createSession = async ({ user, deviceInfo }) => {
   const accessToken = tokenServices.generateAccessToken(payload);
   const refreshToken = tokenServices.generateRefreshToken(payload);
 
-  await userServices.saveRefreshToken({
+  await sessionServices.saveRefreshToken({
     id: user.id,
     sessionId,
     refreshToken,
@@ -191,7 +199,7 @@ const login = async ({ email, password, deviceInfo }) => {
     throw unauthorized("Invalid credentials");
   }
 
-  if (user.account_status !== "active") {
+  if (user.account_status !== ACCOUNT_STATUS.ACTIVE) {
     throw forbidden("Account is not active");
   }
 
@@ -217,12 +225,12 @@ const refreshToken = async (token) => {
     throw unauthorized("Invalid refresh token");
   }
 
-  if (user.account_status !== "active") {
+  if (user.account_status !== ACCOUNT_STATUS.ACTIVE) {
     throw forbidden("Account is not active");
   }
 
   // Require the token to match an active stored session.
-  const activeSession = await userServices.findSessionByToken({
+  const activeSession = await sessionServices.findSessionByToken({
     id: user.id,
     sessionId: decoded.sid,
     refreshToken: token,
@@ -252,18 +260,18 @@ const verifyEmailOtp = async ({ email, code }) => {
   // Count the attempt outside the transaction so a failure is not rolled back.
   const user = await userServices.findUserByEmail(email);
   const otp = user
-    ? await userServices.claimOtpAttempt(user.id, "email_verification")
+    ? await otpServices.claimOtpAttempt(user.id, OTP_PURPOSE.EMAIL_VERIFICATION)
     : null;
   const valid = otp && (await hashing.compareHash(code, otp.code_hash));
 
-  if (!user || !valid || user.account_status !== "pending") {
+  if (!user || !valid || user.account_status !== ACCOUNT_STATUS.PENDING) {
     throw badRequest(null, "Invalid or expired OTP");
   }
 
   const session = await mongoose.startSession();
   try {
     await session.withTransaction(async () => {
-      const used = await userServices.markOtpUsed(otp.id, session);
+      const used = await otpServices.markOtpUsed(otp.id, session);
 
       if (!used) {
         throw badRequest(null, "Invalid or expired OTP");
@@ -272,8 +280,8 @@ const verifyEmailOtp = async ({ email, code }) => {
       await userServices.updateUser(
         {
           id: user.id,
-          status: "active",
-          statusTransition: "emailVerification",
+          status: ACCOUNT_STATUS.ACTIVE,
+          statusTransition: STATUS_TRANSITION.EMAIL_VERIFICATION,
         },
         session,
       );
@@ -295,11 +303,11 @@ const createVerificationOtp = async (email) => {
 
   try {
     const user = await userServices.findUserByEmail(email, session);
-    if (user && user.account_status === "pending") {
+    if (user && user.account_status === ACCOUNT_STATUS.PENDING) {
       await session.withTransaction(async () => {
-        await userServices.createOtp(
+        await otpServices.createOtp(
           user.id,
-          "email_verification",
+          OTP_PURPOSE.EMAIL_VERIFICATION,
           await hashing.generateHash(code),
           session,
         );
@@ -324,11 +332,11 @@ const createPasswordResetOtp = async (email) => {
 
   try {
     const user = await userServices.findUserByEmail(email, session);
-    if (user && user.account_status !== "blocked") {
+    if (user && user.account_status !== ACCOUNT_STATUS.BLOCKED) {
       await session.withTransaction(async () => {
-        await userServices.createOtp(
+        await otpServices.createOtp(
           user.id,
-          "password_reset",
+          OTP_PURPOSE.PASSWORD_RESET,
           await hashing.generateHash(code),
           session,
         );
@@ -354,7 +362,7 @@ const verifyResetOtp = async ({ email, code }) => {
   // Count the attempt outside the transaction so a failure is not rolled back.
   const user = await userServices.findUserByEmail(email);
   const otp = user
-    ? await userServices.claimOtpAttempt(user.id, "password_reset")
+    ? await otpServices.claimOtpAttempt(user.id, OTP_PURPOSE.PASSWORD_RESET)
     : null;
   const valid = otp && (await hashing.compareHash(code, otp.code_hash));
 
@@ -366,13 +374,13 @@ const verifyResetOtp = async ({ email, code }) => {
 
   try {
     await session.withTransaction(async () => {
-      const used = await userServices.markOtpUsed(otp.id, session);
+      const used = await otpServices.markOtpUsed(otp.id, session);
 
       if (!used) {
         throw badRequest(null, "Invalid or expired OTP");
       }
 
-      await userServices.savePasswordResetToken(
+      await passwordResetServices.savePasswordResetToken(
         user.id,
         hashing.generateDigest(resetToken),
         session,
@@ -396,7 +404,7 @@ const resetPassword = async ({ token, password }) => {
   const session = await mongoose.startSession();
   try {
     await session.withTransaction(async () => {
-      const resetToken = await userServices.findPasswordResetToken(
+      const resetToken = await passwordResetServices.findPasswordResetToken(
         token,
         session,
       );
@@ -406,12 +414,15 @@ const resetPassword = async ({ token, password }) => {
         { id: resetToken.user_id, password },
         session,
       );
-      const used = await userServices.markPasswordResetTokenUsed(
+      const used = await passwordResetServices.markPasswordResetTokenUsed(
         resetToken.id,
         session,
       );
       if (!used) throw unauthorized("Invalid or expired reset token");
-      await userServices.clearRefreshToken({ id: resetToken.user_id }, session);
+      await sessionServices.clearRefreshToken(
+        { id: resetToken.user_id },
+        session,
+      );
     });
   } finally {
     await session.endSession();

@@ -1,5 +1,6 @@
 const jwt = require("jsonwebtoken");
-const { badRequest, unauthorized } = require("../../utils/error");
+const { unauthorized } = require("../../utils/error");
+const logger = require("../../utils/logger");
 
 // Keep JWT secrets and lifetimes in one configuration object.
 const CONFIG = {
@@ -29,7 +30,7 @@ const signToken = (payload, secret, expiresIn, label) => {
       expiresIn,
     });
   } catch (err) {
-    console.error(`[JWT SIGN ERROR - ${label}]`, err);
+    logger.error("JWT sign error", { label, message: err.message });
     throw new Error("Failed to generate token");
   }
 };
@@ -57,7 +58,7 @@ const verifyToken = (token, secret, label) => {
       algorithms: ["HS256"],
     });
   } catch (err) {
-    console.error(`[JWT VERIFY ERROR - ${label}]`, err);
+    logger.warn("JWT verify error", { label, name: err.name });
 
     switch (err.name) {
       case "TokenExpiredError":
@@ -111,28 +112,9 @@ const verifyAccessToken = (token) =>
 const verifyRefreshToken = (token) =>
   verifyToken(token, CONFIG.REFRESH_SECRET, "Refresh");
 
-/**
- * Decodes JWT payload without verifying signature.
- *
- * @param {string} token - JWT token.
- * @returns {Object} Decoded payload.
- *
- * @throws {Error} If the token format is invalid.
- */
-const decodeToken = (token) => {
-  const decoded = jwt.decode(token);
-
-  if (!decoded) {
-    throw badRequest(null, "Invalid JWT token format");
-  }
-
-  return decoded;
-};
-
 module.exports = {
   generateAccessToken,
   generateRefreshToken,
   verifyAccessToken,
   verifyRefreshToken,
-  decodeToken,
 };

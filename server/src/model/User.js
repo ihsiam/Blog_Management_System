@@ -1,6 +1,7 @@
 const { Schema, model } = require("mongoose");
 
 const schemaOptions = require("./schemaOptions");
+const { ROLES, ACCOUNT_STATUS } = require("../config/constants");
 
 const UserSchema = new Schema(
   {
@@ -22,14 +23,14 @@ const UserSchema = new Schema(
 
     role: {
       type: String,
-      enum: ["user", "admin"],
-      default: "user",
+      enum: Object.values(ROLES),
+      default: ROLES.USER,
     },
 
     account_status: {
       type: String,
-      enum: ["pending", "active", "blocked"],
-      default: "pending",
+      enum: Object.values(ACCOUNT_STATUS),
+      default: ACCOUNT_STATUS.PENDING,
     },
   },
   schemaOptions,

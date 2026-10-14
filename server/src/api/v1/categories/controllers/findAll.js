@@ -2,6 +2,7 @@ const categoryServices = require("../../../../lib/categories");
 const { query } = require("../../../../utils");
 const defaults = require("../../../../config/defaults");
 const { badRequest } = require("../../../../utils/error");
+const { ROLES, CATEGORY_STATUS } = require("../../../../config/constants");
 
 /**
  * Retrieves a paginated list of categories.
@@ -24,7 +25,7 @@ const findAll = async (req, res, next) => {
     const sortType = req.query.sortType || defaults.sortType;
     const sortBy = req.query.sortBy || defaults.sortBy;
     const searchTerm = req.query.search || defaults.searchTerm;
-    const isAdmin = req.user?.role === "admin";
+    const isAdmin = req.user?.role === ROLES.ADMIN;
     const { status } = req.query;
     const errors = [];
 
@@ -36,13 +37,13 @@ const findAll = async (req, res, next) => {
     }
     if (!["asc", "desc"].includes(sortType)) {
       errors.push({
-        field: "sort_type",
+        field: "sortType",
         message: "invalid input",
         in: "query",
       });
     }
     if (!["createdAt", "name"].includes(sortBy)) {
-      errors.push({ field: "sort_by", message: "invalid input", in: "query" });
+      errors.push({ field: "sortBy", message: "invalid input", in: "query" });
     }
     if (
       typeof searchTerm !== "string" ||
@@ -51,14 +52,14 @@ const findAll = async (req, res, next) => {
       errors.push({ field: "search", message: "invalid input", in: "query" });
     }
 
-    if (isAdmin && status && !["active", "unavailable"].includes(status)) {
+    if (isAdmin && status && !Object.values(CATEGORY_STATUS).includes(status)) {
       errors.push({ field: "status", message: "invalid input", in: "query" });
     }
 
     if (errors.length) throw badRequest(errors, "invalid input");
 
     // public callers are always limited to active categories
-    const statusFilter = isAdmin ? status : "active";
+    const statusFilter = isAdmin ? status : CATEGORY_STATUS.ACTIVE;
 
     const categories = await categoryServices.findAll({
       page,

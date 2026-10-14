@@ -3,8 +3,9 @@ const commentServices = require("../comments");
 const articleServices = require("../articles");
 const UserServices = require("../user");
 const storageService = require("../storage");
-const { notFound, badRequest } = require("../../utils/error");
+const { notFound } = require("../../utils/error");
 const defaults = require("../../config/defaults");
+const { ARTICLE_STATUS } = require("../../config/constants");
 const {
   getCache,
   setCache,
@@ -33,7 +34,7 @@ const deleteArticle = async (id) => {
 
       cover = article.cover_image_url;
 
-      await commentServices.deleteMany({ article: article.id }, session);
+      await commentServices.deleteMany({ article_id: article.id }, session);
       deleted = await articleServices.deleteItem(id, session);
     });
   } finally {
@@ -56,27 +57,24 @@ const deleteArticle = async (id) => {
  * Get comments of a specific article
  *
  * @param {Object} params
- * @param {string} params.articleID
+ * @param {string} params.articleId
  * @param {number} params.page
  * @param {number} params.limit
  * @param {string} params.status
+ * @throws {Error} NotFound if the article does not exist or is not public
  */
 const getCommentByArticle = async ({
-  articleID,
+  articleId,
   page = defaults.page,
   limit = defaults.limit,
   status,
 }) => {
-  // check if article exists
-  const article = await articleServices.findSingleItem({ id: articleID });
-
-  if (!article) {
-    throw notFound();
-  }
+  // check the article exists (throws NotFound otherwise)
+  await articleServices.findSingleItem({ id: articleId });
 
   // fetch comments
   return commentServices.getCommentsByArticle({
-    articleID,
+    articleId,
     page,
     limit,
     status,
@@ -87,13 +85,20 @@ const getCommentByArticle = async ({
  * Get all comments
  *
  * @param {Object} params
+ * @param {number} params.page
+ * @param {number} params.limit
+ * @param {string} params.sortType
+ * @param {string} params.sortBy
+ * @param {string} [params.articleId]
+ * @param {string} [params.status]
+ * @throws {Error} NotFound if the article filter points to a missing article
  */
 const getComments = async ({
   page = defaults.page,
   limit = defaults.limit,
   sortType = defaults.sortType,
   sortBy = defaults.sortBy,
-  postId,
+  articleId,
   status,
 }) => {
   // build sort key
@@ -105,15 +110,15 @@ const getComments = async ({
     sortKey,
   };
 
-  // validate postId if provided
-  if (postId) {
-    const article = await articleServices.findArticleById(postId);
+  // validate articleId if provided
+  if (articleId) {
+    const article = await articleServices.findArticleById(articleId);
 
     if (!article) {
       throw notFound();
     }
 
-    query.postId = postId;
+    query.articleId = articleId;
   }
 
   // add status filter
@@ -128,27 +133,26 @@ const getComments = async ({
  * Create comment on article
  *
  * @param {Object} params
+ * @param {string} params.articleId
+ * @param {string} params.body
+ * @param {string} [params.status]
+ * @param {string} params.author
+ * @param {string} [params.parentCommentId]
+ * @throws {Error} NotFound if the article does not exist or is not public
  */
 const createComment = async ({
-  articleID,
+  articleId,
   body,
   status = defaults.commentStatus,
   author,
   parentCommentId,
 }) => {
-  // validate article exists
-  const article = await articleServices.findSingleItem({ id: articleID });
-
-  if (!article) {
-    throw badRequest(
-      [{ field: "id", message: "invalid id", in: "params" }],
-      "invalid id",
-    );
-  }
+  // validate article exists (throws NotFound otherwise)
+  await articleServices.findSingleItem({ id: articleId });
 
   // create comment
   return commentServices.create({
-    articleID,
+    articleId,
     body,
     status,
     author,
@@ -159,19 +163,19 @@ const createComment = async ({
 /**
  * Get article author
  *
- * @param {string} articleID
+ * @param {string} articleId
  */
-const getArticleAuthor = async (articleID) => {
-  const cacheKey = `article:${articleID}:author`;
+const getArticleAuthor = async (articleId) => {
+  const cacheKey = `article:${articleId}:author`;
   const cached = await getCache(cacheKey);
   if (cached !== null) {
     return cached;
   }
 
-  const article = await articleServices.findArticleById(articleID);
+  const article = await articleServices.findArticleById(articleId);
 
   // drafts are not publicly visible, so their author is not exposed either
-  if (!article || article.status !== defaults.articleStatus) {
+  if (!article || article.status !== ARTICLE_STATUS.PUBLISHED) {
     throw notFound("Article not found");
   }
 

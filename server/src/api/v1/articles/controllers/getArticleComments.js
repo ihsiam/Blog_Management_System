@@ -1,8 +1,9 @@
 const mongoose = require("mongoose");
 const defaults = require("../../../../config/defaults");
 const { badRequest } = require("../../../../utils/error");
+const { COMMENT_STATUS } = require("../../../../config/constants");
 const commentServices = require("../../../../lib/comments");
-const serviceRegistry = require("../../../../lib/service registry");
+const serviceRegistry = require("../../../../lib/serviceRegistry");
 const { query } = require("../../../../utils");
 
 /**
@@ -24,7 +25,7 @@ const { query } = require("../../../../utils");
 const getArticleComments = async (req, res, next) => {
   try {
     // extract request parameters
-    const { id: articleID } = req.params;
+    const { id: articleId } = req.params;
     const page = Number(req.query.page || defaults.page);
     const limit = Number(req.query.limit || defaults.limit);
 
@@ -32,7 +33,7 @@ const getArticleComments = async (req, res, next) => {
     const errors = [];
 
     // validate id
-    if (!articleID || !mongoose.Types.ObjectId.isValid(articleID)) {
+    if (!articleId || !mongoose.Types.ObjectId.isValid(articleId)) {
       errors.push({ field: "id", message: "invalid input", in: "params" });
     }
 
@@ -61,10 +62,10 @@ const getArticleComments = async (req, res, next) => {
 
     // fetch public comments for article
     const comments = await serviceRegistry.getCommentByArticle({
-      articleID,
+      articleId,
       page,
       limit,
-      status: "public",
+      status: COMMENT_STATUS.PUBLIC,
     });
 
     // transform response data while preserving nested replies
@@ -75,8 +76,8 @@ const getArticleComments = async (req, res, next) => {
 
     // count total public comments
     const totalItems = await commentServices.count({
-      article: articleID,
-      status: "public",
+      articleId,
+      status: COMMENT_STATUS.PUBLIC,
       topLevel: true,
     });
 
@@ -94,7 +95,7 @@ const getArticleComments = async (req, res, next) => {
     });
 
     // add related article link
-    links.article = `/api/v1/articles/${articleID}`;
+    links.article = `/api/v1/articles/${articleId}`;
 
     // response
     return res.status(200).json({

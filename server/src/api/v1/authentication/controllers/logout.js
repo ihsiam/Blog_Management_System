@@ -1,6 +1,7 @@
-const userServices = require("../../../../lib/user");
+const sessionServices = require("../../../../lib/session");
 const tokenServices = require("../../../../lib/token");
 const { unauthorized } = require("../../../../utils/error");
+const { clearRefreshTokenCookie } = require("../../../../utils/cookie");
 
 /**
  * Invalidates the current refresh-token session and clears its cookie.
@@ -34,7 +35,7 @@ const logout = async (req, res, next) => {
       throw unauthorized("Invalid session");
     }
 
-    const session = await userServices.findSessionByToken({
+    const session = await sessionServices.findSessionByToken({
       id: decoded.id,
       sessionId: decoded.sid,
       refreshToken,
@@ -44,13 +45,9 @@ const logout = async (req, res, next) => {
       throw unauthorized("Session already invalidated");
     }
 
-    await userServices.deleteSession(decoded.id, session.id);
+    await sessionServices.deleteSession(decoded.id, session.id);
 
-    res.clearCookie("refreshToken", {
-      httpOnly: true,
-      secure: true,
-      sameSite: "strict",
-    });
+    clearRefreshTokenCookie(res);
 
     return res.status(200).json({
       code: 200,

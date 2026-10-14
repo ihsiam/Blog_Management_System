@@ -2,6 +2,7 @@ const authServices = require("../../../../lib/authentication");
 
 const { badRequest } = require("../../../../utils/error");
 const { validation } = require("../../../../utils");
+const { setRefreshTokenCookie } = require("../../../../utils/cookie");
 
 /**
  * Creates the initial system administrator account and session.
@@ -81,11 +82,7 @@ const setupAdmin = async (req, res, next) => {
       deviceInfo: req.get("user-agent") || "unknown",
     });
 
-    res.cookie("refreshToken", refreshToken, {
-      httpOnly: true,
-      secure: true,
-      sameSite: "strict",
-    });
+    setRefreshTokenCookie(res, refreshToken);
 
     return res.status(201).json({
       code: 201,

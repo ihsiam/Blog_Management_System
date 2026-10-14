@@ -28,12 +28,12 @@ Blog Management System/
 ├── server/                   # Application source code and runtime config
 │   ├── src/
 │   │   ├── api/v1/           # Controllers grouped by module
-│   │   │   ├── article/
+│   │   │   ├── articles/
 │   │   │   ├── authentication/
-│   │   │   ├── category/
+│   │   │   ├── categories/
 │   │   │   ├── comments/
 │   │   │   └── user/
-│   │   ├── config/           # Defaults and the Redis connection
+│   │   ├── config/           # Defaults, Redis, and shared role/status constants
 │   │   ├── db/               # MongoDB connection logic
 │   │   ├── lib/              # Business logic (services)
 │   │   │   ├── articles/
@@ -41,14 +41,17 @@ Blog Management System/
 │   │   │   ├── categories/
 │   │   │   ├── comments/
 │   │   │   ├── email/
-│   │   │   ├── service registry/   # Cross-module operations (cascading deletes, comment lookups)
+│   │   │   ├── otp/
+│   │   │   ├── passwordReset/
+│   │   │   ├── serviceRegistry/    # Cross-module operations (cascading deletes, comment lookups)
+│   │   │   ├── session/
 │   │   │   ├── storage/            # Cover image storage (local disk in development)
 │   │   │   ├── token/
 │   │   │   └── user/
 │   │   ├── middleware/       # Auth, authorization, ownership, upload checks, logging
 │   │   ├── model/            # Mongoose schemas and model definitions
 │   │   ├── routes/           # API route registration
-│   │   ├── utils/            # Shared helpers: logger, cache, hashing, validation, errors
+│   │   ├── utils/            # Shared helpers: logger, cache, hashing, validation, mappers, cookies, errors
 │   │   ├── app.js            # Express app setup
 │   │   └── index.js          # Bootstraps the app, database, and Redis
 │   ├── test/                 # Unit and integration tests

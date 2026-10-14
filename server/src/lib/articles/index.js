@@ -3,6 +3,11 @@ const Article = require("../../model/Article");
 const categoryServices = require("../categories");
 const storageService = require("../storage");
 const defaults = require("../../config/defaults");
+const {
+  ROLES,
+  ARTICLE_STATUS,
+  COMMENT_STATUS,
+} = require("../../config/constants");
 const { notFound, badRequest } = require("../../utils/error");
 const { escapeRegex } = require("../../utils/query");
 const { generateDigest } = require("../../utils/hashing");
@@ -12,32 +17,10 @@ const {
   deleteCache,
   deleteCachePattern,
 } = require("../../utils/cache");
+const { mapArticle } = require("../../utils/mappers");
 
 const ARTICLE_LIST_TTL_SECONDS = 60;
 const ARTICLE_TTL_SECONDS = 300;
-
-/**
- * Converts an Article document to the public response shape.
- *
- * @param {Object} article - Article document or object
- * @returns {Object} Normalized article object
- */
-const articleObject = (article) => {
-  const object = article.toObject ? article.toObject() : article;
-  const {
-    cover_image_url: cover,
-    author_id: author,
-    category_id: category,
-    ...rest
-  } = object;
-
-  return {
-    ...rest,
-    cover,
-    author,
-    category,
-  };
-};
 
 /**
  * Ensures an article references an active category.
@@ -112,7 +95,7 @@ const findAll = async ({
   // digest keeps the key short and safe even for arbitrary search input
   const listCacheKey = `article:list:${page}:${limit}:${sortBy}:${sortType}:${generateDigest(searchTerm)}:${category || ""}`;
 
-  if (status === "published") {
+  if (status === ARTICLE_STATUS.PUBLISHED) {
     const cached = await getCache(listCacheKey);
     if (cached !== null) {
       return cached;
@@ -142,9 +125,9 @@ const findAll = async ({
     .skip(page * limit - limit)
     .limit(limit);
 
-  const result = articles.map(articleObject);
+  const result = articles.map(mapArticle);
 
-  if (status === "published") {
+  if (status === ARTICLE_STATUS.PUBLISHED) {
     await setCache(listCacheKey, result, ARTICLE_LIST_TTL_SECONDS);
   }
 
@@ -163,7 +146,7 @@ const findAll = async ({
 const count = async ({ searchTerm = "", status, category }) => {
   const countCacheKey = `article:count:${generateDigest(searchTerm)}:${category || ""}`;
 
-  if (status === "published") {
+  if (status === ARTICLE_STATUS.PUBLISHED) {
     const cached = await getCache(countCacheKey);
     if (cached !== null) {
       return cached;
@@ -186,7 +169,7 @@ const count = async ({ searchTerm = "", status, category }) => {
   // count and return
   const total = await Article.countDocuments(filter);
 
-  if (status === "published") {
+  if (status === ARTICLE_STATUS.PUBLISHED) {
     await setCache(countCacheKey, total, ARTICLE_LIST_TTL_SECONDS);
   }
 
@@ -234,7 +217,7 @@ const create = async ({
     { path: "category_id", select: "name" },
   ]);
 
-  return articleObject(article);
+  return mapArticle(article);
 };
 
 /**
@@ -270,9 +253,9 @@ const findSingleItem = async ({ id, expand = "", user }) => {
 
   // only published article can be retrieved
   const isOwner = user && article.author_id.toString() === user.id.toString();
-  const isAdmin = user && user.role === "admin";
+  const isAdmin = user && user.role === ROLES.ADMIN;
 
-  if (article.status !== "published" && !isOwner && !isAdmin) {
+  if (article.status !== ARTICLE_STATUS.PUBLISHED && !isOwner && !isAdmin) {
     throw notFound("Article not found");
   }
 
@@ -285,12 +268,12 @@ const findSingleItem = async ({ id, expand = "", user }) => {
   if (trimmedExpand.includes("comments")) {
     await article.populate({
       path: "comments",
-      match: { status: "public" },
+      match: { status: COMMENT_STATUS.PUBLIC },
       populate: { path: "author_id", select: "name" },
     });
   }
 
-  const obj = articleObject(article);
+  const obj = mapArticle(article);
 
   // hide status from article
   delete obj.status;
@@ -358,7 +341,7 @@ const updateItemPatch = async (id, { title, body, category, file }) => {
     { path: "category_id", select: "name" },
   ]);
 
-  return articleObject(article);
+  return mapArticle(article);
 };
 
 /**
@@ -386,7 +369,7 @@ const updateStatus = async (id, status) => {
     { path: "category_id", select: "name" },
   ]);
 
-  return articleObject(article);
+  return mapArticle(article);
 };
 
 /**

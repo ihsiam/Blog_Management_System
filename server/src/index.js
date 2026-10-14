@@ -13,6 +13,7 @@ const http = require("http");
 const { connectDB } = require("./db");
 const { connectRedis } = require("./config/redis");
 const app = require("./app");
+const logger = require("./utils/logger");
 
 // create HTTP server instance from express app
 const server = http.createServer(app);
@@ -24,7 +25,10 @@ const PORT = Number(process.env.PORT) || 3000;
  * Handle unhandled promise rejections
  */
 process.on("unhandledRejection", (err) => {
-  console.log("Unhandled rejection:", err);
+  logger.error("Unhandled rejection", {
+    message: err?.message,
+    stack: err?.stack,
+  });
   process.exit(1);
 });
 
@@ -32,7 +36,10 @@ process.on("unhandledRejection", (err) => {
  * Handle uncaught exceptions
  */
 process.on("uncaughtException", (err) => {
-  console.log("Uncaught exception:", err);
+  logger.error("Uncaught exception", {
+    message: err.message,
+    stack: err.stack,
+  });
   process.exit(1);
 });
 
@@ -51,19 +58,18 @@ const main = async () => {
      * Handle server-level errors (port already in use, permission issues, etc).
      */
     server.on("error", (err) => {
-      console.error("Server failed to start:", err);
+      logger.error("Server failed to start", { message: err.message });
       process.exit(1);
     });
 
     // start HTTP server
     server.listen(PORT, () => {
-      console.log("Server is running");
-      console.log(`API documentation: ${process.env.APP_URL}/docs`);
+      logger.info("Server is running", { port: PORT });
+      logger.info(`API documentation: ${process.env.APP_URL}/docs`);
     });
   } catch (e) {
     // database / Redis connection failure handling
-    console.log("DB Connection failed");
-    console.log(e.message);
+    logger.error("Startup failed", { message: e.message });
     process.exit(1);
   }
 };

@@ -1,6 +1,7 @@
 const mongoose = require("mongoose");
 const articleServices = require("../../../../lib/articles");
 const { badRequest } = require("../../../../utils/error");
+const { mapArticle } = require("../../../../utils/mappers");
 
 /**
  * Retrieves a single article by ID.
@@ -95,7 +96,7 @@ const findSingleItem = async (req, res, next) => {
     return res.status(200).json({
       code: 200,
       message: "Data retrieved",
-      data: article,
+      data: mapArticle(article),
       links: {
         self: `/api/v1/articles/${article.id}`,
         author: `/api/v1/articles/${article.id}/author`,

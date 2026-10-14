@@ -7,40 +7,18 @@ const COVER_URL_PREFIX = "/uploads/articles/";
 const COVER_DIR = path.resolve(__dirname, "../../../uploads/articles");
 
 /**
- * Sanitizes an uploaded filename before local storage.
- *
- * @param {string} filename - Original uploaded filename
- * @returns {string} Sanitized filename
- */
-const sanitizeFilename = (filename) => {
-  const extension = path.extname(filename || "cover").toLowerCase();
-  const basename = path
-    .basename(filename || "cover", extension)
-    .replace(/[^a-zA-Z0-9_-]/g, "-")
-    .replace(/-+/g, "-")
-    .replace(/^-|-$/g, "")
-    .toLowerCase();
-
-  return `${basename || "cover"}${extension}`;
-};
-
-/**
  * Stores an Article cover image locally for the current development setup.
  *
  * @param {Object} file - Validated Multer file
  * @returns {Promise<string>} Public local URL for the uploaded cover
  */
 const uploadArticleCover = async (file) => {
-  if (!file) {
+  if (!file || !file.filename) {
     throw serverError("Article cover file is required");
   }
 
-  const filename = sanitizeFilename(
-    file.originalname || file.filename || "cover",
-  );
-  const storedName = file.filename || filename;
-
-  return `${COVER_URL_PREFIX}${storedName}`;
+  // Multer already sanitized the name when it stored the file
+  return `${COVER_URL_PREFIX}${file.filename}`;
 };
 
 /**
@@ -85,7 +63,6 @@ const removeUploadedFile = async (file) => {
 
 module.exports = {
   uploadArticleCover,
-  sanitizeFilename,
   removeArticleCover,
   removeUploadedFile,
 };

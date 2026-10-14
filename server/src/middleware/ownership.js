@@ -3,6 +3,7 @@ const articleServices = require("../lib/articles");
 const commentServices = require("../lib/comments");
 const userServices = require("../lib/user");
 const { forbidden, unauthorized, badRequest } = require("../utils/error");
+const { ROLES } = require("../config/constants");
 
 /**
  * Ownership-based authorization middleware.
@@ -51,7 +52,7 @@ const ownership =
           return next();
         }
 
-        if (options.allowAdmin && req.user.role === "admin") {
+        if (options.allowAdmin && req.user.role === ROLES.ADMIN) {
           return next();
         }
 
@@ -75,7 +76,7 @@ const ownership =
         }
 
         // Allow admin access when needed
-        if (options.allowAdmin && req.user.role === "admin") {
+        if (options.allowAdmin && req.user.role === ROLES.ADMIN) {
           return next();
         }
 
@@ -99,7 +100,7 @@ const ownership =
         }
 
         // Allow admin access when needed
-        if (options.allowAdmin && req.user.role === "admin") {
+        if (options.allowAdmin && req.user.role === ROLES.ADMIN) {
           return next();
         }
 

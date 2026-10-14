@@ -1,5 +1,6 @@
 const { Schema, model } = require("mongoose");
 const schemaOptions = require("./schemaOptions");
+const { ARTICLE_STATUS } = require("../config/constants");
 
 const ArticleSchema = new Schema(
   {
@@ -8,8 +9,8 @@ const ArticleSchema = new Schema(
     cover_image_url: { type: String, required: true },
     status: {
       type: String,
-      enum: ["draft", "published"],
-      default: "published",
+      enum: Object.values(ARTICLE_STATUS),
+      default: ARTICLE_STATUS.PUBLISHED,
     },
     author_id: {
       type: Schema.Types.ObjectId,

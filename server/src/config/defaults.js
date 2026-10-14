@@ -1,3 +1,5 @@
+const { ARTICLE_STATUS, COMMENT_STATUS } = require("./constants");
+
 const config = {
   page: 1,
   limit: 10,
@@ -8,9 +10,8 @@ const config = {
   sortBy: "createdAt",
   searchTerm: "",
   body: "",
-  cover: "",
-  articleStatus: "published",
-  commentStatus: "public",
+  articleStatus: ARTICLE_STATUS.PUBLISHED,
+  commentStatus: COMMENT_STATUS.PUBLIC,
   otpMaxAttempts: 5,
 };
 

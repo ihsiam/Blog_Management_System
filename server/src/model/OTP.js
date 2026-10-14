@@ -1,5 +1,6 @@
 const { Schema, model } = require("mongoose");
 const schemaOptions = require("./schemaOptions");
+const { OTP_PURPOSE } = require("../config/constants");
 
 const OtpSchema = new Schema(
   {
@@ -10,7 +11,7 @@ const OtpSchema = new Schema(
     },
     purpose: {
       type: String,
-      enum: ["email_verification", "password_reset"],
+      enum: Object.values(OTP_PURPOSE),
       required: true,
     },
     code_hash: {

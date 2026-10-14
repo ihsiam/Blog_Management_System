@@ -1,19 +1,19 @@
 const router = require("express").Router();
 const rateLimit = require("express-rate-limit");
 
-const { articleController } = require("../api/v1/article");
+const { articleController } = require("../api/v1/articles");
 const { authController } = require("../api/v1/authentication");
 const { commentsController } = require("../api/v1/comments");
-const { categoryController } = require("../api/v1/category");
+const { categoryController } = require("../api/v1/categories");
 const { userController } = require("../api/v1/user");
 
 const authenticate = require("../middleware/authenticate");
 const authenticateOptional = require("../middleware/authenticateOptional");
 const authorize = require("../middleware/authorize");
 const ownership = require("../middleware/ownership");
-const articleUpload = require("../middleware/articleUpload");
 const uploadCleanup = require("../middleware/uploadCleanup");
 const upload = require("../utils/multer");
+const { ROLES } = require("../config/constants");
 
 /**
  * Authentication rate limiter.
@@ -105,9 +105,8 @@ router
   .get(articleController.findAll)
   .post(
     authenticate,
-    authorize(["user", "admin"]),
+    authorize([ROLES.USER, ROLES.ADMIN]),
     upload.single("cover"),
-    articleUpload,
     articleController.create,
     uploadCleanup,
   );
@@ -117,7 +116,7 @@ router
  */
 router
   .route("/api/v1/articles/admin/all")
-  .get(authenticate, authorize(["admin"]), articleController.getAllByAdmin);
+  .get(authenticate, authorize([ROLES.ADMIN]), articleController.getAllByAdmin);
 
 /**
  * Single article operations.
@@ -127,16 +126,15 @@ router
   .get(authenticateOptional, articleController.findSingleItem)
   .patch(
     authenticate,
-    authorize(["user", "admin"]),
+    authorize([ROLES.USER, ROLES.ADMIN]),
     ownership("article"),
     upload.single("cover"),
-    articleUpload,
     articleController.updateItemPatch,
     uploadCleanup,
   )
   .delete(
     authenticate,
-    authorize(["user", "admin"]),
+    authorize([ROLES.USER, ROLES.ADMIN]),
     ownership("article", { allowAdmin: true }),
     articleController.deleteItem,
   );
@@ -144,7 +142,7 @@ router
 router.patch(
   "/api/v1/articles/:id/status",
   authenticate,
-  authorize(["admin"]),
+  authorize([ROLES.ADMIN]),
   articleController.updateStatus,
 );
 
@@ -163,14 +161,14 @@ router
   .get(articleController.getArticleComments)
   .post(
     authenticate,
-    authorize(["user", "admin"]),
+    authorize([ROLES.USER, ROLES.ADMIN]),
     articleController.postCommentOnArticle,
   );
 
 router.post(
   "/api/v1/articles/:articleId/comments/:commentId/replies",
   authenticate,
-  authorize(["user", "admin"]),
+  authorize([ROLES.USER, ROLES.ADMIN]),
   articleController.postCommentReply,
 );
 
@@ -186,7 +184,7 @@ router.post(
 router
   .route("/api/v1/categories")
   .get(authenticateOptional, categoryController.findAll)
-  .post(authenticate, authorize(["admin"]), categoryController.create);
+  .post(authenticate, authorize([ROLES.ADMIN]), categoryController.create);
 
 /**
  * Single category operations.
@@ -196,7 +194,7 @@ router
   .get(authenticateOptional, categoryController.findSingleItem)
   .patch(
     authenticate,
-    authorize(["admin"]),
+    authorize([ROLES.ADMIN]),
     categoryController.updateItemPatch,
   );
 
@@ -206,7 +204,7 @@ router
 router.patch(
   "/api/v1/categories/:id/status",
   authenticate,
-  authorize(["admin"]),
+  authorize([ROLES.ADMIN]),
   categoryController.updateStatus,
 );
 
@@ -221,7 +219,7 @@ router.patch(
  */
 router
   .route("/api/v1/comments")
-  .get(authenticate, authorize(["admin"]), commentsController.getComments);
+  .get(authenticate, authorize([ROLES.ADMIN]), commentsController.getComments);
 
 /**
  * Single comment operations.
@@ -230,13 +228,13 @@ router
   .route("/api/v1/comments/:id")
   .patch(
     authenticate,
-    authorize(["user", "admin"]),
+    authorize([ROLES.USER, ROLES.ADMIN]),
     ownership("comment"),
     commentsController.updateComment,
   )
   .delete(
     authenticate,
-    authorize(["user", "admin"]),
+    authorize([ROLES.USER, ROLES.ADMIN]),
     ownership("comment", { allowAdmin: true }),
     commentsController.deleteComment,
   );
@@ -244,7 +242,7 @@ router
 router.patch(
   "/api/v1/comments/:id/status",
   authenticate,
-  authorize(["admin"]),
+  authorize([ROLES.ADMIN]),
   commentsController.updateCommentStatus,
 );
 
@@ -259,8 +257,8 @@ router.patch(
  */
 router
   .route("/api/v1/users")
-  .get(authenticate, authorize(["admin"]), userController.getAllUsers)
-  .post(authenticate, authorize(["admin"]), userController.createUser);
+  .get(authenticate, authorize([ROLES.ADMIN]), userController.getAllUsers)
+  .post(authenticate, authorize([ROLES.ADMIN]), userController.createUser);
 
 /**
  * Password change endpoint.
@@ -269,7 +267,7 @@ router
   .route("/api/v1/users/:id/change-password")
   .patch(
     authenticate,
-    authorize(["admin", "user"]),
+    authorize([ROLES.ADMIN, ROLES.USER]),
     ownership("user"),
     userController.changePassword,
   );
@@ -281,11 +279,11 @@ router
   .route("/api/v1/users/:id")
   .get(
     authenticate,
-    authorize(["admin", "user"]),
+    authorize([ROLES.ADMIN, ROLES.USER]),
     ownership("user", { allowAdmin: true }),
     userController.getSingleUser,
   )
-  .patch(authenticate, authorize(["admin"]), userController.updateUser)
-  .delete(authenticate, authorize(["admin"]), userController.deleteUser);
+  .patch(authenticate, authorize([ROLES.ADMIN]), userController.updateUser)
+  .delete(authenticate, authorize([ROLES.ADMIN]), userController.deleteUser);
 
 module.exports = router;

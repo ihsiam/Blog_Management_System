@@ -1,6 +1,8 @@
 const { badRequest } = require("../../../../utils/error");
 const userServices = require("../../../../lib/user");
 const { validation } = require("../../../../utils");
+const { ROLES } = require("../../../../config/constants");
+const { mapUser } = require("../../../../utils/mappers");
 
 /**
  * Creates a new user.
@@ -65,7 +67,7 @@ const createUser = async (req, res, next) => {
     if (
       !role ||
       typeof role !== "string" ||
-      !["user", "admin"].includes(role)
+      !Object.values(ROLES).includes(role)
     ) {
       errors.push({ field: "role", message: "invalid input", in: "body" });
     }
@@ -87,7 +89,7 @@ const createUser = async (req, res, next) => {
     return res.status(201).json({
       code: 201,
       message: "Account created",
-      data,
+      data: mapUser(data),
     });
   } catch (err) {
     return next(err);

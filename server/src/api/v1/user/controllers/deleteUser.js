@@ -1,6 +1,6 @@
 const mongoose = require("mongoose");
 const { badRequest, conflict } = require("../../../../utils/error");
-const serviceRegistry = require("../../../../lib/service registry");
+const serviceRegistry = require("../../../../lib/serviceRegistry");
 
 /**
  * Deletes a user and all related credentials from the system.

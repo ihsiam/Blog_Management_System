@@ -1,5 +1,5 @@
 const mongoose = require("mongoose");
-const serviceRegistry = require("../../../../lib/service registry");
+const serviceRegistry = require("../../../../lib/serviceRegistry");
 const { badRequest } = require("../../../../utils/error");
 /**
  * Deletes an article by ID.

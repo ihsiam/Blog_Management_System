@@ -1,6 +1,7 @@
 const authServices = require("../../../../lib/authentication");
 const { badRequest } = require("../../../../utils/error");
 const { validation } = require("../../../../utils");
+const { setRefreshTokenCookie } = require("../../../../utils/cookie");
 
 /**
  * Authenticates a user and issues access and refresh tokens.
@@ -55,11 +56,7 @@ const login = async (req, res, next) => {
       deviceInfo: req.get("user-agent") || "unknown",
     });
 
-    res.cookie("refreshToken", refreshToken, {
-      httpOnly: true,
-      secure: true,
-      sameSite: "strict",
-    });
+    setRefreshTokenCookie(res, refreshToken);
 
     return res.status(200).json({
       code: 200,

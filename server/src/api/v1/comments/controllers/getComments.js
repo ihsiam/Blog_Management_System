@@ -1,9 +1,11 @@
 const mongoose = require("mongoose");
 const defaults = require("../../../../config/defaults");
 const { badRequest } = require("../../../../utils/error");
+const { COMMENT_STATUS } = require("../../../../config/constants");
 const commentServices = require("../../../../lib/comments");
-const serviceRegistry = require("../../../../lib/service registry");
+const serviceRegistry = require("../../../../lib/serviceRegistry");
 const { query } = require("../../../../utils");
+const { mapComment } = require("../../../../utils/mappers");
 /**
  * Retrieves paginated comments with filtering, sorting, and optional article filtering.
  *
@@ -33,7 +35,7 @@ const getComments = async (req, res, next) => {
     const limit = Number(req.query.limit || defaults.limit);
     const sortType = req.query.sortType || defaults.sortType;
     const sortBy = req.query.sortBy || defaults.sortBy;
-    const postId = req.query.articleId;
+    const { articleId } = req.query;
     const { status } = req.query || null;
 
     // collect validation errors
@@ -60,7 +62,7 @@ const getComments = async (req, res, next) => {
     // validate sort type
     if (!["asc", "desc"].includes(sortType)) {
       errors.push({
-        field: "sort_type",
+        field: "sortType",
         message: "invalid input",
         in: "query",
       });
@@ -69,13 +71,13 @@ const getComments = async (req, res, next) => {
     // validate sort by
     if (!["createdAt", "updatedAt"].includes(sortBy)) {
       errors.push({
-        field: "sort_by",
+        field: "sortBy",
         message: "invalid input",
         in: "query",
       });
     }
 
-    if (status && !["public", "hidden"].includes(status)) {
+    if (status && !Object.values(COMMENT_STATUS).includes(status)) {
       errors.push({
         field: "status",
         message: "invalid input",
@@ -85,8 +87,9 @@ const getComments = async (req, res, next) => {
 
     // id validation
     if (
-      postId &&
-      (typeof postId !== "string" || !mongoose.Types.ObjectId.isValid(postId))
+      articleId &&
+      (typeof articleId !== "string" ||
+        !mongoose.Types.ObjectId.isValid(articleId))
     ) {
       errors.push({
         field: "articleId",
@@ -101,18 +104,19 @@ const getComments = async (req, res, next) => {
     }
 
     // fetch comments
-    const data = await serviceRegistry.getComments({
+    const comments = await serviceRegistry.getComments({
       page,
       limit,
       sortType,
       sortBy,
-      postId,
+      articleId,
       status,
     });
+    const data = comments.map(mapComment);
 
     // count total comments
     const totalItem = await commentServices.count({
-      article: postId,
+      articleId,
       status,
     });
 

@@ -1,15 +1,21 @@
 const mongoose = require("mongoose");
-const categoryServices = require("../../../../lib/categories");
+const articleServices = require("../../../../lib/articles");
 const { badRequest } = require("../../../../utils/error");
+const { ARTICLE_STATUS } = require("../../../../config/constants");
+const { mapArticle } = require("../../../../utils/mappers");
 
 /**
- * Updates category availability status.
+ * Updates an article publication status.
  *
  * @param {import("express").Request} req - Express request object
+ * @param {Object} req.params - Route parameters
+ * @param {string} req.params.id - Article ID
+ * @param {Object} req.body - Request body
+ * @param {string} req.body.status - Article status
  * @param {import("express").Response} res - Express response object
  * @param {Function} next - Express error handler middleware
  *
- * @returns {Promise<void>} Sends updated category response
+ * @returns {Promise<void>} Sends the updated article response
  */
 const updateStatus = async (req, res, next) => {
   try {
@@ -20,18 +26,20 @@ const updateStatus = async (req, res, next) => {
     if (!id || !mongoose.Types.ObjectId.isValid(id)) {
       errors.push({ field: "id", message: "invalid input", in: "params" });
     }
-    if (!status || !["active", "unavailable"].includes(status)) {
+
+    if (!status || !Object.values(ARTICLE_STATUS).includes(status)) {
       errors.push({ field: "status", message: "invalid input", in: "body" });
     }
+
     if (errors.length) throw badRequest(errors, "invalid input");
 
-    const category = await categoryServices.updateStatus(id, status);
+    const article = await articleServices.updateStatus(id, status);
 
     return res.status(200).json({
       code: 200,
-      message: "Category status updated",
-      data: category,
-      links: { self: `/api/v1/categories/${category.id}` },
+      message: "Successfully updated article status",
+      data: mapArticle(article),
+      links: { self: `/api/v1/articles/${article.id}` },
     });
   } catch (err) {
     return next(err);

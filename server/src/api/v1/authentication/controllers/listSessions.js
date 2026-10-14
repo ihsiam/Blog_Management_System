@@ -1,4 +1,4 @@
-const userServices = require("../../../../lib/user");
+const sessionServices = require("../../../../lib/session");
 
 /**
  * Lists the authenticated user's active sessions.
@@ -10,14 +10,14 @@ const userServices = require("../../../../lib/user");
  */
 const listSessions = async (req, res, next) => {
   try {
-    const sessions = await userServices.getActiveSessions(
+    const sessions = await sessionServices.getActiveSessions(
       req.user.id,
       req.user.sessionId,
     );
 
     return res.status(200).json({
       code: 200,
-      message: "Data retrieved.",
+      message: "Data retrieved",
       data: sessions,
     });
   } catch (err) {

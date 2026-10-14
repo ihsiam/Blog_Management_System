@@ -1,5 +1,6 @@
 const Category = require("../../model/Category");
 const defaults = require("../../config/defaults");
+const { CATEGORY_STATUS } = require("../../config/constants");
 const { notFound } = require("../../utils/error");
 const { escapeRegex } = require("../../utils/query");
 
@@ -81,7 +82,7 @@ const create = async ({ name, description }) => {
 const findSingleItem = async ({ id, includeUnavailable = false }) => {
   const filter = includeUnavailable
     ? { _id: id }
-    : { _id: id, status: "active" };
+    : { _id: id, status: CATEGORY_STATUS.ACTIVE };
   const category = await Category.findOne(filter);
 
   if (!category) throw notFound("Category not found");

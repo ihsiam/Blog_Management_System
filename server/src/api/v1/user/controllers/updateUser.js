@@ -1,6 +1,12 @@
 const mongoose = require("mongoose");
 const { badRequest, conflict } = require("../../../../utils/error");
 const userServices = require("../../../../lib/user");
+const {
+  ROLES,
+  ACCOUNT_STATUS,
+  STATUS_TRANSITION,
+} = require("../../../../config/constants");
+const { mapUser } = require("../../../../utils/mappers");
 
 /**
  * Updates user profile or account details.
@@ -44,7 +50,7 @@ const updateUser = async (req, res, next) => {
       if (
         typeof role !== "string" ||
         !role.trim() ||
-        !["user", "admin"].includes(role)
+        !Object.values(ROLES).includes(role)
       ) {
         errors.push({ field: "role", message: "invalid input", in: "body" });
       }
@@ -52,12 +58,10 @@ const updateUser = async (req, res, next) => {
 
     // status validation
     if (status !== undefined) {
-      const allowedStatus = ["pending", "active", "blocked"];
-
       if (
         typeof status !== "string" ||
         !status.trim() ||
-        !allowedStatus.includes(status)
+        !Object.values(ACCOUNT_STATUS).includes(status)
       ) {
         errors.push({ field: "status", message: "invalid input", in: "body" });
       }
@@ -71,7 +75,8 @@ const updateUser = async (req, res, next) => {
     // an admin cannot block or demote their own account
     if (
       new mongoose.Types.ObjectId(id).toString() === req.user.id &&
-      ((role !== undefined && role !== "admin") || status === "blocked")
+      ((role !== undefined && role !== ROLES.ADMIN) ||
+        status === ACCOUNT_STATUS.BLOCKED)
     ) {
       throw conflict("You cannot block or demote your own account");
     }
@@ -82,14 +87,16 @@ const updateUser = async (req, res, next) => {
       name,
       role,
       status,
-      ...(status !== undefined && { statusTransition: "admin" }),
+      ...(status !== undefined && {
+        statusTransition: STATUS_TRANSITION.ADMIN,
+      }),
     });
 
     // response
     return res.status(200).json({
       code: 200,
       message: "Account updated",
-      data,
+      data: mapUser(data),
     });
   } catch (e) {
     return next(e);

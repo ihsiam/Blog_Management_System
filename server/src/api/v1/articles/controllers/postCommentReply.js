@@ -1,7 +1,8 @@
 const mongoose = require("mongoose");
 const defaults = require("../../../../config/defaults");
-const serviceRegistry = require("../../../../lib/service registry");
+const serviceRegistry = require("../../../../lib/serviceRegistry");
 const { badRequest } = require("../../../../utils/error");
+const { mapComment } = require("../../../../utils/mappers");
 
 /**
  * Creates a reply to an article comment.
@@ -44,7 +45,7 @@ const postCommentReply = async (req, res, next) => {
     if (errors.length) throw badRequest(errors, "invalid input");
 
     const comment = await serviceRegistry.createComment({
-      articleID: articleId,
+      articleId,
       body,
       status: defaults.commentStatus,
       author: req.user.id,
@@ -53,8 +54,8 @@ const postCommentReply = async (req, res, next) => {
 
     return res.status(201).json({
       code: 201,
-      message: "reply posted",
-      data: comment,
+      message: "Reply posted",
+      data: mapComment(comment),
       links: {
         self: `/api/v1/articles/${articleId}/comments/${commentId}/replies`,
         article: `/api/v1/articles/${articleId}`,

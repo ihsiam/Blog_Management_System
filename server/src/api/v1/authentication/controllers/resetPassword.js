@@ -1,6 +1,7 @@
 const authServices = require("../../../../lib/authentication");
 const { badRequest, unauthorized } = require("../../../../utils/error");
 const { validation } = require("../../../../utils");
+const { clearResetTokenCookie } = require("../../../../utils/cookie");
 
 /**
  * Resets a user's password using a valid reset token.
@@ -55,11 +56,7 @@ const resetPassword = async (req, res, next) => {
     if (!token) throw unauthorized("Reset token is missing");
 
     await authServices.resetPassword({ token, password });
-    res.clearCookie("resetToken", {
-      httpOnly: true,
-      secure: true,
-      sameSite: "strict",
-    });
+    clearResetTokenCookie(res);
 
     return res.status(200).json({
       code: 200,
