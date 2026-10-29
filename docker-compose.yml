@@ -4,6 +4,7 @@ services:
   server:
     build:
       context: ./server
+      network: host
       dockerfile: dockerfile
     image: mdismilehosensiam/blog_management_system:latest
     container_name: server
@@ -80,8 +81,7 @@ services:
       - mongo3
     volumes:
       - ./mongo-init:/scripts
-    entrypoint:
-      [
+    entrypoint: [
         "bash",
         "-c",
         # Wait before connecting so the MongoDB nodes can start.
