@@ -5,17 +5,16 @@ const { ARTICLE_STATUS } = require("../../../../config/constants");
 const { mapArticle } = require("../../../../utils/mappers");
 
 /**
- * Updates an article publication status.
+ * Update an article's publication status.
  *
- * @param {import("express").Request} req - Express request object
- * @param {Object} req.params - Route parameters
- * @param {string} req.params.id - Article ID
- * @param {Object} req.body - Request body
- * @param {string} req.body.status - Article status
- * @param {import("express").Response} res - Express response object
- * @param {Function} next - Express error handler middleware
- *
- * @returns {Promise<void>} Sends the updated article response
+ * @param {import("express").Request} req - Express request object.
+ * @param {Object} req.params - Route parameters.
+ * @param {string} req.params.id - Article ID.
+ * @param {Object} req.body - Request body.
+ * @param {string} req.body.status - Article status.
+ * @param {import("express").Response} res - Express response object.
+ * @param {import("express").NextFunction} next - Next middleware function.
+ * @returns {Promise<import("express").Response|void>} The Express response after sending the 200 reply, or undefined when an error is forwarded to `next`.
  */
 const updateStatus = async (req, res, next) => {
   try {

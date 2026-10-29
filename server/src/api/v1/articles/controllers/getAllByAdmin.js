@@ -7,68 +7,43 @@ const { ARTICLE_STATUS } = require("../../../../config/constants");
 const { mapArticle } = require("../../../../utils/mappers");
 
 /**
- * Retrieves a paginated list of articles for admin panel.
+ * List articles for admin with optional status filter and full visibility.
  *
- * Admin can:
- * - View all article statuses (published, draft)
- * - Filter by status
- * - Use pagination, sorting, and search
- *
- * @param {import("express").Request} req - Express request object
- * @param {Object} req.query - Query parameters
- * @param {string} [req.query.page] - Page number
- * @param {string} [req.query.limit] - Items per page
- * @param {string} [req.query.sortType] - Sort order ("asc" | "desc")
- * @param {string} [req.query.sortBy] - Field to sort by
- * @param {string} [req.query.search] - Search keyword
- * @param {string} [req.query.status] - Article status filter (optional)
- * @param {string} [req.query.category] - Category ID filter (optional)
- *
- * @param {import("express").Response} res
- * @param {Function} next
- *
- * @returns {Promise<void>} Sends paginated article list response
+ * @param {import("express").Request} req - Express request object.
+ * @param {Object} req.query - Query parameters.
+ * @param {string} [req.query.page=defaults.page] - Page number.
+ * @param {string} [req.query.limit=defaults.limit] - Items per page.
+ * @param {string} [req.query.sortType=defaults.sortType] - Sort order ("asc" | "desc").
+ * @param {string} [req.query.sortBy=defaults.sortBy] - Field to sort by.
+ * @param {string} [req.query.search=defaults.searchTerm] - Search keyword.
+ * @param {string} [req.query.status] - Article status filter. When omitted, articles of every status are returned.
+ * @param {string} [req.query.category] - Category ID filter.
+ * @param {import("express").Response} res - Express response object.
+ * @param {import("express").NextFunction} next - Next middleware function.
+ * @returns {Promise<import("express").Response|void>} The Express response after sending the 200 reply, or undefined when an error is forwarded to `next`.
  */
 const getAllByAdmin = async (req, res, next) => {
   try {
-    /**
-     * Extract query params with fallback defaults
-     */
     const page = Number(req.query.page || defaults.page);
     const limit = Number(req.query.limit || defaults.limit);
     const sortType = req.query.sortType || defaults.sortType;
     const sortBy = req.query.sortBy || defaults.sortBy;
     const searchTerm = req.query.search || defaults.searchTerm;
 
-    /**
-     * Admin can optionally filter by status
-     * If not provided → allow all statuses
-     */
+    // Omitting status returns every article status for admin listing.
     const status = req.query.status || null;
     const category = req.query.category || null;
 
-    /**
-     * Collect validation errors
-     */
     const errors = [];
 
-    /**
-     * Validate page
-     */
     if (!Number.isInteger(page) || page < 1) {
       errors.push({ field: "page", message: "invalid input", in: "query" });
     }
 
-    /**
-     * Validate limit
-     */
     if (!Number.isInteger(limit) || limit < 1 || limit > defaults.maxLimit) {
       errors.push({ field: "limit", message: "invalid input", in: "query" });
     }
 
-    /**
-     * Validate sort type
-     */
     if (!["asc", "desc"].includes(sortType)) {
       errors.push({
         field: "sortType",
@@ -77,14 +52,10 @@ const getAllByAdmin = async (req, res, next) => {
       });
     }
 
-    /**
-     * Validate sort field
-     */
     if (!["title", "createdAt", "updatedAt"].includes(sortBy)) {
       errors.push({ field: "sortBy", message: "invalid input", in: "query" });
     }
 
-    // validate status
     if (status && !Object.values(ARTICLE_STATUS).includes(status)) {
       errors.push({ field: "status", message: "invalid input", in: "query" });
     }
@@ -104,16 +75,10 @@ const getAllByAdmin = async (req, res, next) => {
       errors.push({ field: "category", message: "invalid input", in: "query" });
     }
 
-    /**
-     * Throw validation error if any exist
-     */
     if (errors.length) {
       throw badRequest(errors, "invalid input");
     }
 
-    /**
-     * Fetch articles (admin has full visibility)
-     */
     const articles = await articleServices.findAll({
       page,
       limit,
@@ -124,18 +89,12 @@ const getAllByAdmin = async (req, res, next) => {
       category,
     });
 
-    /**
-     * Count total articles (respecting optional status filter)
-     */
     const totalItems = await articleServices.count({
       searchTerm,
       status,
       category,
     });
 
-    /**
-     * Transform response data
-     */
     const data = query.transformData({
       items: articles.map(mapArticle),
       selection: [
@@ -150,14 +109,8 @@ const getAllByAdmin = async (req, res, next) => {
       path: "/api/v1/articles",
     });
 
-    /**
-     * Pagination metadata
-     */
     const pagination = query.getPagination(page, limit, totalItems);
 
-    /**
-     * HATEOAS navigation links
-     */
     const links = query.hateOAS({
       url: req.url,
       path: req.path,
@@ -167,9 +120,6 @@ const getAllByAdmin = async (req, res, next) => {
       page,
     });
 
-    /**
-     * Final response
-     */
     return res.status(200).json({
       code: 200,
       message: "Data retrieved",

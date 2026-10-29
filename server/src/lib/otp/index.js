@@ -2,21 +2,26 @@ const OTP = require("../../model/OTP");
 const defaults = require("../../config/defaults");
 const { deleteCache, incrementCounter } = require("../../utils/cache");
 
-// OTPs are valid for 5 minutes
+// OTP lifetime, in seconds
 const OTP_TTL_SECONDS = 5 * 60;
 
+/**
+ * Build the Redis key for OTP attempt counting.
+ *
+ * @param {string} userId - User ID.
+ * @param {string} purpose - OTP purpose.
+ * @returns {string} Cache key for the attempt counter.
+ */
 const otpAttemptsKey = (userId, purpose) => `otp:attempts:${purpose}:${userId}`;
 
 /**
- * Create or replace the OTP of a user for a purpose
+ * Create or replace the OTP for a user and purpose.
  *
- * The previous code of the same purpose is invalidated by the overwrite.
- *
- * @param {string} userId - User ID
- * @param {string} purpose - OTP purpose
- * @param {string} codeHash - Hashed OTP code
- * @param {ClientSession} [session] - Optional MongoDB session
- * @returns {Promise<void>}
+ * @param {string} userId - User ID.
+ * @param {string} purpose - OTP purpose.
+ * @param {string} codeHash - Hashed OTP code.
+ * @param {import("mongoose").ClientSession} [session] - Optional MongoDB session.
+ * @returns {Promise<void>} Resolves when the OTP document is saved.
  */
 const createOtp = async (userId, purpose, codeHash, session) => {
   await OTP.findOneAndUpdate(
@@ -31,22 +36,17 @@ const createOtp = async (userId, purpose, codeHash, session) => {
     { upsert: true, new: true, session },
   );
 
-  // a new code starts with a fresh attempt budget
+  // A new code starts with a fresh attempt budget.
   await deleteCache(otpAttemptsKey(userId, purpose));
 };
 
 /**
- * Atomically consume one verification attempt of a valid OTP
+ * Consume one verification attempt against a valid OTP.
  *
- * The attempt is counted in Redis before the code is compared, so concurrent
- * guesses cannot exceed `defaults.otpMaxAttempts`. A code that ran out of
- * attempts is no longer returned and must be requested again. When Redis is
- * unavailable the counter is skipped and only the IP rate limit applies.
- *
- * @param {string} userId - User ID
- * @param {string} purpose - OTP purpose
- * @param {ClientSession} [session] - Optional MongoDB session
- * @returns {Promise<Object|null>} OTP document or null
+ * @param {string} userId - User ID.
+ * @param {string} purpose - OTP purpose.
+ * @param {import("mongoose").ClientSession} [session] - Optional MongoDB session.
+ * @returns {Promise<Object|null>} OTP document, or null when the attempt limit is exceeded or no unused, unexpired OTP exists.
  */
 const claimOtpAttempt = async (userId, purpose, session) => {
   const attempts = await incrementCounter(
@@ -54,6 +54,7 @@ const claimOtpAttempt = async (userId, purpose, session) => {
     OTP_TTL_SECONDS,
   );
 
+  // A null count means no counter is available, so the limit is not enforced here.
   if (attempts !== null && attempts > defaults.otpMaxAttempts) {
     return null;
   }
@@ -70,11 +71,11 @@ const claimOtpAttempt = async (userId, purpose, session) => {
 };
 
 /**
- * Mark an OTP as used
+ * Mark an OTP as used.
  *
- * @param {string} id - OTP ID
- * @param {ClientSession} [session] - Optional MongoDB session
- * @returns {Promise<boolean>} False when the OTP was already used
+ * @param {string} id - OTP ID.
+ * @param {import("mongoose").ClientSession} [session] - Optional MongoDB session.
+ * @returns {Promise<boolean>} True when the OTP was marked as used, false when it was already used or does not exist.
  */
 const markOtpUsed = async (id, session) => {
   const query = OTP.updateOne(
@@ -88,11 +89,11 @@ const markOtpUsed = async (id, session) => {
 };
 
 /**
- * Delete all OTPs of a user
+ * Delete all OTPs belonging to a user.
  *
- * @param {string} userId - User ID
- * @param {ClientSession} [session] - Optional MongoDB session
- * @returns {Promise<void>}
+ * @param {string} userId - User ID.
+ * @param {import("mongoose").ClientSession} [session] - Optional MongoDB session.
+ * @returns {Promise<void>} Resolves when matching OTP documents are deleted.
  */
 const deleteOtpsByUser = async (userId, session) => {
   await OTP.deleteMany({ user_id: userId }, session ? { session } : undefined);

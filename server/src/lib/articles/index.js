@@ -19,14 +19,22 @@ const {
 } = require("../../utils/cache");
 const { mapArticle } = require("../../utils/mappers");
 
+/**
+ * Cache lifetime, in seconds, for published article lists and counts.
+ */
 const ARTICLE_LIST_TTL_SECONDS = 60;
+
+/**
+ * Cache lifetime, in seconds, for a single article.
+ */
 const ARTICLE_TTL_SECONDS = 300;
 
 /**
- * Ensures an article references an active category.
+ * Ensure an article references an active category.
  *
- * @param {string} category - Category ID
- * @returns {Promise<void>}
+ * @param {string} category - Category ID.
+ * @returns {Promise<void>} Resolves when the category is valid.
+ * @throws {Error} When the category ID is invalid, missing, or unavailable.
  */
 const validateCategory = async (category) => {
   if (!category || !mongoose.Types.ObjectId.isValid(category)) {
@@ -39,7 +47,7 @@ const validateCategory = async (category) => {
   try {
     await categoryServices.findSingleItem({ id: category });
   } catch (err) {
-    // only a missing/unavailable category is a client error
+    // Only a missing or unavailable category is a client error.
     if (err.statusCode !== 404) throw err;
 
     throw badRequest(
@@ -50,9 +58,9 @@ const validateCategory = async (category) => {
 };
 
 /**
- * Drops public article list and count keys.
+ * Drop public article list and count cache keys.
  *
- * @returns {Promise<void>}
+ * @returns {Promise<void>} Resolves when matching cache keys are deleted.
  */
 const invalidatePublishedArticleLists = async () => {
   await deleteCachePattern("article:list:*");
@@ -60,10 +68,10 @@ const invalidatePublishedArticleLists = async () => {
 };
 
 /**
- * Drops single-article keys (exact author key + expand variants).
+ * Drop single-article cache keys (author key and expand variants).
  *
- * @param {string} id - Article ID
- * @returns {Promise<void>}
+ * @param {string} id - Article ID.
+ * @returns {Promise<void>} Resolves when matching cache keys are deleted.
  */
 const invalidateArticleResource = async (id) => {
   await deleteCache(`article:${id}:author`);
@@ -71,17 +79,17 @@ const invalidateArticleResource = async (id) => {
 };
 
 /**
- * Retrieves paginated articles with optional filtering.
+ * List paginated articles with optional filtering.
  *
- * @param {Object} params
- * @param {number} params.page - Page number
- * @param {number} params.limit - Items per page
- * @param {string} params.sortBy - Field to sort by
- * @param {string} params.sortType - Sorting order (asc | desc)
- * @param {string} params.searchTerm - Search keyword
- * @param {string} [params.status] - Article status filter
- *
- * @returns {Promise<Array<Object>>}
+ * @param {Object} params - Query options.
+ * @param {number} [params.page=defaults.page] - Page number.
+ * @param {number} [params.limit=defaults.limit] - Items per page.
+ * @param {string} [params.sortBy=defaults.sortBy] - Field to sort by.
+ * @param {string} [params.sortType=defaults.sortType] - Sort order (`asc` or `desc`).
+ * @param {string} [params.searchTerm=defaults.searchTerm] - Title search keyword.
+ * @param {string} [params.status] - Article status filter.
+ * @param {string} [params.category] - Category ID filter.
+ * @returns {Promise<Array<Object>>} Mapped article records.
  */
 const findAll = async ({
   page = defaults.page,
@@ -92,7 +100,7 @@ const findAll = async ({
   status,
   category,
 }) => {
-  // digest keeps the key short and safe even for arbitrary search input
+  // Digest keeps the key short and safe even for arbitrary search input.
   const listCacheKey = `article:list:${page}:${limit}:${sortBy}:${sortType}:${generateDigest(searchTerm)}:${category || ""}`;
 
   if (status === ARTICLE_STATUS.PUBLISHED) {
@@ -102,9 +110,9 @@ const findAll = async ({
     }
   }
 
+  // A leading minus sorts in descending order.
   const sortKey = `${sortType === "desc" ? "-" : ""}${sortBy}`;
 
-  // build query filter
   const filter = {
     title: { $regex: escapeRegex(searchTerm), $options: "i" },
   };
@@ -117,11 +125,11 @@ const findAll = async ({
     filter.category_id = category;
   }
 
-  // retrieve articles
   const articles = await Article.find(filter)
     .populate({ path: "author_id", select: "name" })
     .populate({ path: "category_id", select: "name" })
     .sort(sortKey)
+    // Skip the items of all previous pages.
     .skip(page * limit - limit)
     .limit(limit);
 
@@ -135,13 +143,13 @@ const findAll = async ({
 };
 
 /**
- * Counts total articles based on filter.
+ * Count articles matching optional title, status, and category filters.
  *
- * @param {Object} params
- * @param {string} params.searchTerm
- * @param {string} [params.status]
- *
- * @returns {Promise<number>}
+ * @param {Object} params - Filter options.
+ * @param {string} [params.searchTerm=""] - Title search keyword.
+ * @param {string} [params.status] - Article status filter.
+ * @param {string} [params.category] - Category ID filter.
+ * @returns {Promise<number>} Matching article count.
  */
 const count = async ({ searchTerm = "", status, category }) => {
   const countCacheKey = `article:count:${generateDigest(searchTerm)}:${category || ""}`;
@@ -153,7 +161,6 @@ const count = async ({ searchTerm = "", status, category }) => {
     }
   }
 
-  // build query filter
   const filter = {
     title: { $regex: escapeRegex(searchTerm), $options: "i" },
   };
@@ -166,7 +173,6 @@ const count = async ({ searchTerm = "", status, category }) => {
     filter.category_id = category;
   }
 
-  // count and return
   const total = await Article.countDocuments(filter);
 
   if (status === ARTICLE_STATUS.PUBLISHED) {
@@ -177,16 +183,16 @@ const count = async ({ searchTerm = "", status, category }) => {
 };
 
 /**
- * Creates a new article.
+ * Create a new article.
  *
- * @param {Object} params
- * @param {string} params.title
- * @param {string} [params.body]
- * @param {string} params.status
- * @param {string} params.author
- * @param {Object} params.file - Validated cover image file
- *
- * @returns {Promise<Object>}
+ * @param {Object} params - Article fields.
+ * @param {string} params.title - Article title.
+ * @param {string} [params.body=defaults.body] - Article body.
+ * @param {string} [params.status=defaults.articleStatus] - Publication status.
+ * @param {string} params.author - Author user ID.
+ * @param {string} params.category - Category ID.
+ * @param {Object} params.file - Validated cover image file.
+ * @returns {Promise<Object>} Mapped created article.
  */
 const create = async ({
   title,
@@ -221,21 +227,24 @@ const create = async ({
 };
 
 /**
- * Retrieves a single article with optional population.
+ * Fetch a single article with optional related-data expansion.
  *
- * @param {Object} params
- * @param {string} params.id
- * @param {string} [params.expand]
- *
- * @returns {Promise<Object>}
+ * @param {Object} params - Lookup options.
+ * @param {string} params.id - Article ID.
+ * @param {string} [params.expand=""] - Comma-separated expansions (for example `comments`).
+ * @param {Object} [params.user] - Requesting user for draft access checks.
+ * @returns {Promise<Object>} Mapped article (status omitted from payload).
+ * @throws {Error} When the article is missing or not visible to the caller.
  */
 const findSingleItem = async ({ id, expand = "", user }) => {
   const trimmedExpand = expand
     .split(",")
     .map((item) => item.trim())
     .filter(Boolean);
+  // Sort the expansions so the same set always maps to the same cache key.
   const expandKey = [...trimmedExpand].sort().join(",");
   const cacheKey = `article:${id}:expand:${expandKey}`;
+  // Only anonymous requests are cached, since drafts are visible per user.
   const useCache = !user;
 
   if (useCache) {
@@ -251,7 +260,7 @@ const findSingleItem = async ({ id, expand = "", user }) => {
     throw notFound("Article not found");
   }
 
-  // only published article can be retrieved
+  // Non-public articles are hidden unless the caller is the author or an admin.
   const isOwner = user && article.author_id.toString() === user.id.toString();
   const isAdmin = user && user.role === ROLES.ADMIN;
 
@@ -275,7 +284,7 @@ const findSingleItem = async ({ id, expand = "", user }) => {
 
   const obj = mapArticle(article);
 
-  // hide status from article
+  // Public API shape omits internal status fields.
   delete obj.status;
 
   // hide status from comments if exists
@@ -297,11 +306,16 @@ const findSingleItem = async ({ id, expand = "", user }) => {
 };
 
 /**
- * Partially updates an article.
+ * Partially update an article.
  *
- * @param {string} id
- * @param {Object} data
- * @returns {Promise<Object>}
+ * @param {string} id - Article ID.
+ * @param {Object} data - Fields to patch.
+ * @param {string} [data.title] - New title.
+ * @param {string} [data.body] - New body.
+ * @param {string} [data.category] - New category ID.
+ * @param {Object} [data.file] - Replacement cover image file.
+ * @returns {Promise<Object>} Mapped updated article.
+ * @throws {Error} When the article does not exist or the new category is invalid.
  */
 const updateItemPatch = async (id, { title, body, category, file }) => {
   const article = await Article.findById(id);
@@ -324,13 +338,14 @@ const updateItemPatch = async (id, { title, body, category, file }) => {
     category_id: category,
   };
 
+  // Apply only the provided fields.
   Object.keys(payload).forEach((key) => {
     article[key] = payload[key] ?? article[key];
   });
 
   await article.save();
 
-  // the replaced cover is no longer referenced
+  // The replaced cover is no longer referenced.
   if (cover) await storageService.removeArticleCover(previousCover);
 
   await invalidateArticleResource(id);
@@ -345,11 +360,12 @@ const updateItemPatch = async (id, { title, body, category, file }) => {
 };
 
 /**
- * Updates only the article status.
+ * Update only the article status.
  *
- * @param {string} id - Article ID
- * @param {string} status - New article status
- * @returns {Promise<Object>}
+ * @param {string} id - Article ID.
+ * @param {string} status - New article status.
+ * @returns {Promise<Object>} Mapped updated article.
+ * @throws {Error} When the article does not exist.
  */
 const updateStatus = async (id, status) => {
   const article = await Article.findById(id);
@@ -373,10 +389,11 @@ const updateStatus = async (id, status) => {
 };
 
 /**
- * Deletes an article by ID.
+ * Delete an article by ID.
  *
- * @param {string} id
- * @returns {Promise<Object>}
+ * @param {string} id - Article ID.
+ * @param {import("mongoose").ClientSession} [session] - Optional MongoDB session.
+ * @returns {Promise<Object|null>} Deleted article document, or null when missing.
  */
 const deleteItem = async (id, session) => {
   const query = Article.findByIdAndDelete(id);
@@ -392,10 +409,11 @@ const deleteItem = async (id, session) => {
 };
 
 /**
- * Deletes multiple articles based on filter.
+ * Delete multiple articles matching a filter.
  *
- * @param {Object} filter
- * @returns {Promise<boolean>}
+ * @param {Object} filter - MongoDB filter.
+ * @param {import("mongoose").ClientSession} [session] - Optional MongoDB session.
+ * @returns {Promise<boolean>} True when `deleteMany` ran.
  */
 const deleteMany = async (filter, session) => {
   const result = await Article.deleteMany(
@@ -411,10 +429,11 @@ const deleteMany = async (filter, session) => {
 };
 
 /**
- * Finds article by ID.
+ * Find an article by ID.
  *
- * @param {string} id
- * @returns {Promise<Object|null>}
+ * @param {string} id - Article ID.
+ * @param {import("mongoose").ClientSession} [session] - Optional MongoDB session.
+ * @returns {Promise<Object|null>} Article document, or null when missing.
  */
 const findArticleById = async (id, session) => {
   const query = Article.findById(id);
@@ -423,11 +442,11 @@ const findArticleById = async (id, session) => {
 };
 
 /**
- * Finds the IDs and cover URLs of all articles by a user.
+ * Find the IDs and cover URLs of all articles by a user.
  *
- * @param {string} id - User ID
- * @param {ClientSession} [session] - Optional MongoDB session
- * @returns {Promise<Array<{id: ObjectId, cover: string}>>}
+ * @param {string} id - User ID.
+ * @param {import("mongoose").ClientSession} [session] - Optional MongoDB session.
+ * @returns {Promise<Array<{id: import("mongoose").Types.ObjectId, cover: string}>>} Article IDs and cover URLs.
  */
 const findArticlesByUser = async (id, session) => {
   const query = Article.find({ author_id: id }).select("_id cover_image_url");
@@ -441,13 +460,13 @@ const findArticlesByUser = async (id, session) => {
 };
 
 /**
- * Checks article ownership.
+ * Return whether `userId` authored the article.
  *
- * @param {Object} params
- * @param {string} params.resourceId
- * @param {string} params.userId
- *
- * @returns {Promise<boolean>}
+ * @param {Object} params - Ownership check fields.
+ * @param {string} params.resourceId - Article ID.
+ * @param {string} params.userId - Authenticated user ID.
+ * @returns {Promise<boolean>} True when the user is the author.
+ * @throws {Error} When the article does not exist.
  */
 const checkOwner = async ({ resourceId, userId }) => {
   const article = await findArticleById(resourceId);

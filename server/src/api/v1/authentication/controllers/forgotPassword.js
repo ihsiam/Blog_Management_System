@@ -5,18 +5,14 @@ const emailService = require("../../../../lib/email");
 const { validation } = require("../../../../utils");
 
 /**
- * Requests a password reset email for a registered user.
+ * Request a password reset email for a registered user.
  *
  * @param {import("express").Request} req - Express request object.
  * @param {Object} req.body - Request payload.
  * @param {string} req.body.email - User email address.
- *
  * @param {import("express").Response} res - Express response object.
- * @param {Function} next - Express error-handling middleware.
- *
- * @returns {Promise<void>} Sends a confirmation response.
- *
- * @throws {Error} NotFound if the email is not registered.
+ * @param {import("express").NextFunction} next - Next middleware function.
+ * @returns {Promise<import("express").Response|void>} The Express response after sending the 200 reply, or undefined when an error is forwarded to `next`.
  */
 const forgotPassword = async (req, res, next) => {
   try {

@@ -5,17 +5,16 @@ const commentServices = require("../../../../lib/comments");
 const { mapComment } = require("../../../../utils/mappers");
 
 /**
- * Updates a comment visibility status.
+ * Update a comment's visibility status.
  *
- * @param {import("express").Request} req - Express request object
- * @param {Object} req.params - Route parameters
- * @param {string} req.params.id - Comment ID
- * @param {Object} req.body - Request payload
- * @param {string} req.body.status - Comment visibility status
- * @param {import("express").Response} res - Express response object
- * @param {Function} next - Express error handler middleware
- *
- * @returns {Promise<void>} Sends the updated comment response
+ * @param {import("express").Request} req - Express request object.
+ * @param {Object} req.params - Route parameters.
+ * @param {string} req.params.id - Comment ID.
+ * @param {Object} req.body - Request payload.
+ * @param {string} req.body.status - Comment visibility status.
+ * @param {import("express").Response} res - Express response object.
+ * @param {import("express").NextFunction} next - Next middleware function.
+ * @returns {Promise<import("express").Response|void>} The Express response after sending the 200 reply, or undefined when an error is forwarded to `next`.
  */
 const updateCommentStatus = async (req, res, next) => {
   try {

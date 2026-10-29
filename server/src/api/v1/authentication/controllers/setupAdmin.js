@@ -5,7 +5,7 @@ const { validation } = require("../../../../utils");
 const { setRefreshTokenCookie } = require("../../../../utils/cookie");
 
 /**
- * Creates the initial system administrator account and session.
+ * Create the initial system administrator account and session.
  *
  * This endpoint is intended for one-time system bootstrap and should
  * be disabled or protected after initial setup.
@@ -15,13 +15,9 @@ const { setRefreshTokenCookie } = require("../../../../utils/cookie");
  * @param {string} req.body.name - Administrator name.
  * @param {string} req.body.email - Administrator email address.
  * @param {string} req.body.password - Administrator password.
- *
  * @param {import("express").Response} res - Express response object.
- * @param {Function} next - Express error-handling middleware.
- *
- * @returns {Promise<void>} Sends an authentication response.
- *
- * @throws {Error} BadRequest if validation fails
+ * @param {import("express").NextFunction} next - Next middleware function.
+ * @returns {Promise<import("express").Response|void>} The Express response after sending the 201 reply, or undefined when an error is forwarded to `next`.
  */
 const setupAdmin = async (req, res, next) => {
   try {

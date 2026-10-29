@@ -4,22 +4,16 @@ const commentServices = require("../../../../lib/comments");
 const { mapComment } = require("../../../../utils/mappers");
 
 /**
- * Updates the body of an existing comment.
+ * Update the body of an existing comment.
  *
- * Only the comment owner can reach this handler. Visibility (status) is
- * changed by admins through the status endpoint.
- *
- * @param {import("express").Request} req - Express request object
- * @param {Object} req.params - Route parameters
- * @param {string} req.params.id - Comment ID
- *
- * @param {Object} req.body - Request payload
- * @param {string} req.body.body - Comment text content
- *
- * @param {import("express").Response} res - Express response object
- * @param {Function} next - Express error handler middleware
- *
- * @returns {Promise<void>} Returns updated comment response
+ * @param {import("express").Request} req - Express request object.
+ * @param {Object} req.params - Route parameters.
+ * @param {string} req.params.id - Comment ID.
+ * @param {Object} req.body - Request payload.
+ * @param {string} req.body.body - Comment text.
+ * @param {import("express").Response} res - Express response object.
+ * @param {import("express").NextFunction} next - Next middleware function.
+ * @returns {Promise<import("express").Response|void>} The Express response after sending the 200 reply, or undefined when an error is forwarded to `next`.
  */
 const updateComment = async (req, res, next) => {
   try {

@@ -7,37 +7,30 @@ const serviceRegistry = require("../../../../lib/serviceRegistry");
 const { query } = require("../../../../utils");
 
 /**
- * Retrieves paginated public comments for a specific article.
+ * List paginated public top-level comments for an article.
  *
- * @param {import("express").Request} req - Express request object
- * @param {Object} req.params - Route parameters
- * @param {string} req.params.id - Article ID
- *
- * @param {Object} req.query - Query parameters
- * @param {string} [req.query.page] - Page number
- * @param {string} [req.query.limit] - Items per page
- *
- * @param {import("express").Response} res - Express response object
- * @param {Function} next - Express error handler middleware
- *
- * @returns {Promise<void>} Sends paginated comment list
+ * @param {import("express").Request} req - Express request object.
+ * @param {Object} req.params - Route parameters.
+ * @param {string} req.params.id - Article ID.
+ * @param {Object} req.query - Query parameters.
+ * @param {string} [req.query.page=defaults.page] - Page number.
+ * @param {string} [req.query.limit=defaults.limit] - Items per page.
+ * @param {import("express").Response} res - Express response object.
+ * @param {import("express").NextFunction} next - Next middleware function.
+ * @returns {Promise<import("express").Response|void>} The Express response after sending the 200 reply, or undefined when an error is forwarded to `next`.
  */
 const getArticleComments = async (req, res, next) => {
   try {
-    // extract request parameters
     const { id: articleId } = req.params;
     const page = Number(req.query.page || defaults.page);
     const limit = Number(req.query.limit || defaults.limit);
 
-    // collect validation errors
     const errors = [];
 
-    // validate id
     if (!articleId || !mongoose.Types.ObjectId.isValid(articleId)) {
       errors.push({ field: "id", message: "invalid input", in: "params" });
     }
 
-    // page validation
     if (!Number.isInteger(page) || page < 1) {
       errors.push({
         field: "page",
@@ -46,7 +39,6 @@ const getArticleComments = async (req, res, next) => {
       });
     }
 
-    // limit validation
     if (!Number.isInteger(limit) || limit < 1 || limit > defaults.maxLimit) {
       errors.push({
         field: "limit",
@@ -55,12 +47,10 @@ const getArticleComments = async (req, res, next) => {
       });
     }
 
-    // throw validation error if any
     if (errors.length) {
       throw badRequest(errors, "invalid input");
     }
 
-    // fetch public comments for article
     const comments = await serviceRegistry.getCommentByArticle({
       articleId,
       page,
@@ -68,23 +58,20 @@ const getArticleComments = async (req, res, next) => {
       status: COMMENT_STATUS.PUBLIC,
     });
 
-    // transform response data while preserving nested replies
+    // keep client shape stable for nested threads.
     const data = comments.map((comment) => ({
       ...comment,
       replies: Array.isArray(comment.replies) ? comment.replies : [],
     }));
 
-    // count total public comments
     const totalItems = await commentServices.count({
       articleId,
       status: COMMENT_STATUS.PUBLIC,
       topLevel: true,
     });
 
-    // generate pagination metadata
     const pagination = query.getPagination(page, limit, totalItems);
 
-    // generate HATEOAS navigation links
     const links = query.hateOAS({
       url: req.url,
       path: req.path,
@@ -94,10 +81,8 @@ const getArticleComments = async (req, res, next) => {
       page,
     });
 
-    // add related article link
     links.article = `/api/v1/articles/${articleId}`;
 
-    // response
     return res.status(200).json({
       code: 200,
       message: "Data retrieved",

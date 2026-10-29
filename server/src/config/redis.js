@@ -12,18 +12,16 @@ const logger = require("../utils/logger");
 let client = null;
 
 /**
- * Establishes a connection to Redis, retrying on failure.
+ * Establish a connection to Redis, retrying on failure.
  *
- * Matches the retry style of `src/db/connection.js`: a bounded
- * attempt loop with a delay, plus client-level reconnect after the
- * initial handshake succeeds.
+ * Reads the connection URL from the `REDIS_URL` environment variable. The
+ * client is created once and reused across attempts. On the last failed
+ * attempt, the original connection error is rethrown.
  *
- * @param {number} retries - number of attempts before giving up
- * @param {number} delayMs - delay between retries in milliseconds
- * @returns {Promise<void>}
- *
- * @throws {Error} If REDIS_URL is not defined
- * @throws {Error} If all retry attempts fail
+ * @param {number} [retries=5] - Number of connection attempts before giving up.
+ * @param {number} [delayMs=5000] - Delay between retries, in milliseconds.
+ * @returns {Promise<void>} Resolves once the client is connected.
+ * @throws {Error} When REDIS_URL is missing or every retry fails.
  */
 const connectRedis = async (retries = 5, delayMs = 5000) => {
   const { REDIS_URL } = process.env;
@@ -38,11 +36,12 @@ const connectRedis = async (retries = 5, delayMs = 5000) => {
         client = createClient({
           url: REDIS_URL,
           socket: {
+            // Back off by 50 ms per retry, capped at 2000 ms.
             reconnectStrategy: (retryCount) => Math.min(retryCount * 50, 2000),
           },
         });
 
-        // handle disconnects after initial successful connection
+        // Reconnect is handled by the Redis client after an initial success.
         client.on("end", () => {
           logger.warn(
             "Redis disconnected — client will attempt to reconnect automatically",
@@ -54,6 +53,7 @@ const connectRedis = async (retries = 5, delayMs = 5000) => {
         });
       }
 
+      // Skip connecting when a previous attempt already opened the client.
       if (!client.isOpen) {
         // eslint-disable-next-line no-await-in-loop
         await client.connect();
@@ -66,10 +66,12 @@ const connectRedis = async (retries = 5, delayMs = 5000) => {
         `Redis connection attempt ${attempt}/${retries} failed: ${err.message}`,
       );
 
+      // Give up and surface the error after the final attempt.
       if (attempt === retries) {
         throw err;
       }
 
+      // Wait before the next attempt.
       // eslint-disable-next-line no-await-in-loop
       await new Promise((resolve) => {
         setTimeout(resolve, delayMs);
@@ -79,9 +81,9 @@ const connectRedis = async (retries = 5, delayMs = 5000) => {
 };
 
 /**
- * Returns the shared Redis client, or null when it has not been connected.
+ * Return the shared Redis client, or null when it has not been connected.
  *
- * @returns {import("redis").RedisClientType | null}
+ * @returns {import("redis").RedisClientType | null} Shared client, or null.
  */
 const getRedisClient = () => client;
 

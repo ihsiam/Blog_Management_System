@@ -4,19 +4,15 @@ const { validation } = require("../../../../utils");
 const { setRefreshTokenCookie } = require("../../../../utils/cookie");
 
 /**
- * Authenticates a user and issues access and refresh tokens.
+ * Authenticate a user and issue access and refresh tokens.
  *
  * @param {import("express").Request} req - Express request object.
  * @param {Object} req.body - Request payload.
  * @param {string} req.body.email - User email address.
  * @param {string} req.body.password - User password.
- *
  * @param {import("express").Response} res - Express response object.
- * @param {Function} next - Express error-handling middleware.
- *
- * @returns {Promise<void>} Sends an authentication response with an access token.
- *
- * @throws {Error} BadRequest when validation fails
+ * @param {import("express").NextFunction} next - Next middleware function.
+ * @returns {Promise<import("express").Response|void>} The Express response after sending the 200 reply, or undefined when an error is forwarded to `next`.
  */
 const login = async (req, res, next) => {
   try {

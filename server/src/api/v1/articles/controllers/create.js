@@ -4,30 +4,22 @@ const { ARTICLE_STATUS } = require("../../../../config/constants");
 const { mapArticle } = require("../../../../utils/mappers");
 
 /**
- * Creates a new article.
+ * Create a new article for the authenticated author.
  *
- * @param {import("express").Request} req - Express request object
- * @param {Object} req.body - Request payload
- * @param {string} req.body.title - Article title
- * @param {string} req.body.body - Article content
- * @param {string} req.body.category - Category ID
- * @param {Object} req.file - Uploaded cover image
- *
- * @param {Object} req.user - Authenticated user (from auth middleware)
- * @param {string} req.user.id - User ID of the author
- *
- * @param {import("express").Response} res - Express response object
- * @param {Function} next - Express error handler middleware
- *
- * @returns {Promise<void>} Sends created article response
- *
- * @throws {Error} BadRequest if title validation fails
+ * @param {import("express").Request} req - Express request object.
+ * @param {Object} req.body - Request payload.
+ * @param {string} req.body.title - Article title.
+ * @param {string} req.body.body - Article content.
+ * @param {string} req.body.category - Category ID.
+ * @param {Object} req.file - Uploaded cover image.
+ * @param {Object} req.user - Authenticated user.
+ * @param {string} req.user.id - Author user ID.
+ * @param {import("express").Response} res - Express response object.
+ * @param {import("express").NextFunction} next - Next middleware function.
+ * @returns {Promise<import("express").Response|void>} The Express response after sending the 201 reply, or undefined when an error is forwarded to `next`.
  */
 const create = async (req, res, next) => {
   try {
-    /**
-     * Extract and validate title
-     */
     const { title, body, category } = req.body;
 
     const errors = [];
@@ -36,9 +28,6 @@ const create = async (req, res, next) => {
       errors.push({ field: "title", message: "invalid input", in: "body" });
     }
 
-    /**
-     * Prepare article payload with defaults
-     */
     const status = ARTICLE_STATUS.PUBLISHED;
     const author = req.user?.id;
 
@@ -56,9 +45,7 @@ const create = async (req, res, next) => {
       errors.push({ field: "cover", message: "invalid input", in: "file" });
     }
     if (errors.length) throw badRequest(errors, "invalid input");
-    /**
-     * Create article in database
-     */
+
     const article = await articleServices.create({
       title,
       body,
@@ -68,9 +55,6 @@ const create = async (req, res, next) => {
       file: req.file,
     });
 
-    /**
-     * Send response
-     */
     return res.status(201).json({
       code: 201,
       message: "Article created",

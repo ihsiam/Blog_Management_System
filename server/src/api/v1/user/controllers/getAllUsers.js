@@ -6,31 +6,24 @@ const { query } = require("../../../../utils");
 const { mapUser } = require("../../../../utils/mappers");
 
 /**
- * Retrieves a paginated list of users.
+ * List users with pagination, sort, and name/email/status filters.
  *
- * - Pagination (page, limit)
- * - Sorting (sortBy, sortType)
- * - Filtering (name, email, status)
- * - HATEOAS links generation
- *
- * @param {import("express").Request} req - Express request object
- * @param {Object} req.query - Query parameters
- * @param {string} [req.query.page] - Page number
- * @param {string} [req.query.limit] - Items per page
- * @param {string} [req.query.sortType] - Sort direction (asc | desc)
- * @param {string} [req.query.sortBy] - Field to sort by
- * @param {string} [req.query.name] - Filter by user name
- * @param {string} [req.query.email] - Filter by user email
- * @param {string} [req.query.status] - Filter by account status
- *
- * @param {import("express").Response} res - Express response object
- * @param {Function} next - Express error handler middleware
- *
- * @returns {Promise<void>} Returns paginated user list
+ * @param {import("express").Request} req - Express request.
+ * @param {Object} req.query - Query parameters.
+ * @param {string} [req.query.page=defaults.page] - Page number.
+ * @param {string} [req.query.limit=defaults.limit] - Items per page.
+ * @param {string} [req.query.sortType=defaults.sortType] - Sort direction (`asc` or `desc`).
+ * @param {string} [req.query.sortBy=defaults.sortBy] - Field to sort by (`createdAt`, `updatedAt`, `email`, or `name`).
+ * @param {string} [req.query.name] - Filter by user name.
+ * @param {string} [req.query.email] - Filter by user email.
+ * @param {string} [req.query.status] - Filter by account status.
+ * @param {import("express").Response} res - Express response.
+ * @param {import("express").NextFunction} next - Next middleware.
+ * @returns {Promise<void>} Resolves after the response is sent or `next` has been called.
+ * @throws {Error} When query parameters are invalid.
  */
 const getAllUsers = async (req, res, next) => {
   try {
-    // extract params from request
     const page = Number(req.query.page || defaults.page);
     const limit = Number(req.query.limit || defaults.limit);
     const sortType = req.query.sortType || defaults.sortType;
@@ -38,20 +31,17 @@ const getAllUsers = async (req, res, next) => {
 
     const { name, email, status } = req.query;
 
-    // collect validation errors
+    // Collect every validation error so the client can fix them in one request.
     const errors = [];
 
-    // page validation
     if (!Number.isInteger(page) || page < 1) {
       errors.push({ field: "page", message: "invalid input", in: "query" });
     }
 
-    // limit validation
     if (!Number.isInteger(limit) || limit < 1 || limit > defaults.maxLimit) {
       errors.push({ field: "limit", message: "invalid input", in: "query" });
     }
 
-    // sort type validation
     if (!["asc", "desc"].includes(sortType)) {
       errors.push({
         field: "sortType",
@@ -60,7 +50,7 @@ const getAllUsers = async (req, res, next) => {
       });
     }
 
-    // sort by validation
+    // Allow only known fields so clients cannot sort by arbitrary ones.
     if (!["createdAt", "updatedAt", "email", "name"].includes(sortBy)) {
       errors.push({
         field: "sortBy",
@@ -69,7 +59,7 @@ const getAllUsers = async (req, res, next) => {
       });
     }
 
-    // status validation (optional filter)
+    // Reject non-string values (such as repeated parameters) and overlong search text.
     [
       { field: "name", value: name },
       { field: "email", value: email },
@@ -90,12 +80,10 @@ const getAllUsers = async (req, res, next) => {
       });
     }
 
-    // throw validation errors if any
     if (errors.length) {
       throw badRequest(errors, "invalid input");
     }
 
-    // fetch users from service layer
     const users = await UserServices.getAllUsers({
       page,
       limit,
@@ -106,14 +94,13 @@ const getAllUsers = async (req, res, next) => {
       status,
     });
 
-    // count total users
     const totalItems = await UserServices.countTotal({
       name,
       email,
       status,
     });
 
-    // transform response data
+    // Return only the listed fields, so other user fields are not exposed.
     const data = query.transformData({
       items: users.map(mapUser),
       selection: [
@@ -127,10 +114,8 @@ const getAllUsers = async (req, res, next) => {
       ],
     });
 
-    // pagination metadata
     const pagination = query.getPagination(page, limit, totalItems);
 
-    // HATEOAS links
     const links = query.hateOAS({
       url: req.url,
       path: req.path,
@@ -148,6 +133,7 @@ const getAllUsers = async (req, res, next) => {
       links,
     });
   } catch (err) {
+    // Forward validation and service errors to the error handler.
     return next(err);
   }
 };

@@ -4,35 +4,32 @@ const userServices = require("../../../../lib/user");
 const { mapUser } = require("../../../../utils/mappers");
 
 /**
- * Retrieves a single user by ID.
+ * Fetch a single user by ID.
  *
- * @param {import("express").Request} req - Express request object
- * @param {Object} req.params - Route parameters
- * @param {string} req.params.id - User ID
- *
- * @param {Object} req.query - Query parameters
- * @param {string} [req.query.expand] - Optional fields to expand
- *
- * @param {import("express").Response} res - Express response object
- * @param {Function} next - Express error handler middleware
- *
- * @returns {Promise<void>} Returns user data
+ * @param {import("express").Request} req - Express request.
+ * @param {Object} req.params - Route parameters.
+ * @param {string} req.params.id - User ID.
+ * @param {Object} req.query - Query parameters.
+ * @param {string} [req.query.expand] - Optional related fields to expand.
+ * @param {import("express").Response} res - Express response.
+ * @param {import("express").NextFunction} next - Next middleware.
+ * @returns {Promise<void>} Resolves after the response is sent or `next` has been called.
+ * @throws {Error} When the user ID or expand query is invalid.
  */
 const getSingleUser = async (req, res, next) => {
   try {
-    // extract data from request
     const { id } = req.params;
     const { expand } = req.query;
 
-    // collect validation errors
+    // Collect every validation error so the client can fix them in one request.
     const errors = [];
 
-    // validate user id
+    // Reject malformed IDs before they reach the database query.
     if (!id || !mongoose.Types.ObjectId.isValid(id)) {
       errors.push({ field: "id", message: "invalid input", in: "params" });
     }
 
-    // validate expand query param
+    // Reject non-string values, such as repeated query parameters.
     if (expand !== undefined && typeof expand !== "string") {
       errors.push({
         field: "expand",
@@ -41,21 +38,19 @@ const getSingleUser = async (req, res, next) => {
       });
     }
 
-    // throw validation error if any
     if (errors.length) {
       throw badRequest(errors, "invalid input");
     }
 
-    // fetch user from service layer
     const data = await userServices.getSingleUser({ id, expand });
 
-    // response
     return res.status(200).json({
       code: 200,
       message: "Data retrieved",
       data: mapUser(data),
     });
   } catch (err) {
+    // Forward validation and service errors to the error handler.
     return next(err);
   }
 };

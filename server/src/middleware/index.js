@@ -7,6 +7,7 @@ const YAML = require("yamljs");
 
 const path = require("path");
 
+// Load the API documentation once at startup
 const swaggerDocs = YAML.load(path.join(__dirname, "../../swagger.yaml"));
 
 /**
@@ -26,13 +27,13 @@ const swaggerDocs = YAML.load(path.join(__dirname, "../../swagger.yaml"));
  * @returns {void}
  */
 const applyMiddleware = (app) => {
-  // Apply security-related HTTP headers.
+  // Set secure HTTP response headers
   app.use(helmet());
 
   // Parse incoming JSON requests.
   app.use(express.json());
 
-  // Serve locally stored article cover uploads during development.
+  // Cover images are stored on disk and served from /uploads in development
   app.use("/uploads", express.static(path.join(__dirname, "../../uploads")));
 
   // Enable CORS with credentials support (cookies, auth headers).
@@ -46,7 +47,7 @@ const applyMiddleware = (app) => {
   // Parse cookies from incoming requests.
   app.use(cookieParser());
 
-  // API documentation endpoint.
+  // Serve the Swagger UI at /docs
   app.use("/docs", swaggerUI.serve, swaggerUI.setup(swaggerDocs));
 };
 

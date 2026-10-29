@@ -5,18 +5,24 @@ const { badRequest } = require("../../../../utils/error");
 const { ROLES, CATEGORY_STATUS } = require("../../../../config/constants");
 
 /**
- * Retrieves a paginated list of categories.
+ * List categories with pagination.
  *
  * Public callers only see active categories. Admins see every category and
  * may filter by status.
  *
- * @param {import("express").Request} req - Express request object
- * @param {Object} req.query - Query parameters
- * @param {string} [req.query.status] - Status filter (admin only)
- * @param {import("express").Response} res - Express response object
- * @param {Function} next - Express error handler middleware
- *
- * @returns {Promise<void>} Sends paginated category list response
+ * @param {import("express").Request} req - Express request object.
+ * @param {Object} req.query - Query parameters.
+ * @param {string} [req.query.page=defaults.page] - Page number.
+ * @param {string} [req.query.limit=defaults.limit] - Items per page.
+ * @param {string} [req.query.sortType=defaults.sortType] - Sort order ("asc" | "desc").
+ * @param {string} [req.query.sortBy=defaults.sortBy] - Field to sort by.
+ * @param {string} [req.query.search=defaults.searchTerm] - Search keyword.
+ * @param {string} [req.query.status] - Status filter (admin only).
+ * @param {Object} [req.user] - Authenticated user, if any.
+ * @param {string} [req.user.role] - User role, used to detect administrators.
+ * @param {import("express").Response} res - Express response object.
+ * @param {import("express").NextFunction} next - Next middleware function.
+ * @returns {Promise<import("express").Response|void>} The Express response after sending the 200 reply, or undefined when an error is forwarded to `next`.
  */
 const findAll = async (req, res, next) => {
   try {
@@ -58,7 +64,7 @@ const findAll = async (req, res, next) => {
 
     if (errors.length) throw badRequest(errors, "invalid input");
 
-    // public callers are always limited to active categories
+    // Hide inactive categories from non-admin callers regardless of query params.
     const statusFilter = isAdmin ? status : CATEGORY_STATUS.ACTIVE;
 
     const categories = await categoryServices.findAll({

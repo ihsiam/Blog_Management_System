@@ -1,5 +1,7 @@
 /**
  * Email format accepted by the API.
+ *
+ * Requires one `@` and a dot in the domain part, with no whitespace anywhere.
  */
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -10,32 +12,33 @@ const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const MAX_PASSWORD_BYTES = 72;
 
 /**
- * Normalizes an email address for storage and lookup.
+ * Normalize an email address for storage and lookup.
  *
- * @param {string} email - Raw email address
- *
- * @returns {string} Trimmed, lower-cased email address
+ * @param {string} email - Raw email address.
+ * @returns {string} Trimmed, lower-cased email.
  */
 const normalizeEmail = (email) =>
-  // emails are case-insensitive in practice, so store one canonical form
+  // Emails are treated as case-insensitive, so store one canonical form
   String(email).trim().toLowerCase();
 
 /**
- * Checks that a value is a string with a valid email format.
+ * Return whether a value is a string with a valid email format.
  *
- * @param {*} email - Value to check
+ * Surrounding whitespace is ignored when checking the format.
  *
- * @returns {boolean} True when the value is a valid email address
+ * @param {*} email - Value to check.
+ * @returns {boolean} True when the value is a valid email address.
  */
 const isValidEmail = (email) =>
   typeof email === "string" && EMAIL_PATTERN.test(email.trim());
 
 /**
- * Checks whether a password is longer than bcrypt can hash.
+ * Return whether a password is longer than bcrypt can hash.
  *
- * @param {string} password - Plain text password
+ * The length is measured in UTF-8 bytes, not characters.
  *
- * @returns {boolean} True when the password exceeds the byte limit
+ * @param {string} password - Plain-text password.
+ * @returns {boolean} True when the password exceeds the byte limit.
  */
 const isPasswordTooLong = (password) =>
   Buffer.byteLength(password, "utf8") > MAX_PASSWORD_BYTES;

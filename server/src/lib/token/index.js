@@ -12,16 +12,14 @@ const CONFIG = {
 };
 
 /**
- * Signs a JWT token.
+ * Sign a JWT token.
  *
  * @param {Object} payload - Data stored inside the token.
  * @param {string} secret - Secret key used to sign the token.
- * @param {string|number} expiresIn - Expiration time, such as "15m" or "7d".
+ * @param {string|number} expiresIn - Expiration time, such as `"15m"` or `"7d"`.
  * @param {string} label - Token type label used for logging and debugging.
- *
  * @returns {string} Signed JWT token.
- *
- * @throws {Error} If token generation fails due to a JWT error.
+ * @throws {Error} When token generation fails.
  */
 const signToken = (payload, secret, expiresIn, label) => {
   try {
@@ -30,23 +28,21 @@ const signToken = (payload, secret, expiresIn, label) => {
       expiresIn,
     });
   } catch (err) {
+    // Log the original error and throw a generic one so details are not exposed.
     logger.error("JWT sign error", { label, message: err.message });
     throw new Error("Failed to generate token");
   }
 };
 
 /**
- * Verifies a JWT token and returns decoded payload.
- *
- * Converts JWT errors into standardized authentication errors.
+ * Verify a JWT token and return the decoded payload.
  *
  * @param {string} token - JWT token to verify.
  * @param {string} secret - Secret key used for verification.
  * @param {string} label - Token type label for logging and error context.
- *
  * @returns {Object} Decoded JWT payload.
- *
- * @throws {Error} Unauthorized if the token is missing, invalid, expired, or not active.
+ * @throws {Error} When the token is missing, invalid, expired, or not active yet.
+ * @throws {Error} When verification fails for any other reason.
  */
 const verifyToken = (token, secret, label) => {
   try {
@@ -60,6 +56,7 @@ const verifyToken = (token, secret, label) => {
   } catch (err) {
     logger.warn("JWT verify error", { label, name: err.name });
 
+    // Map each JWT error to a specific message; anything else gets a generic one.
     switch (err.name) {
       case "TokenExpiredError":
         throw unauthorized(`${label} token expired`);
@@ -77,37 +74,41 @@ const verifyToken = (token, secret, label) => {
 };
 
 /**
- * Generates short-lived access token for API authentication.
+ * Generate a short-lived access token for API authentication.
  *
  * @param {Object} payload - User identity and claims.
  * @returns {string} Signed JWT access token.
+ * @throws {Error} When token generation fails.
  */
 const generateAccessToken = (payload) =>
   signToken(payload, CONFIG.ACCESS_SECRET, CONFIG.ACCESS_EXPIRES, "ACCESS");
 
 /**
- * Generates long-lived refresh token for session management.
+ * Generate a long-lived refresh token for session management.
  *
  * @param {Object} payload - User identity and session data.
  * @returns {string} Signed JWT refresh token.
+ * @throws {Error} When token generation fails.
  */
 const generateRefreshToken = (payload) =>
   signToken(payload, CONFIG.REFRESH_SECRET, CONFIG.REFRESH_EXPIRES, "REFRESH");
 
 /**
- * Verifies access token used for API authentication.
+ * Verify an access token used for API authentication.
  *
  * @param {string} token - JWT access token.
- * @returns {Object} Decoded payload.
+ * @returns {Object} Decoded JWT payload.
+ * @throws {Error} When the token is missing, invalid, expired, or not active yet.
  */
 const verifyAccessToken = (token) =>
   verifyToken(token, CONFIG.ACCESS_SECRET, "Access");
 
 /**
- * Verifies refresh token used for session continuation.
+ * Verify a refresh token used for session continuation.
  *
  * @param {string} token - JWT refresh token.
- * @returns {Object} Decoded payload.
+ * @returns {Object} Decoded JWT payload.
+ * @throws {Error} When the token is missing, invalid, expired, or not active yet.
  */
 const verifyRefreshToken = (token) =>
   verifyToken(token, CONFIG.REFRESH_SECRET, "Refresh");

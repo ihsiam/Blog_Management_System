@@ -2,12 +2,14 @@ const sessionServices = require("../../../../lib/session");
 const { clearRefreshTokenCookie } = require("../../../../utils/cookie");
 
 /**
- * Logs the authenticated user out of all devices.
+ * Log the authenticated user out of all devices.
  *
  * @param {import("express").Request} req - Express request object.
+ * @param {Object} req.user - Authenticated user.
+ * @param {string} req.user.id - User ID.
  * @param {import("express").Response} res - Express response object.
- * @param {Function} next - Express error-handling middleware.
- * @returns {Promise<void>} Sends a logout confirmation response.
+ * @param {import("express").NextFunction} next - Next middleware function.
+ * @returns {Promise<import("express").Response|void>} The Express response after sending the 200 reply, or undefined when an error is forwarded to `next`.
  */
 const logoutAll = async (req, res, next) => {
   try {

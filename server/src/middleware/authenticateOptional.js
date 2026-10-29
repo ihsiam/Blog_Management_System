@@ -23,9 +23,11 @@ const authenticateOptional = async (req, _res, next) => {
     const decoded = tokenServices.verifyAccessToken(token);
     const user = await userServices.findAuthUserById(decoded.id);
 
+    // Skip the session lookup when the user does not exist.
     const hasSession =
       user && (await sessionServices.hasActiveSession(user.id, decoded.sid));
 
+    // Set `req.user` only for active accounts with an active session.
     if (hasSession && user.account_status === ACCOUNT_STATUS.ACTIVE) {
       req.user = {
         id: user.id,
@@ -38,6 +40,7 @@ const authenticateOptional = async (req, _res, next) => {
 
     return next();
   } catch (err) {
+    // Forward token verification and unexpected errors to the error handler.
     return next(err);
   }
 };

@@ -6,20 +6,43 @@ const { forbidden, unauthorized, badRequest } = require("../utils/error");
 const { ROLES } = require("../config/constants");
 
 /**
- * Ownership-based authorization middleware.
- * Restricts access to resources based on ownership rules.
+ * Maps each supported resource type to its ownership service and label.
  *
- * @param {string} model - Resource type (e.g., "article", "comment")
- * @param {Object} [options={}] - Middleware configuration options
- *
- * @returns {import("express").RequestHandler} Express middleware function
+ * @type {Record<string, { service: { checkOwner: Function }, label: string }>}
  */
-const ownership =
-  (model, options = {}) =>
-  async (req, _res, next) => {
+const RESOURCES = {
+  article: { service: articleServices, label: "article" },
+  comment: { service: commentServices, label: "comment" },
+  user: { service: userServices, label: "user" },
+};
+
+/**
+ * Create middleware that allows the resource owner, and optionally admins.
+ *
+ * @param {"article" | "comment" | "user"} model - Resource type.
+ * @param {Object} [options={}] - Middleware options.
+ * @param {boolean} [options.allowAdmin=false] - Allow admins who are not owners.
+ * @returns {import("express").RequestHandler} Ownership-checking middleware.
+ * @throws {Error} When `model` is not a supported resource type.
+ */
+const ownership = (model, options = {}) => {
+  const resource = RESOURCES[model];
+
+  if (!resource) {
+    throw new Error(`Unsupported ownership model: ${model}`);
+  }
+
+  /**
+   * Allow the owner (and optionally an admin); otherwise pass an error.
+   *
+   * @param {import("express").Request} req - Express request.
+   * @param {import("express").Response} _res - Express response.
+   * @param {import("express").NextFunction} next - Next middleware.
+   * @returns {Promise<void>} Resolves after `next` has been called.
+   */
+  return async (req, _res, next) => {
     try {
-      // Ensure user is authenticated
-      if (!req.user || !req.user.id) {
+      if (!req.user?.id) {
         return next(unauthorized("Authentication required"));
       }
 
@@ -28,92 +51,37 @@ const ownership =
         return next(forbidden("Resource ID is required"));
       }
 
-      // id validation
+      // Reject malformed IDs before they reach the database query.
       if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
-        throw badRequest([
-          {
-            field: "id",
-            message: "invalid input",
-            in: "params",
-          },
-        ]);
-      }
-
-      /**
-       * ARTICLE ownership check
-       */
-      if (model === "article") {
-        const isOwner = await articleServices.checkOwner({
-          resourceId: req.params.id,
-          userId: req.user.id,
-        });
-
-        if (isOwner) {
-          return next();
-        }
-
-        if (options.allowAdmin && req.user.role === ROLES.ADMIN) {
-          return next();
-        }
-
         return next(
-          forbidden("You do not have permission to access this article"),
+          badRequest([{ field: "id", message: "invalid input", in: "params" }]),
         );
       }
 
-      /**
-       * COMMENT ownership check
-       */
-      if (model === "comment") {
-        const isOwner = await commentServices.checkOwner({
-          resourceId: req.params.id,
-          userId: req.user.id,
-        });
+      const isOwner = await resource.service.checkOwner({
+        resourceId: req.params.id,
+        userId: req.user.id,
+      });
 
-        // Allow access if user is owner
-        if (isOwner) {
-          return next();
-        }
-
-        // Allow admin access when needed
-        if (options.allowAdmin && req.user.role === ROLES.ADMIN) {
-          return next();
-        }
-
-        return next(
-          forbidden("You do not have permission to access this comment"),
-        );
+      if (isOwner) {
+        return next();
       }
 
-      /**
-       * User ownership check
-       */
-      if (model === "user") {
-        const isOwner = await userServices.checkOwner({
-          resourceId: req.params.id,
-          userId: req.user.id,
-        });
-
-        // Allow access if user is owner
-        if (isOwner) {
-          return next();
-        }
-
-        // Allow admin access when needed
-        if (options.allowAdmin && req.user.role === ROLES.ADMIN) {
-          return next();
-        }
-
-        return next(
-          forbidden("You do not have permission to access this user"),
-        );
+      // Admins may act on resources they do not own only when `allowAdmin` is set.
+      if (options.allowAdmin && req.user.role === ROLES.ADMIN) {
+        return next();
       }
 
-      // Unsupported model fallback
-      return next(forbidden("You are not allowed to access this resource"));
+      return next(
+        forbidden(
+          `You do not have permission to access this ${resource.label}`,
+        ),
+      );
     } catch (err) {
+      // Forward errors from `checkOwner`, such as a missing resource.
       return next(err);
     }
   };
+};
 
 module.exports = ownership;

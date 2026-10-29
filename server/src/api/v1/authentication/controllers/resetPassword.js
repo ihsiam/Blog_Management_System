@@ -4,19 +4,16 @@ const { validation } = require("../../../../utils");
 const { clearResetTokenCookie } = require("../../../../utils/cookie");
 
 /**
- * Resets a user's password using a valid reset token.
+ * Reset a user's password using a valid reset token.
  *
  * @param {import("express").Request} req - Express request object.
- *
  * @param {Object} req.body - Request payload.
- * @param {string} req.body.password - New user password.
- *
+ * @param {string} req.body.password - New password.
+ * @param {Object} [req.cookies] - Request cookies.
+ * @param {string} [req.cookies.resetToken] - Reset token cookie.
  * @param {import("express").Response} res - Express response object.
- * @param {Function} next - Express error-handling middleware.
- *
- * @returns {Promise<void>} Sends a password reset confirmation response.
- *
- * @throws {Error} BadRequest if password validation fails
+ * @param {import("express").NextFunction} next - Next middleware function.
+ * @returns {Promise<import("express").Response|void>} The Express response after sending the 200 reply, or undefined when an error is forwarded to `next`.
  */
 const resetPassword = async (req, res, next) => {
   try {

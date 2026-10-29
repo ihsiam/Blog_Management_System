@@ -4,21 +4,16 @@ const { unauthorized } = require("../../../../utils/error");
 const { clearRefreshTokenCookie } = require("../../../../utils/cookie");
 
 /**
- * Invalidates the current refresh-token session and clears its cookie.
+ * Invalidate the current refresh-token session and clear its cookie.
  *
  * @param {import("express").Request} req - Express request object.
- * @param {Object} req.cookies - Request cookies.
+ * @param {Object} [req.cookies] - Request cookies.
  * @param {string} [req.cookies.refreshToken] - Refresh token cookie.
- *
  * @param {Object} req.user - Authenticated user.
  * @param {string} req.user.id - User ID.
- *
  * @param {import("express").Response} res - Express response object.
- * @param {Function} next - Express error-handling middleware.
- *
- * @returns {Promise<void>} Sends a logout confirmation response.
- *
- * @throws {Error} Unauthorized error when session is invalid or already logged out
+ * @param {import("express").NextFunction} next - Next middleware function.
+ * @returns {Promise<import("express").Response|void>} The Express response after sending the 200 reply, or undefined when an error is forwarded to `next`.
  */
 const logout = async (req, res, next) => {
   try {

@@ -14,12 +14,10 @@ const BASE_OPTIONS = {
 };
 
 /**
- * Sets the refresh token cookie for the lifetime of the session.
+ * Set the refresh token cookie for the lifetime of the session.
  *
- * @param {import("express").Response} res - Express response object
- * @param {string} token - Refresh token
- *
- * @returns {void}
+ * @param {import("express").Response} res - Express response.
+ * @param {string} token - Refresh token.
  */
 const setRefreshTokenCookie = (res, token) => {
   res.cookie(REFRESH_TOKEN_COOKIE, token, {
@@ -29,23 +27,22 @@ const setRefreshTokenCookie = (res, token) => {
 };
 
 /**
- * Clears the refresh token cookie.
+ * Clear the refresh token cookie.
  *
- * @param {import("express").Response} res - Express response object
+ * The same base options are passed so the browser matches and removes the
+ * cookie that was originally set.
  *
- * @returns {void}
+ * @param {import("express").Response} res - Express response.
  */
 const clearRefreshTokenCookie = (res) => {
   res.clearCookie(REFRESH_TOKEN_COOKIE, BASE_OPTIONS);
 };
 
 /**
- * Sets the short-lived password reset token cookie.
+ * Set the short-lived password reset token cookie.
  *
- * @param {import("express").Response} res - Express response object
- * @param {string} token - Reset token
- *
- * @returns {void}
+ * @param {import("express").Response} res - Express response.
+ * @param {string} token - Reset token.
  */
 const setResetTokenCookie = (res, token) => {
   res.cookie(RESET_TOKEN_COOKIE, token, {
@@ -55,11 +52,12 @@ const setResetTokenCookie = (res, token) => {
 };
 
 /**
- * Clears the password reset token cookie.
+ * Clear the password reset token cookie.
  *
- * @param {import("express").Response} res - Express response object
+ * The same base options are passed so the browser matches and removes the
+ * cookie that was originally set.
  *
- * @returns {void}
+ * @param {import("express").Response} res - Express response.
  */
 const clearResetTokenCookie = (res) => {
   res.clearCookie(RESET_TOKEN_COOKIE, BASE_OPTIONS);

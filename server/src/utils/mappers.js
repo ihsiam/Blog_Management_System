@@ -6,8 +6,12 @@
  */
 
 /**
- * @param {Object} value - Document or plain object
- * @returns {Object} Plain object
+ * Convert a Mongoose document to a plain object; leave other values as shallow copies.
+ *
+ * Falsy values are returned unchanged.
+ *
+ * @param {Object|null|undefined} value - Document or plain object.
+ * @returns {Object|null|undefined} Plain object, or the original falsy value.
  */
 const toPlain = (value) => {
   if (!value) return value;
@@ -15,11 +19,14 @@ const toPlain = (value) => {
 };
 
 /**
- * Maps an article document to the public response shape.
- * Renames cover_image_url → cover, author_id → author, category_id → category.
+ * Map an article document to the public response shape.
  *
- * @param {Object} article - Article document or object
- * @returns {Object} Normalized article
+ * Renames `cover_image_url` to `cover`, `author_id` to `author`, and
+ * `category_id` to `category`. When both names are present, the public name
+ * (`cover`, `author`, `category`) takes precedence.
+ *
+ * @param {Object} article - Article document or object.
+ * @returns {Object} Normalized article.
  */
 const mapArticle = (article) => {
   const object = toPlain(article);
@@ -33,6 +40,7 @@ const mapArticle = (article) => {
     ...rest
   } = object;
 
+  // Prefer already-mapped fields so repeated mapping gives the same result.
   return {
     ...rest,
     cover: cover ?? coverFromDb,
@@ -42,7 +50,7 @@ const mapArticle = (article) => {
 };
 
 /**
- * Maps a comment document (with populated author when present) to the
+ * Map a comment document (with populated author when present) to the
  * response shape shared by every comment endpoint.
  *
  * @param {Object} comment - Comment document or object
@@ -60,6 +68,7 @@ const mapComment = (comment) => {
     ...rest
   } = object;
 
+  // Use `author` when present (even if null); otherwise fall back to `author_id`.
   const resolvedAuthor = author !== undefined ? author : authorFromDb;
 
   return {
@@ -74,22 +83,23 @@ const mapComment = (comment) => {
 };
 
 /**
- * Maps a user document to the public response shape (no password hash).
+ * Map a user document to the public response shape (without `password_hash`).
  *
- * @param {Object} user - User document or object
- * @returns {Object} Sanitized user
+ * @param {Object} user - User document or object.
+ * @returns {Object} Sanitized user.
  */
 const mapUser = (user) => {
   const object = toPlain(user);
+  // Delete from the plain copy so the source document is not mutated.
   delete object.password_hash;
   return object;
 };
 
 /**
- * Maps a user to the public author preview used by article author endpoints.
+ * Map a user to the public author preview used by article author endpoints.
  *
- * @param {Object} user - User document or object
- * @returns {{ id: *, name: * }}
+ * @param {Object} user - User document or object.
+ * @returns {{ id: *, name: * }} Author id and name.
  */
 const mapAuthor = (user) => {
   const object = toPlain(user);
@@ -100,10 +110,10 @@ const mapAuthor = (user) => {
 };
 
 /**
- * Maps a newly registered user to the sign-up response payload.
+ * Map a newly registered user to the sign-up response payload.
  *
- * @param {Object} user - User document or object
- * @returns {Object} Sign-up user fields
+ * @param {Object} user - User document or object.
+ * @returns {Object} Sign-up user fields.
  */
 const mapSignUpUser = (user) => {
   const object = toPlain(user);

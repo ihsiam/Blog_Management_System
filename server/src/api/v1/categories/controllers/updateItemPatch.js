@@ -3,13 +3,17 @@ const categoryServices = require("../../../../lib/categories");
 const { badRequest, conflict } = require("../../../../utils/error");
 
 /**
- * Updates category details.
+ * Update category details via partial payload.
  *
- * @param {import("express").Request} req - Express request object
- * @param {import("express").Response} res - Express response object
- * @param {Function} next - Express error handler middleware
- *
- * @returns {Promise<void>} Sends updated category response
+ * @param {import("express").Request} req - Express request object.
+ * @param {Object} req.params - Route parameters.
+ * @param {string} req.params.id - Category ID.
+ * @param {Object} req.body - Fields to update.
+ * @param {string} [req.body.name] - Updated category name.
+ * @param {string|null} [req.body.description] - Updated category description.
+ * @param {import("express").Response} res - Express response object.
+ * @param {import("express").NextFunction} next - Next middleware function.
+ * @returns {Promise<import("express").Response|void>} The Express response after sending the 200 reply, or undefined when an error is forwarded to `next`.
  */
 const updateItemPatch = async (req, res, next) => {
   try {
@@ -20,6 +24,7 @@ const updateItemPatch = async (req, res, next) => {
     if (!id || !mongoose.Types.ObjectId.isValid(id)) {
       errors.push({ field: "id", message: "invalid input", in: "params" });
     }
+    // Reject no-op PATCH requests that would not change stored data.
     if (name === undefined && description === undefined) {
       errors.push({ field: "body", message: "invalid input", in: "body" });
     }
@@ -51,6 +56,7 @@ const updateItemPatch = async (req, res, next) => {
         links: { self: `/api/v1/categories/${category.id}` },
       });
     } catch (err) {
+      // Map unique-index violation to a client-friendly conflict response.
       if (err.code === 11000) {
         throw conflict("A category with this name already exists.");
       }

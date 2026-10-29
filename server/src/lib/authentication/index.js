@@ -14,19 +14,22 @@ const { badRequest, unauthorized, forbidden } = require("../../utils/error");
 const { hashing } = require("../../utils");
 const tokenServices = require("../token");
 
+/**
+ * Generate a six-digit numeric OTP string.
+ *
+ * @returns {string} Plain-text OTP code.
+ */
 const createOtpCode = () => crypto.randomInt(100000, 1000000).toString();
 
 /**
- * Creates a new user account.
+ * Create a new user account and an email verification OTP.
  *
  * @param {Object} params - Account details.
- * @param {string} params.name - User full name.
+ * @param {string} params.name - Full name of the user.
  * @param {string} params.email - Unique user email.
- * @param {string} params.password - Plain text password.
- *
- * @returns {Promise<Object>} Created user record.
- *
- * @throws {Error} BadRequest if the email already exists.
+ * @param {string} params.password - Plain-text password.
+ * @returns {Promise<Object>} Created user plus `verificationCode`.
+ * @throws {Error} When the email is already registered.
  */
 const register = async ({ name, email, password }) => {
   // Hash the password before persistence.
@@ -36,6 +39,7 @@ const register = async ({ name, email, password }) => {
 
   try {
     let user;
+    // Create the user and the OTP in one transaction so neither is saved alone.
     await session.withTransaction(async () => {
       const hasUser = await userServices.userExist(email, session);
 
@@ -51,6 +55,7 @@ const register = async ({ name, email, password }) => {
         session,
       );
 
+      // Store only a hash of the OTP.
       const codeHash = await hashing.generateHash(code);
 
       await otpServices.createOtp(
@@ -68,20 +73,18 @@ const register = async ({ name, email, password }) => {
 };
 
 /**
- * Creates the first system administrator account.
+ * Create the first system administrator account.
  *
  * This is a one-time bootstrap operation.
  * It should be disabled or protected after initial setup.
  *
  * @param {Object} params - Administrator details.
- * @param {string} params.name - Administrator full name.
+ * @param {string} params.name - Full name of the administrator.
  * @param {string} params.email - Unique administrator email.
- * @param {string} params.password - Administrator password.
- *
+ * @param {string} params.password - Plain-text administrator password.
  * @returns {Promise<Object>} Created administrator user.
- *
- * @throws {Error} Forbidden if an administrator already exists.
- * @throws {Error} BadRequest if the email is already taken.
+ * @throws {Error} When an administrator already exists.
+ * @throws {Error} When the email is already taken.
  */
 const systemAdmin = async ({ name, email, password }) => {
   // Hash the password before persistence.
@@ -93,6 +96,7 @@ const systemAdmin = async ({ name, email, password }) => {
 
     try {
       await session.withTransaction(async () => {
+        // Atomically claim the one-time setup flag.
         const setup = await SystemInfo.findOneAndUpdate(
           { id: "system-admin", adminSetup: false },
           { $set: { adminSetup: true } },
@@ -118,6 +122,7 @@ const systemAdmin = async ({ name, email, password }) => {
         );
       });
     } catch (err) {
+      // Treat a duplicate key error as an already completed setup.
       if (err.code === 11000) {
         throw forbidden("System admin already exists");
       }
@@ -131,21 +136,23 @@ const systemAdmin = async ({ name, email, password }) => {
 };
 
 /**
- * Creates a device session and issues a JWT token pair bound to it.
+ * Create a device session and issue a JWT token pair bound to it.
  *
  * The session ID is embedded in both tokens, so the session can be looked up
  * directly and an access token stops working once its session is removed.
  *
  * @param {Object} params - Session details.
- * @param {Object} params.user - Authenticated user (id, role, email).
+ * @param {Object} params.user - Authenticated user.
+ * @param {string} params.user.id - User ID.
+ * @param {string} params.user.role - User role.
+ * @param {string} params.user.email - User email.
  * @param {string} [params.deviceInfo] - Client device information.
- *
  * @returns {Promise<{accessToken: string, refreshToken: string}>} Access and refresh tokens.
  */
 const createSession = async ({ user, deviceInfo }) => {
   const sessionId = new mongoose.Types.ObjectId();
 
-  // drop this user's expired sessions so they do not pile up
+  // Drop this user's expired sessions so they do not pile up.
   await sessionServices.deleteExpiredSessions(user.id);
 
   const payload = {
@@ -169,21 +176,17 @@ const createSession = async ({ user, deviceInfo }) => {
 };
 
 /**
- * Authenticates a user and issues JWT token pair.
+ * Authenticate a user and issue a JWT token pair.
  *
  * Login is allowed only for active accounts.
  *
  * @param {Object} params - Login details.
  * @param {string} params.email - User email.
- * @param {string} params.password - Plain text password.
+ * @param {string} params.password - Plain-text password.
  * @param {string} [params.deviceInfo] - Client device information.
- *
  * @returns {Promise<{accessToken: string, refreshToken: string}>} Access and refresh tokens.
- *
- * @throws {Error} Unauthorized if credentials are invalid.
- * @throws {Error} Forbidden if the account is not active.
- * @throws {Error} Unauthorized if credentials are invalid.
- * @throws {Error} Forbidden if the account is not active.
+ * @throws {Error} When the credentials are invalid.
+ * @throws {Error} When the account is not active.
  */
 const login = async ({ email, password, deviceInfo }) => {
   const user = await userServices.findUserByEmail(email);
@@ -207,14 +210,12 @@ const login = async ({ email, password, deviceInfo }) => {
 };
 
 /**
- * Issues a new access token for an active device session.
+ * Issue a new access token for an active device session.
  *
  * @param {string} token - Refresh token from the client.
- *
  * @returns {Promise<{accessToken: string}>} New access token.
- *
- * @throws {Error} Unauthorized if the token is invalid or revoked.
- * @throws {Error} Forbidden if the account is inactive.
+ * @throws {Error} When the token is invalid, the user no longer exists, or the session is revoked.
+ * @throws {Error} When the account is not active.
  */
 const refreshToken = async (token) => {
   const decoded = tokenServices.verifyRefreshToken(token);
@@ -250,11 +251,14 @@ const refreshToken = async (token) => {
 };
 
 /**
- * Verifies an email OTP and activates the pending account.
+ * Verify an email OTP and activate the pending account.
  *
- * @param {{email: string, code: string}} params - Verification details.
+ * @param {Object} params - Verification details.
+ * @param {string} params.email - User email.
+ * @param {string} params.code - Plain-text OTP.
  * @returns {Promise<void>} Resolves after the account is activated.
- * @throws {Error} BadRequest if the OTP is invalid, expired, or already used.
+ * @throws {Error} When the OTP is invalid, expired, or already used.
+ * @throws {Error} When the account is not pending verification.
  */
 const verifyEmailOtp = async ({ email, code }) => {
   // Count the attempt outside the transaction so a failure is not rolled back.
@@ -292,10 +296,10 @@ const verifyEmailOtp = async ({ email, code }) => {
 };
 
 /**
- * Creates an email verification OTP for a pending account.
+ * Create an email verification OTP for a pending account.
  *
- * @param {string} email - User email address.
- * @returns {Promise<{user: Object|null, code: string}>} User and plaintext OTP.
+ * @param {string} email - User email.
+ * @returns {Promise<{user: Object|null, code: string}>} User (if found) and plain-text OTP.
  */
 const createVerificationOtp = async (email) => {
   const code = createOtpCode();
@@ -321,10 +325,10 @@ const createVerificationOtp = async (email) => {
 };
 
 /**
- * Creates a password reset OTP for an eligible account.
+ * Create a password reset OTP for an eligible (non-blocked) account.
  *
- * @param {string} email - User email address.
- * @returns {Promise<{user: Object|null, code: string}>} User and plaintext OTP.
+ * @param {string} email - User email.
+ * @returns {Promise<{user: Object|null, code: string}>} User (if found) and plain-text OTP.
  */
 const createPasswordResetOtp = async (email) => {
   const code = createOtpCode();
@@ -350,11 +354,13 @@ const createPasswordResetOtp = async (email) => {
 };
 
 /**
- * Verifies a password reset OTP and creates a reset token.
+ * Verify a password reset OTP and create a reset token.
  *
- * @param {{email: string, code: string}} params - Verification details.
- * @returns {Promise<string>} Plaintext password reset token.
- * @throws {Error} BadRequest if the OTP is invalid or expired.
+ * @param {Object} params - Verification details.
+ * @param {string} params.email - User email.
+ * @param {string} params.code - Plain-text OTP.
+ * @returns {Promise<string>} Plain-text password reset token.
+ * @throws {Error} When the OTP is invalid, expired, or already used.
  */
 const verifyResetOtp = async ({ email, code }) => {
   const resetToken = crypto.randomBytes(32).toString("hex");
@@ -380,6 +386,7 @@ const verifyResetOtp = async ({ email, code }) => {
         throw badRequest(null, "Invalid or expired OTP");
       }
 
+      // Store only a digest of the token so the raw value is never persisted.
       await passwordResetServices.savePasswordResetToken(
         user.id,
         hashing.generateDigest(resetToken),
@@ -394,11 +401,13 @@ const verifyResetOtp = async ({ email, code }) => {
 };
 
 /**
- * Resets a password and invalidates the user's refresh-token sessions.
+ * Reset a password and invalidate the user's refresh-token sessions.
  *
- * @param {{token: string, password: string}} params - Reset details.
+ * @param {Object} params - Reset details.
+ * @param {string} params.token - Raw password reset token.
+ * @param {string} params.password - New plain-text password.
  * @returns {Promise<void>} Resolves after the password has been reset.
- * @throws {Error} Unauthorized if the reset token is invalid, expired, or used.
+ * @throws {Error} When the reset token is invalid, expired, or already used.
  */
 const resetPassword = async ({ token, password }) => {
   const session = await mongoose.startSession();
@@ -419,6 +428,7 @@ const resetPassword = async ({ token, password }) => {
         session,
       );
       if (!used) throw unauthorized("Invalid or expired reset token");
+      // Revoke existing sessions so old logins stop working after the reset.
       await sessionServices.clearRefreshToken(
         { id: resetToken.user_id },
         session,

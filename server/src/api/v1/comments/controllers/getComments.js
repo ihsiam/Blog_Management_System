@@ -6,31 +6,24 @@ const commentServices = require("../../../../lib/comments");
 const serviceRegistry = require("../../../../lib/serviceRegistry");
 const { query } = require("../../../../utils");
 const { mapComment } = require("../../../../utils/mappers");
+
 /**
- * Retrieves paginated comments with filtering, sorting, and optional article filtering.
+ * List comments with pagination, sort, and optional article/status filters.
  *
- * - Pagination (page, limit)
- * - Sorting (sortBy, sortType)
- * - Filtering by articleId and status
- * - HATEOAS navigation links
- *
- * @param {import("express").Request} req - Express request object
- * @param {Object} req.query - Query parameters
- * @param {string} [req.query.page] - Page number (starts from 1)
- * @param {string} [req.query.limit] - Number of items per page
- * @param {string} [req.query.sortType] - Sort direction (asc | desc)
- * @param {string} [req.query.sortBy] - Field name to sort by
- * @param {string} [req.query.articleId] - Article ID to filter comments
- * @param {string} [req.query.status] - Comment status filter (e.g., public, hidden)
- *
- * @param {import("express").Response} res - Express response object
- * @param {Function} next - Express error handling middleware
- *
- * @returns {Promise<void>} Sends paginated comments response
+ * @param {import("express").Request} req - Express request object.
+ * @param {Object} req.query - Query parameters.
+ * @param {string} [req.query.page=defaults.page] - Page number.
+ * @param {string} [req.query.limit=defaults.limit] - Items per page.
+ * @param {string} [req.query.sortType=defaults.sortType] - Sort direction ("asc" | "desc").
+ * @param {string} [req.query.sortBy=defaults.sortBy] - Field to sort by.
+ * @param {string} [req.query.articleId] - Article ID to filter comments.
+ * @param {string} [req.query.status] - Comment status filter (public or hidden).
+ * @param {import("express").Response} res - Express response object.
+ * @param {import("express").NextFunction} next - Next middleware function.
+ * @returns {Promise<import("express").Response|void>} The Express response after sending the 200 reply, or undefined when an error is forwarded to `next`.
  */
 const getComments = async (req, res, next) => {
   try {
-    // extract query params
     const page = Number(req.query.page || defaults.page);
     const limit = Number(req.query.limit || defaults.limit);
     const sortType = req.query.sortType || defaults.sortType;
@@ -38,10 +31,8 @@ const getComments = async (req, res, next) => {
     const { articleId } = req.query;
     const { status } = req.query || null;
 
-    // collect validation errors
     const errors = [];
 
-    // validate page
     if (!Number.isInteger(page) || page < 1) {
       errors.push({
         field: "page",
@@ -50,7 +41,6 @@ const getComments = async (req, res, next) => {
       });
     }
 
-    // validate limit
     if (!Number.isInteger(limit) || limit < 1 || limit > defaults.maxLimit) {
       errors.push({
         field: "limit",
@@ -59,7 +49,6 @@ const getComments = async (req, res, next) => {
       });
     }
 
-    // validate sort type
     if (!["asc", "desc"].includes(sortType)) {
       errors.push({
         field: "sortType",
@@ -68,7 +57,6 @@ const getComments = async (req, res, next) => {
       });
     }
 
-    // validate sort by
     if (!["createdAt", "updatedAt"].includes(sortBy)) {
       errors.push({
         field: "sortBy",
@@ -85,7 +73,6 @@ const getComments = async (req, res, next) => {
       });
     }
 
-    // id validation
     if (
       articleId &&
       (typeof articleId !== "string" ||
@@ -98,12 +85,10 @@ const getComments = async (req, res, next) => {
       });
     }
 
-    // throw validation error if exists
     if (errors.length) {
       throw badRequest(errors, "invalid input");
     }
 
-    // fetch comments
     const comments = await serviceRegistry.getComments({
       page,
       limit,
@@ -114,16 +99,13 @@ const getComments = async (req, res, next) => {
     });
     const data = comments.map(mapComment);
 
-    // count total comments
     const totalItem = await commentServices.count({
       articleId,
       status,
     });
 
-    // pagination metadata
     const pagination = query.getPagination(page, limit, totalItem);
 
-    // HATEOAS links
     const links = query.hateOAS({
       url: req.url,
       path: req.path,
@@ -133,7 +115,6 @@ const getComments = async (req, res, next) => {
       page,
     });
 
-    // response
     return res.status(200).json({
       code: 200,
       message: "Data retrieved",

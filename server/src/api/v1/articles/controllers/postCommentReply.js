@@ -5,19 +5,19 @@ const { badRequest } = require("../../../../utils/error");
 const { mapComment } = require("../../../../utils/mappers");
 
 /**
- * Creates a reply to an article comment.
+ * Post a reply under an existing article comment.
  *
- * @param {import("express").Request} req - Express request object
- * @param {Object} req.params - Route parameters
- * @param {string} req.params.articleId - Article ID
- * @param {string} req.params.commentId - Parent comment ID
- * @param {Object} req.body - Request body
- * @param {string} req.body.body - Reply text
- * @param {Object} req.user - Authenticated user
- * @param {import("express").Response} res - Express response object
- * @param {Function} next - Express error handler middleware
- *
- * @returns {Promise<void>} Sends the created reply response
+ * @param {import("express").Request} req - Express request object.
+ * @param {Object} req.params - Route parameters.
+ * @param {string} req.params.articleId - Article ID.
+ * @param {string} req.params.commentId - Parent comment ID.
+ * @param {Object} req.body - Request body.
+ * @param {string} req.body.body - Reply text.
+ * @param {Object} req.user - Authenticated user.
+ * @param {string} req.user.id - Reply author ID.
+ * @param {import("express").Response} res - Express response object.
+ * @param {import("express").NextFunction} next - Next middleware function.
+ * @returns {Promise<import("express").Response|void>} The Express response after sending the 201 reply, or undefined when an error is forwarded to `next`.
  */
 const postCommentReply = async (req, res, next) => {
   try {

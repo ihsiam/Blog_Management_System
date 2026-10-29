@@ -6,22 +6,23 @@ const { notFound } = require("../../utils/error");
 const { getCache, setCache, deleteCachePattern } = require("../../utils/cache");
 const { mapComment } = require("../../utils/mappers");
 
+// Cache lifetime, in seconds, for public comment lists and counts
 const ARTICLE_COMMENTS_TTL_SECONDS = 60;
 
 /**
- * Populates the author name on a comment document.
+ * Populate the author name on a comment document.
  *
- * @param {Object} comment - Comment document
- * @returns {Promise<Object>} The same document with `author_id` populated
+ * @param {Object} comment - Comment document.
+ * @returns {Promise<Object>} The same document with `author_id` populated.
  */
 const populateAuthor = (comment) =>
   comment.populate({ path: "author_id", select: "name" });
 
 /**
- * Drops public comment lists and article payloads that embed comments.
+ * Drop cached comment lists, comment counts, and article payloads that embed comments.
  *
- * @param {string} articleId - Article ID
- * @returns {Promise<void>}
+ * @param {string|import("mongoose").Types.ObjectId} articleId - Article ID.
+ * @returns {Promise<void>} Resolves when matching cache keys are deleted.
  */
 const invalidateArticleCommentCaches = async (articleId) => {
   if (!articleId) {
@@ -34,19 +35,14 @@ const invalidateArticleCommentCaches = async (articleId) => {
 };
 
 /**
- * Fetch comments for a specific article as a nested tree.
+ * Fetch comments for an article as a nested tree.
  *
- * - Supports pagination of top-level comments
- * - Filters by status (optional)
- * - Populates author details
- *
- * @param {Object} params
- * @param {string} params.articleId - Article ID
- * @param {number} [params.page] - Page number
- * @param {number} [params.limit] - Items per page
- * @param {string} [params.status] - Comment status filter
- *
- * @returns {Promise<Array<Object>>} List of top-level comments with replies
+ * @param {Object} params - Query options.
+ * @param {string} params.articleId - Article ID.
+ * @param {number} [params.page=defaults.page] - Page number.
+ * @param {number} [params.limit=defaults.limit] - Items per page.
+ * @param {string} [params.status] - Comment status filter.
+ * @returns {Promise<Array<Object>>} Top-level comments with nested replies.
  */
 const getCommentsByArticle = async ({
   articleId,
@@ -64,7 +60,6 @@ const getCommentsByArticle = async ({
     }
   }
 
-  // build filter
   const filter = { article_id: articleId };
 
   if (status) {
@@ -80,7 +75,7 @@ const getCommentsByArticle = async ({
     replies: [],
   }));
 
-  // keys are strings so parent lookups match ObjectId values
+  // Keys are strings so parent lookups match ObjectId values.
   const nodeMap = new Map(nodes.map((node) => [node.id.toString(), node]));
   const roots = [];
 
@@ -93,6 +88,12 @@ const getCommentsByArticle = async ({
     }
   });
 
+  /**
+   * Remove tree-building fields from a comment node and its replies.
+   *
+   * @param {Object} node - Comment node with nested replies.
+   * @returns {Object} Copy of the node without `parentCommentId`, with replies cleaned recursively.
+   */
   const stripInternalFields = (node) => {
     const rest = { ...node };
     delete rest.parentCommentId;
@@ -103,6 +104,7 @@ const getCommentsByArticle = async ({
     };
   };
 
+  // Paginate top-level comments only, after the full tree is built
   const result = roots
     .slice(page * limit - limit, page * limit)
     .map(stripInternalFields);
@@ -115,20 +117,15 @@ const getCommentsByArticle = async ({
 };
 
 /**
- * Fetch all comments.
+ * Fetch a flat, paginated list of comments.
  *
- * - Supports filtering by article and status
- * - Supports sorting
- * - Supports pagination
- *
- * @param {Object} params
- * @param {number} [params.page]
- * @param {number} [params.limit]
- * @param {string} [params.sortKey]
- * @param {string} [params.articleId]
- * @param {string} [params.status]
- *
- * @returns {Promise<Array<Object>>}
+ * @param {Object} params - Query options.
+ * @param {number} [params.page=defaults.page] - Page number.
+ * @param {number} [params.limit=defaults.limit] - Items per page.
+ * @param {string} [params.sortKey] - Mongoose sort key (for example `-createdAt`).
+ * @param {string} [params.articleId] - Article ID filter.
+ * @param {string} [params.status] - Comment status filter.
+ * @returns {Promise<Array<Object>>} Mapped comments.
  */
 const getAllComments = async ({
   page = defaults.page,
@@ -137,7 +134,6 @@ const getAllComments = async ({
   articleId,
   status,
 }) => {
-  // build filter
   const filter = {};
 
   if (articleId) {
@@ -158,14 +154,13 @@ const getAllComments = async ({
 };
 
 /**
- * Count comments based on filter.
+ * Count comments matching optional filters.
  *
- * @param {Object} params
- * @param {string} [params.articleId] - Article ID filter
- * @param {string} [params.status] - Comment status filter
- * @param {boolean} [params.topLevel] - Count only top-level comments
- *
- * @returns {Promise<number>} Total count
+ * @param {Object} params - Filter options.
+ * @param {string} [params.articleId] - Article ID filter.
+ * @param {string} [params.status] - Comment status filter.
+ * @param {boolean} [params.topLevel=false] - Count only top-level comments when true.
+ * @returns {Promise<number>} Matching comment count.
  */
 const count = async ({ articleId, status, topLevel = false }) => {
   const cacheable = articleId && status === COMMENT_STATUS.PUBLIC;
@@ -178,7 +173,6 @@ const count = async ({ articleId, status, topLevel = false }) => {
     }
   }
 
-  // build filter
   const filter = {};
 
   if (articleId) {
@@ -202,16 +196,16 @@ const count = async ({ articleId, status, topLevel = false }) => {
 };
 
 /**
- * Creates a new comment.
+ * Create a new comment.
  *
- * @param {Object} params
- * @param {string} params.articleId - Article ID
- * @param {string} params.body - Comment content
- * @param {string} [params.status] - Comment status
- * @param {string} params.author - User ID
- * @param {string} [params.parentCommentId] - Parent comment ID for replies
- *
- * @returns {Promise<Object>} Created comment
+ * @param {Object} params - Comment fields.
+ * @param {string} params.articleId - Article ID.
+ * @param {string} params.body - Comment content.
+ * @param {string} [params.status=defaults.commentStatus] - Comment status.
+ * @param {string} params.author - Author user ID.
+ * @param {string|null} [params.parentCommentId=null] - Parent comment ID for replies.
+ * @returns {Promise<Object>} Created comment.
+ * @throws {Error} When the parent comment is missing or not a public comment on the article.
  */
 const create = async ({
   articleId,
@@ -221,7 +215,7 @@ const create = async ({
   parentCommentId = null,
 }) => {
   if (parentCommentId) {
-    // replies are only allowed on visible comments of the same article
+    // Allow replies only to public comments on the same article.
     const parentComment = await Comment.findOne({
       _id: parentCommentId,
       article_id: articleId,
@@ -248,27 +242,22 @@ const create = async ({
 };
 
 /**
- * Updates a comment.
+ * Update a comment body.
  *
- * @param {Object} params
- * @param {string} params.id - Comment ID
- * @param {string} [params.body] - Updated body
- * @param {string} [params.status] - Updated status
- *
- * @returns {Promise<Object>} Updated comment
- * @throws {Error} NotFound if comment does not exist
+ * @param {Object} params - Fields to update.
+ * @param {string} params.id - Comment ID.
+ * @param {string} [params.body] - Updated body.
+ * @returns {Promise<Object>} Updated comment.
+ * @throws {Error} When the comment does not exist.
  */
-const updateComment = async ({ id, body, status }) => {
-  // find comment
+const updateComment = async ({ id, body }) => {
   const comment = await Comment.findById(id);
 
   if (!comment) {
     throw notFound();
   }
 
-  // update data
   if (body !== undefined) comment.body = body;
-  if (status !== undefined) comment.status = status;
 
   await comment.save();
   await populateAuthor(comment);
@@ -279,13 +268,13 @@ const updateComment = async ({ id, body, status }) => {
 };
 
 /**
- * Updates a comment visibility status.
+ * Update the status of a comment.
  *
- * @param {Object} params
- * @param {string} params.id - Comment ID
- * @param {string} params.status - Comment visibility status
- * @returns {Promise<Object>} Updated comment
- * @throws {Error} NotFound if comment does not exist
+ * @param {Object} params - Status update fields.
+ * @param {string} params.id - Comment ID.
+ * @param {string} params.status - New comment status.
+ * @returns {Promise<Object>} Updated comment.
+ * @throws {Error} When the comment does not exist.
  */
 const updateStatus = async ({ id, status }) => {
   const comment = await Comment.findById(id);
@@ -305,13 +294,11 @@ const updateStatus = async ({ id, status }) => {
 };
 
 /**
- * Collects the given comment IDs plus the IDs of all their nested replies.
+ * Collect the given comment IDs plus the IDs of all nested replies.
  *
- * Walks the reply tree one level per query instead of one query per comment.
- *
- * @param {Array<ObjectId>} rootIds - IDs of the top comments
- * @param {ClientSession} [session] - Optional MongoDB session
- * @returns {Promise<Array<string>>} Root and reply IDs
+ * @param {Array<import("mongoose").Types.ObjectId>} rootIds - IDs of the top comments.
+ * @param {import("mongoose").ClientSession} [session] - Optional MongoDB session.
+ * @returns {Promise<Array<string>>} IDs of the given comments and all nested replies, as strings.
  */
 const collectCommentTreeIds = async (rootIds, session) => {
   const ids = new Set(rootIds.map((rootId) => rootId.toString()));
@@ -323,9 +310,11 @@ const collectCommentTreeIds = async (rootIds, session) => {
     );
     if (session) query.session(session);
 
+    // Each level depends on the previous one, so queries must run in sequence
     // eslint-disable-next-line no-await-in-loop
     const children = await query;
 
+    // Skip IDs that were already collected so the walk always ends
     level = children
       .map((child) => child._id)
       .filter((childId) => !ids.has(childId.toString()));
@@ -336,11 +325,11 @@ const collectCommentTreeIds = async (rootIds, session) => {
 };
 
 /**
- * Deletes the comments matching a filter together with all nested replies.
+ * Delete comments matching a filter together with all nested replies.
  *
- * @param {Object} filter - MongoDB filter selecting the top comments
- * @param {ClientSession} [session] - Optional MongoDB session
- * @returns {Promise<number>} Number of deleted comments
+ * @param {Object} filter - MongoDB filter selecting the top comments.
+ * @param {import("mongoose").ClientSession} [session] - Optional MongoDB session.
+ * @returns {Promise<number>} Number of deleted comments.
  */
 const deleteWithReplies = async (filter, session) => {
   const query = Comment.find(filter).select("_id");
@@ -361,18 +350,18 @@ const deleteWithReplies = async (filter, session) => {
 };
 
 /**
- * Deletes a comment and all of its nested replies.
+ * Delete a comment and all of its nested replies.
  *
- * @param {string} id - Comment ID
- * @returns {Promise<boolean>} Deletion success flag
- * @throws {Error} NotFound if comment does not exist
+ * @param {string} id - Comment ID.
+ * @returns {Promise<boolean>} True when deletion completes.
+ * @throws {Error} When the comment does not exist.
  */
 const deleteItem = async (id) => {
   const session = await mongoose.startSession();
   let articleId;
 
   try {
-    // comment and replies are removed together or not at all
+    // Comment and replies are removed together or not at all.
     await session.withTransaction(async () => {
       const comment = await Comment.findById(id).session(session);
 
@@ -388,17 +377,18 @@ const deleteItem = async (id) => {
     await session.endSession();
   }
 
+  // Clear caches only after the transaction has committed
   await invalidateArticleCommentCaches(articleId);
 
   return true;
 };
 
 /**
- * Deletes multiple comments based on filter.
+ * Delete multiple comments matching a filter (without nested replies).
  *
- * @param {Object} filter - MongoDB filter
- * @param {ClientSession} [session] - Optional MongoDB session
- * @returns {Promise<boolean>} Success flag
+ * @param {Object} filter - MongoDB filter.
+ * @param {import("mongoose").ClientSession} [session] - Optional MongoDB session.
+ * @returns {Promise<boolean>} True when the delete operation returned a result.
  */
 const deleteMany = async (filter, session) => {
   const result = await Comment.deleteMany(
@@ -409,14 +399,13 @@ const deleteMany = async (filter, session) => {
 };
 
 /**
- * Checks ownership of a comment.
+ * Return whether `userId` authored the comment.
  *
- * @param {Object} params
- * @param {string} params.resourceId - Comment ID
- * @param {string} params.userId - User ID
- *
- * @returns {Promise<boolean>} Ownership result
- * @throws {Error} NotFound if comment does not exist
+ * @param {Object} params - Ownership check fields.
+ * @param {string} params.resourceId - Comment ID.
+ * @param {string} params.userId - Authenticated user ID.
+ * @returns {Promise<boolean>} True when the user is the author.
+ * @throws {Error} When the comment does not exist.
  */
 const checkOwner = async ({ resourceId, userId }) => {
   const comment = await Comment.findById(resourceId);

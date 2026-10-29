@@ -4,25 +4,17 @@ const { badRequest } = require("../../../../utils/error");
 const { mapArticle } = require("../../../../utils/mappers");
 
 /**
- * Retrieves a single article by ID.
+ * Fetch one article by ID with optional related-data expansion.
  *
- * Supports optional expansion of related fields via `expand` query param.
- *
- * Response includes:
- * - Article data
- * - HATEOAS-style navigation links
- *
- * @param {import("express").Request} req - Express request object
- * @param {Object} req.params - Route parameters
- * @param {string} req.params.id - Article ID
- *
- * @param {Object} req.query - Query parameters
- * @param {string} [req.query.expand] - Optional related data expansion (e.g. author, comments)
- *
- * @param {import("express").Response} res
- * @param {Function} next
- *
- * @returns {Promise<void>} Sends single article response
+ * @param {import("express").Request} req - Express request object.
+ * @param {Object} req.params - Route parameters.
+ * @param {string} req.params.id - Article ID.
+ * @param {Object} req.query - Query parameters.
+ * @param {string} [req.query.expand] - Comma-separated expansions (only "comments" is supported).
+ * @param {Object} [req.user] - Authenticated user, passed to the article service.
+ * @param {import("express").Response} res - Express response object.
+ * @param {import("express").NextFunction} next - Next middleware function.
+ * @returns {Promise<import("express").Response|void>} The Express response after sending the 200 reply, or undefined when an error is forwarded to `next`.
  */
 const findSingleItem = async (req, res, next) => {
   try {
@@ -36,14 +28,8 @@ const findSingleItem = async (req, res, next) => {
             .filter(Boolean)
         : [];
 
-    /**
-     * Collect validation errors
-     */
     const errors = [];
 
-    /**
-     * Validate article ID
-     */
     if (!id || !mongoose.Types.ObjectId.isValid(id)) {
       errors.push({
         field: "id",
@@ -52,9 +38,6 @@ const findSingleItem = async (req, res, next) => {
       });
     }
 
-    /**
-     * Validate expand query
-     */
     if (typeof expand !== "string") {
       errors.push({
         field: "expand",
@@ -74,25 +57,16 @@ const findSingleItem = async (req, res, next) => {
       });
     }
 
-    /**
-     * Throw validation error if any exist
-     */
     if (errors.length) {
       throw badRequest(errors, "invalid input");
     }
 
-    /**
-     * Fetch article from service layer
-     */
     const article = await articleServices.findSingleItem({
       id,
       expand,
       user: req.user,
     });
 
-    /**
-     * Response
-     */
     return res.status(200).json({
       code: 200,
       message: "Data retrieved",

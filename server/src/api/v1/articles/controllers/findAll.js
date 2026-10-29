@@ -7,32 +7,22 @@ const { ARTICLE_STATUS } = require("../../../../config/constants");
 const { mapArticle } = require("../../../../utils/mappers");
 
 /**
- * Retrieves a paginated list of published articles.
+ * List published articles with pagination, sort, search, and category filter.
  *
- * - Pagination (page, limit)
- * - Sorting (sortBy, sortType)
- * - Search filtering
- * - Only "published" articles are returned
- *
- * @param {import("express").Request} req - Express request object
- * @param {Object} req.query - Query parameters
- * @param {string} [req.query.page] - Page number (defaults to system default)
- * @param {string} [req.query.limit] - Items per page (defaults to system default)
- * @param {string} [req.query.sortType] - Sort order ("asc" | "desc")
- * @param {string} [req.query.sortBy] - Field to sort by
- * @param {string} [req.query.search] - Search keyword
- * @param {string} [req.query.category] - Category ID filter
- *
- * @param {import("express").Response} res - Express response object
- * @param {Function} next - Express error handler middleware
- *
- * @returns {Promise<void>} Sends paginated article list response
+ * @param {import("express").Request} req - Express request object.
+ * @param {Object} req.query - Query parameters.
+ * @param {string} [req.query.page=defaults.page] - Page number.
+ * @param {string} [req.query.limit=defaults.limit] - Items per page.
+ * @param {string} [req.query.sortType=defaults.sortType] - Sort order ("asc" | "desc").
+ * @param {string} [req.query.sortBy=defaults.sortBy] - Field to sort by.
+ * @param {string} [req.query.search=defaults.searchTerm] - Search keyword.
+ * @param {string} [req.query.category] - Category ID filter.
+ * @param {import("express").Response} res - Express response object.
+ * @param {import("express").NextFunction} next - Next middleware function.
+ * @returns {Promise<import("express").Response|void>} The Express response after sending the 200 reply, or undefined when an error is forwarded to `next`.
  */
 const findAll = async (req, res, next) => {
   try {
-    /**
-     * Extract query params with fallback defaults
-     */
     const page = Number(req.query.page || defaults.page);
     const limit = Number(req.query.limit || defaults.limit);
     const sortType = req.query.sortType || defaults.sortType;
@@ -40,21 +30,12 @@ const findAll = async (req, res, next) => {
     const searchTerm = req.query.search || defaults.searchTerm;
     const { category } = req.query;
 
-    /**
-     * Collect validation errors
-     */
     const errors = [];
 
-    /**
-     * Validate page number
-     */
     if (!Number.isInteger(page) || page < 1) {
       errors.push({ field: "page", message: "invalid input", in: "query" });
     }
 
-    /**
-     * Validate limit
-     */
     if (!Number.isInteger(limit) || limit < 1 || limit > defaults.maxLimit) {
       errors.push({ field: "limit", message: "invalid input", in: "query" });
     }
@@ -74,9 +55,6 @@ const findAll = async (req, res, next) => {
       errors.push({ field: "category", message: "invalid input", in: "query" });
     }
 
-    /**
-     * Validate sort type
-     */
     if (!["asc", "desc"].includes(sortType)) {
       errors.push({
         field: "sortType",
@@ -85,23 +63,15 @@ const findAll = async (req, res, next) => {
       });
     }
 
-    /**
-     * Validate sort field
-     */
     if (!["title", "createdAt", "updatedAt"].includes(sortBy)) {
       errors.push({ field: "sortBy", message: "invalid input", in: "query" });
     }
 
-    /**
-     * Throw validation error if any exist
-     */
     if (errors.length) {
       throw badRequest(errors, "invalid input");
     }
 
-    /**
-     * Fetch only published articles
-     */
+    // Public listing must not expose draft or non-published rows.
     const articles = await articleServices.findAll({
       page,
       limit,
@@ -112,32 +82,20 @@ const findAll = async (req, res, next) => {
       category,
     });
 
-    /**
-     * Count only published articles
-     */
     const totalItems = await articleServices.count({
       searchTerm,
       status: ARTICLE_STATUS.PUBLISHED,
       category,
     });
 
-    /**
-     * Transform response data (DTO layer)
-     */
     const data = query.transformData({
       items: articles.map(mapArticle),
       selection: ["id", "title", "cover", "author", "createdAt", "updatedAt"],
       path: "/api/v1/articles",
     });
 
-    /**
-     * Generate pagination metadata
-     */
     const pagination = query.getPagination(page, limit, totalItems);
 
-    /**
-     * Generate HATEOAS navigation links
-     */
     const links = query.hateOAS({
       url: req.url,
       path: req.path,
@@ -147,9 +105,6 @@ const findAll = async (req, res, next) => {
       page,
     });
 
-    /**
-     * Final response
-     */
     return res.status(200).json({
       code: 200,
       message: "Data retrieved",

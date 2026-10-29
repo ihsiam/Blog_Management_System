@@ -31,6 +31,7 @@ const OtpSchema = new Schema(
   schemaOptions,
 );
 
+// Indexes
 OtpSchema.index({ user_id: 1, purpose: 1 }, { unique: true });
 
 const OTP = model("OTP", OtpSchema);

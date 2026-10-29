@@ -3,12 +3,12 @@ const { hashing } = require("../../utils");
 const { TTL_MS } = require("../../config/constants");
 
 /**
- * Create or replace the reset token of a user
+ * Create or replace the password reset token for a user.
  *
- * @param {string} userId - User ID
- * @param {string} tokenHash - SHA-256 digest of the raw reset token
- * @param {ClientSession} [session] - Optional MongoDB session
- * @returns {Promise<void>}
+ * @param {string} userId - User ID.
+ * @param {string} tokenHash - SHA-256 digest of the raw reset token.
+ * @param {import("mongoose").ClientSession} [session] - Optional MongoDB session.
+ * @returns {Promise<void>} Resolves when the token document is saved.
  */
 const savePasswordResetToken = async (userId, tokenHash, session) => {
   await PasswordResetToken.findOneAndUpdate(
@@ -20,16 +20,17 @@ const savePasswordResetToken = async (userId, tokenHash, session) => {
         expiresAt: new Date(Date.now() + TTL_MS.RESET_TOKEN),
       },
     },
+    // Upsert so the first request for a user creates the document.
     { upsert: true, new: true, session },
   );
 };
 
 /**
- * Find an unused, unexpired password reset token by its raw value
+ * Find an unused, unexpired password reset token by its raw value.
  *
- * @param {string} token - Raw reset token
- * @param {ClientSession} [session] - Optional MongoDB session
- * @returns {Promise<Object|null>} Reset token document or null
+ * @param {string} token - Raw reset token.
+ * @param {import("mongoose").ClientSession} [session] - Optional MongoDB session.
+ * @returns {Promise<Object|null>} Reset token document, or null when invalid.
  */
 const findPasswordResetToken = async (token, session) => {
   const query = PasswordResetToken.findOne({
@@ -43,14 +44,15 @@ const findPasswordResetToken = async (token, session) => {
 };
 
 /**
- * Mark a reset token as used
+ * Mark a reset token as used.
  *
- * @param {string} id - Reset token ID
- * @param {ClientSession} [session] - Optional MongoDB session
- * @returns {Promise<boolean>} False when the token was already used
+ * @param {string} id - Reset token ID.
+ * @param {import("mongoose").ClientSession} [session] - Optional MongoDB session.
+ * @returns {Promise<boolean>} True when the token was marked as used, or false when it was already used or does not exist.
  */
 const markPasswordResetTokenUsed = async (id, session) => {
   const query = PasswordResetToken.updateOne(
+    // Match only unused tokens so a token cannot be consumed twice.
     { _id: id, is_used: false },
     { $set: { is_used: true } },
   );
@@ -61,11 +63,11 @@ const markPasswordResetTokenUsed = async (id, session) => {
 };
 
 /**
- * Delete the reset token of a user
+ * Delete all password reset tokens for a user.
  *
- * @param {string} userId - User ID
- * @param {ClientSession} [session] - Optional MongoDB session
- * @returns {Promise<void>}
+ * @param {string} userId - User ID.
+ * @param {import("mongoose").ClientSession} [session] - Optional MongoDB session.
+ * @returns {Promise<void>} Resolves when matching token documents are deleted.
  */
 const deletePasswordResetTokenByUser = async (userId, session) => {
   await PasswordResetToken.deleteMany(

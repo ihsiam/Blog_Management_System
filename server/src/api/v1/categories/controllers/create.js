@@ -2,14 +2,15 @@ const categoryServices = require("../../../../lib/categories");
 const { badRequest, conflict } = require("../../../../utils/error");
 
 /**
- * Creates a new category.
+ * Create a category.
  *
- * @param {import("express").Request} req - Express request object
- * @param {Object} req.body - Request payload
- * @param {import("express").Response} res - Express response object
- * @param {Function} next - Express error handler middleware
- *
- * @returns {Promise<void>} Sends created category response
+ * @param {import("express").Request} req - Express request object.
+ * @param {Object} req.body - Request payload.
+ * @param {string} req.body.name - Category display name.
+ * @param {string|null} [req.body.description] - Optional category description.
+ * @param {import("express").Response} res - Express response object.
+ * @param {import("express").NextFunction} next - Next middleware function.
+ * @returns {Promise<import("express").Response|void>} The Express response after sending the 201 reply, or undefined when an error is forwarded to `next`.
  */
 const create = async (req, res, next) => {
   try {
@@ -44,6 +45,7 @@ const create = async (req, res, next) => {
         links: { self: `/api/v1/categories/${category.id}` },
       });
     } catch (err) {
+      // Map unique-index violation to a client-friendly conflict response.
       if (err.code === 11000) {
         throw conflict("A category with this name already exists.");
       }

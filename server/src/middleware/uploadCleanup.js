@@ -1,17 +1,19 @@
 const storageServices = require("../lib/storage");
 
 /**
- * Removes an uploaded file when the request fails after Multer stored it.
+ * Delete a Multer-stored file when a later handler fails, then forward the error.
  *
- * Error-handling middleware: place it after the controller of any route that
- * uses Multer, so failed validation never leaves orphan files behind.
+ * Place after the controller on routes that use Multer so failed requests
+ * do not leave orphan files.
  *
- * @param {Error} err - Error raised by a previous handler
- * @param {import("express").Request} req - Express request object
- * @param {import("express").Response} _res - Express response object
- * @param {Function} next - Express middleware callback
+ * This is an Express error-handling middleware, so it runs only when an error
+ * has been passed to `next`. It always forwards the original error.
  *
- * @returns {Promise<void>} Passes the original error on
+ * @param {Error} err - Error from a previous handler.
+ * @param {import("express").Request} req - Express request.
+ * @param {import("express").Response} _res - Express response.
+ * @param {import("express").NextFunction} next - Next middleware.
+ * @returns {Promise<void>} Resolves after `next` has been called.
  */
 const uploadCleanup = async (err, req, _res, next) => {
   await storageServices.removeUploadedFile(req.file);

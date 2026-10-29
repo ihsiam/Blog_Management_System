@@ -1,28 +1,21 @@
 const mongoose = require("mongoose");
 const serviceRegistry = require("../../../../lib/serviceRegistry");
 const { badRequest } = require("../../../../utils/error");
+
 /**
- * Deletes an article by ID.
+ * Delete an article by ID.
  *
- * @param {import("express").Request} req - Express request object
- * @param {Object} req.params - Route parameters
- * @param {string} req.params.id - Article ID
- *
- * @param {import("express").Response} res
- * @param {Function} next
- *
- * @returns {Promise<void>} Sends empty 204 response on success
+ * @param {import("express").Request} req - Express request object.
+ * @param {Object} req.params - Route parameters.
+ * @param {string} req.params.id - Article ID.
+ * @param {import("express").Response} res - Express response object.
+ * @param {import("express").NextFunction} next - Next middleware function.
+ * @returns {Promise<import("express").Response|void>} The Express response after sending the 204 reply, or undefined when an error is forwarded to `next`.
  */
 const deleteItem = async (req, res, next) => {
   try {
-    /**
-     * Extract article ID
-     */
     const { id } = req.params;
 
-    /**
-     * Validate ID
-     */
     if (!id || !mongoose.Types.ObjectId.isValid(id)) {
       throw badRequest(
         [
@@ -36,14 +29,8 @@ const deleteItem = async (req, res, next) => {
       );
     }
 
-    /**
-     * Delete article
-     */
     await serviceRegistry.deleteArticle(id);
 
-    /**
-     * No content response
-     */
     return res.status(204).end();
   } catch (err) {
     return next(err);

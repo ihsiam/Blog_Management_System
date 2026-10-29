@@ -17,13 +17,13 @@ const getOpenClient = () => {
 };
 
 /**
- * Reads a JSON value from cache.
+ * Read a JSON value from cache.
  *
  * Fail-open: missing keys, parse errors, and Redis errors all return
  * null so the caller can fall through to the database.
  *
- * @param {string} key - Cache key
- * @returns {Promise<*|null>} Parsed value, or null on miss/error
+ * @param {string} key - Cache key.
+ * @returns {Promise<*|null>} Parsed value, or null on miss or error.
  */
 const getCache = async (key) => {
   try {
@@ -51,15 +51,15 @@ const getCache = async (key) => {
 };
 
 /**
- * Writes a JSON value to cache with a TTL.
+ * Write a JSON value to cache with a TTL.
  *
  * Fail-open: Redis errors are logged and swallowed so writes to the
  * primary store are never blocked by cache failures.
  *
- * @param {string} key - Cache key
- * @param {*} value - JSON-serializable value
- * @param {number} ttlSeconds - Expiry in seconds
- * @returns {Promise<void>}
+ * @param {string} key - Cache key.
+ * @param {*} value - JSON-serializable value.
+ * @param {number} ttlSeconds - Expiry in seconds.
+ * @returns {Promise<void>} Resolves when the write finishes or is skipped.
  */
 const setCache = async (key, value, ttlSeconds) => {
   try {
@@ -77,10 +77,12 @@ const setCache = async (key, value, ttlSeconds) => {
 };
 
 /**
- * Deletes a single cache key.
+ * Delete a single cache key.
  *
- * @param {string} key - Exact cache key
- * @returns {Promise<void>}
+ * Redis errors are logged and swallowed.
+ *
+ * @param {string} key - Exact cache key.
+ * @returns {Promise<void>} Resolves when the delete finishes or is skipped.
  */
 const deleteCache = async (key) => {
   try {
@@ -98,10 +100,12 @@ const deleteCache = async (key) => {
 };
 
 /**
- * Deletes all keys matching a glob pattern using SCAN (never KEYS).
+ * Delete all keys matching a glob pattern using SCAN (never KEYS).
  *
- * @param {string} pattern - Redis MATCH glob (e.g. article:list:*)
- * @returns {Promise<void>}
+ * Redis errors are logged and swallowed.
+ *
+ * @param {string} pattern - Redis MATCH glob (e.g. article:list:*).
+ * @returns {Promise<void>} Resolves when the delete finishes or is skipped.
  */
 const deleteCachePattern = async (pattern) => {
   try {
@@ -116,6 +120,7 @@ const deleteCachePattern = async (pattern) => {
     let step = await iterator.next();
 
     while (!step.done) {
+      // Handle both batched (array) and single-key iterator results.
       if (Array.isArray(step.value)) {
         keys.push(...step.value);
       } else {
@@ -139,15 +144,15 @@ const deleteCachePattern = async (pattern) => {
 };
 
 /**
- * Atomically increments a counter that expires after the given TTL.
+ * Increment a counter that expires after the given TTL.
  *
  * The TTL is set when the counter is created, so the window starts at the
- * first increment. Returns null when Redis is unavailable so callers can
- * decide how to degrade.
+ * first increment. Returns null when Redis is unavailable or errors, so
+ * callers can decide how to degrade.
  *
- * @param {string} key - Counter key
- * @param {number} ttlSeconds - Counter lifetime in seconds
- * @returns {Promise<number|null>} Counter value after the increment
+ * @param {string} key - Counter key.
+ * @param {number} ttlSeconds - Counter lifetime in seconds.
+ * @returns {Promise<number|null>} Counter value after the increment, or null on unavailability or error.
  */
 const incrementCounter = async (key, ttlSeconds) => {
   try {
@@ -159,6 +164,7 @@ const incrementCounter = async (key, ttlSeconds) => {
 
     const value = await client.incr(key);
 
+    // Set the expiry only on creation so the window starts at the first increment.
     if (value === 1) {
       await client.expire(key, ttlSeconds);
     }

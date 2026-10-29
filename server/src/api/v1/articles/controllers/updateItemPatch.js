@@ -4,27 +4,19 @@ const { badRequest } = require("../../../../utils/error");
 const { mapArticle } = require("../../../../utils/mappers");
 
 /**
- * Partially updates an article (PATCH).
+ * Partially update article fields (title, body, category, cover).
  *
- * Updates title, body, cover, or category for the article owner.
- *
- * @param {import("express").Request} req - Express request object
- * @param {Object} req.params - Route parameters
- * @param {string} req.params.id - Article ID
- *
- * @param {Object} req.body - Request payload
- * @param {string} [req.body.title] - Article title
- * @param {string} [req.body.body] - Article content
- * @param {string} [req.body.category] - Category ID
- * @param {Object} [req.file] - Uploaded cover image
- *
- * @param {Object} req.user - Authenticated user
- * @param {string} req.user.role - User role (admin/user)
- *
- * @param {import("express").Response} res
- * @param {Function} next
- *
- * @returns {Promise<void>} Sends updated article response
+ * @param {import("express").Request} req - Express request object.
+ * @param {Object} req.params - Route parameters.
+ * @param {string} req.params.id - Article ID.
+ * @param {Object} req.body - Request payload.
+ * @param {string} [req.body.title] - Article title.
+ * @param {string} [req.body.body] - Article content.
+ * @param {string} [req.body.category] - Category ID.
+ * @param {Object} [req.file] - Uploaded cover image.
+ * @param {import("express").Response} res - Express response object.
+ * @param {import("express").NextFunction} next - Next middleware function.
+ * @returns {Promise<import("express").Response|void>} The Express response after sending the 200 reply, or undefined when an error is forwarded to `next`.
  */
 const updateItemPatch = async (req, res, next) => {
   try {

@@ -15,12 +15,9 @@ const uploadCleanup = require("../middleware/uploadCleanup");
 const upload = require("../utils/multer");
 const { ROLES } = require("../config/constants");
 
-/**
- * Authentication rate limiter.
- *
- * Protects sensitive authentication endpoints
- * against brute-force and credential-stuffing attacks.
- */
+// Authentication rate limiter.
+// Protects sensitive authentication endpoints against brute-force and
+// credential-stuffing attacks. Allows 5 requests per 60-second window.
 const authLimit = rateLimit({
   windowMs: 60 * 1000,
   max: 5,
@@ -31,21 +28,15 @@ const authLimit = rateLimit({
   },
 });
 
-/**
- * ==================================================
- * Authentication Routes
- * ==================================================
- */
+// ==================================================
+// Authentication Routes
+// ==================================================
 
-/**
- * Initial admin account setup.
- * Intended for first-time system initialization.
- */
+// Initial admin account setup.
+// Intended for first-time system initialization.
 router.post("/api/v1/auth/setup-admin", authLimit, authController.setupAdmin);
 
-/**
- * User registration and email verification flow.
- */
+// User registration and email verification flow.
 router.post("/api/v1/auth/sign-up", authLimit, authController.register);
 router.post(
   "/api/v1/auth/verify-email-otp",
@@ -58,9 +49,7 @@ router.post(
   authController.resendVerificationMail,
 );
 
-/**
- * Password recovery flow.
- */
+// Password recovery flow.
 router.post(
   "/api/v1/auth/forgot-password",
   authLimit,
@@ -77,9 +66,9 @@ router.patch(
   authController.resetPassword,
 );
 
-/**
- * Authentication session management.
- */
+// Authentication session management.
+// Sign-in is rate limited; refresh requires no access token; the remaining
+// routes require an authenticated user.
 router.post("/api/v1/auth/sign-in", authLimit, authController.login);
 router.post("/api/v1/auth/refresh", authController.refresh);
 router.post("/api/v1/auth/logout", authenticate, authController.logout);
@@ -91,15 +80,11 @@ router.delete(
   authController.deleteSession,
 );
 
-/**
- * ==================================================
- * Article Routes
- * ==================================================
- */
+// ==================================================
+// Article Routes
+// ==================================================
 
-/**
- * Public article endpoints.
- */
+// Article collection: public listing and authenticated creation.
 router
   .route("/api/v1/articles")
   .get(articleController.findAll)
@@ -111,16 +96,13 @@ router
     uploadCleanup,
   );
 
-/**
- * Admin article listing.
- */
+// Admin article listing.
 router
   .route("/api/v1/articles/admin/all")
   .get(authenticate, authorize([ROLES.ADMIN]), articleController.getAllByAdmin);
 
-/**
- * Single article operations.
- */
+// Single article operations.
+// Update requires ownership; delete allows the owner or an admin.
 router
   .route("/api/v1/articles/:id")
   .get(authenticateOptional, articleController.findSingleItem)
@@ -139,6 +121,7 @@ router
     articleController.deleteItem,
   );
 
+// Article status management (admin only).
 router.patch(
   "/api/v1/articles/:id/status",
   authenticate,
@@ -146,16 +129,12 @@ router.patch(
   articleController.updateStatus,
 );
 
-/**
- * Article author resource.
- */
+// Article author resource.
 router
   .route("/api/v1/articles/:id/author")
   .get(articleController.getArticleAuthor);
 
-/**
- * Article comments resource.
- */
+// Article comments resource: public listing and authenticated posting.
 router
   .route("/api/v1/articles/:id/comments")
   .get(articleController.getArticleComments)
@@ -165,6 +144,7 @@ router
     articleController.postCommentOnArticle,
   );
 
+// Replies to a comment on an article.
 router.post(
   "/api/v1/articles/:articleId/comments/:commentId/replies",
   authenticate,
@@ -172,23 +152,18 @@ router.post(
   articleController.postCommentReply,
 );
 
-/**
- * ==================================================
- * Category Routes
- * ==================================================
- */
+// ==================================================
+// Category Routes
+// ==================================================
 
-/**
- * Public category endpoints.
- */
+// Category collection: listing with optional authentication, and admin-only
+// creation.
 router
   .route("/api/v1/categories")
   .get(authenticateOptional, categoryController.findAll)
   .post(authenticate, authorize([ROLES.ADMIN]), categoryController.create);
 
-/**
- * Single category operations.
- */
+// Single category operations.
 router
   .route("/api/v1/categories/:id")
   .get(authenticateOptional, categoryController.findSingleItem)
@@ -198,9 +173,7 @@ router
     categoryController.updateItemPatch,
   );
 
-/**
- * Category status management.
- */
+// Category status management.
 router.patch(
   "/api/v1/categories/:id/status",
   authenticate,
@@ -208,22 +181,17 @@ router.patch(
   categoryController.updateStatus,
 );
 
-/**
- * ==================================================
- * Comment Routes
- * ==================================================
- */
+// ==================================================
+// Comment Routes
+// ==================================================
 
-/**
- * Comment collection endpoints (Admin-only access).
- */
+// Comment collection endpoints (Admin-only access).
 router
   .route("/api/v1/comments")
   .get(authenticate, authorize([ROLES.ADMIN]), commentsController.getComments);
 
-/**
- * Single comment operations.
- */
+// Single comment operations.
+// Update requires ownership; delete allows the owner or an admin.
 router
   .route("/api/v1/comments/:id")
   .patch(
@@ -239,6 +207,7 @@ router
     commentsController.deleteComment,
   );
 
+// Comment status management (admin only).
 router.patch(
   "/api/v1/comments/:id/status",
   authenticate,
@@ -246,23 +215,18 @@ router.patch(
   commentsController.updateCommentStatus,
 );
 
-/**
- * ==================================================
- * User Routes
- * ==================================================
- */
+// ==================================================
+// User Routes
+// ==================================================
 
-/**
- * User collection management (Admin-only access).
- */
+// User collection management (Admin-only access).
 router
   .route("/api/v1/users")
   .get(authenticate, authorize([ROLES.ADMIN]), userController.getAllUsers)
   .post(authenticate, authorize([ROLES.ADMIN]), userController.createUser);
 
-/**
- * Password change endpoint.
- */
+// Password change endpoint.
+// Ownership is required without an admin exception.
 router
   .route("/api/v1/users/:id/change-password")
   .patch(
@@ -272,9 +236,8 @@ router
     userController.changePassword,
   );
 
-/**
- * Single user management.
- */
+// Single user management.
+// Read allows the owner or an admin; update and delete are admin only.
 router
   .route("/api/v1/users/:id")
   .get(

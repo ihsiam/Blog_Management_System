@@ -2,19 +2,21 @@ FROM node:22-alpine
 
 WORKDIR /app
 
-# Enable Corepack so Yarn 4 works
+# Enable Corepack so the Yarn version pinned for the project (Yarn 4) is available
 RUN corepack enable
 
-# Copy package manager files first
+# Copy the package manager files first so the dependency layer stays cached
+# until they change
 COPY package.json yarn.lock ./
 COPY .yarnrc.yml ./
 
-# Install dependencies
+# Install exact versions from the lockfile and fail if it is out of date
 RUN yarn install --immutable
 
-# Copy the rest of the application
+# Copy the application source after installing dependencies to preserve the cache
 COPY . .
 
+# Document the port the server listens on
 EXPOSE 3000
 
 CMD ["yarn", "start"]

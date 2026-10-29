@@ -4,16 +4,19 @@ const { badRequest } = require("../../../../utils/error");
 const { ROLES } = require("../../../../config/constants");
 
 /**
- * Retrieves a single category by ID.
+ * Fetch a category by ID.
  *
  * Public callers can only retrieve active categories. Admins can also
  * retrieve unavailable ones.
  *
- * @param {import("express").Request} req - Express request object
- * @param {import("express").Response} res - Express response object
- * @param {Function} next - Express error handler middleware
- *
- * @returns {Promise<void>} Sends a category response
+ * @param {import("express").Request} req - Express request object.
+ * @param {Object} req.params - Route parameters.
+ * @param {string} req.params.id - Category ID.
+ * @param {Object} [req.user] - Authenticated user, if any.
+ * @param {string} [req.user.role] - User role, used to detect administrators.
+ * @param {import("express").Response} res - Express response object.
+ * @param {import("express").NextFunction} next - Next middleware function.
+ * @returns {Promise<import("express").Response|void>} The Express response after sending the 200 reply, or undefined when an error is forwarded to `next`.
  */
 const findSingleItem = async (req, res, next) => {
   try {

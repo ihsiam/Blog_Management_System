@@ -5,20 +5,16 @@ const { validation } = require("../../../../utils");
 const { mapSignUpUser } = require("../../../../utils/mappers");
 
 /**
- * Registers a user and sends an email verification code.
+ * Register a user and sends an email verification code.
  *
  * @param {import("express").Request} req - Express request object.
  * @param {Object} req.body - Request payload.
  * @param {string} req.body.name - User full name.
  * @param {string} req.body.email - User email address.
- * @param {string} req.body.password - Plain text password.
- *
+ * @param {string} req.body.password - Plain-text password.
  * @param {import("express").Response} res - Express response object.
- * @param {Function} next - Express error-handling middleware.
- *
- * @returns {Promise<void>} Sends a registration confirmation response.
- *
- * @throws {Error} BadRequest error if validation fails
+ * @param {import("express").NextFunction} next - Next middleware function.
+ * @returns {Promise<import("express").Response|void>} The Express response after sending the 201 reply, or undefined when an error is forwarded to `next`.
  */
 const register = async (req, res, next) => {
   try {

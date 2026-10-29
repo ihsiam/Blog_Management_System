@@ -4,23 +4,19 @@ const { badRequest } = require("../../../../utils/error");
 const { mapAuthor } = require("../../../../utils/mappers");
 
 /**
- * Retrieves the author of a specific article.
+ * Return the author profile for an article.
  *
- * @param {import("express").Request} req - Express request object
- * @param {Object} req.params - Route parameters
- * @param {string} req.params.id - Article ID
- *
- * @param {import("express").Response} res - Express response object
- * @param {Function} next - Express error handler middleware
- *
- * @returns {Promise<void>} Sends article author details
+ * @param {import("express").Request} req - Express request object.
+ * @param {Object} req.params - Route parameters.
+ * @param {string} req.params.id - Article ID.
+ * @param {import("express").Response} res - Express response object.
+ * @param {import("express").NextFunction} next - Next middleware function.
+ * @returns {Promise<import("express").Response|void>} The Express response after sending the 200 reply, or undefined when an error is forwarded to `next`.
  */
 const getArticleAuthor = async (req, res, next) => {
   try {
-    // extract article id from route params
     const { id: articleId } = req.params;
 
-    // validate article id
     if (!articleId || !mongoose.Types.ObjectId.isValid(articleId)) {
       return next(
         badRequest(
@@ -30,13 +26,10 @@ const getArticleAuthor = async (req, res, next) => {
       );
     }
 
-    // fetch author
     const user = await serviceRegistry.getArticleAuthor(articleId);
 
-    // transform response data
     const data = mapAuthor(user);
 
-    // response
     return res.status(200).json({
       code: 200,
       message: "Data retrieved",

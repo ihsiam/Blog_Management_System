@@ -5,17 +5,16 @@ const { notFound } = require("../../utils/error");
 const { escapeRegex } = require("../../utils/query");
 
 /**
- * Retrieves paginated categories with optional name filtering.
+ * List paginated categories with optional name and status filtering.
  *
- * @param {Object} params
- * @param {number} params.page
- * @param {number} params.limit
- * @param {string} params.sortBy
- * @param {string} params.sortType
- * @param {string} params.searchTerm
- * @param {string} [params.status] - Status filter, all statuses when omitted
- *
- * @returns {Promise<Array<Object>>}
+ * @param {Object} params - Query options.
+ * @param {number} [params.page=defaults.page] - Page number.
+ * @param {number} [params.limit=defaults.limit] - Items per page.
+ * @param {string} [params.sortBy=defaults.sortBy] - Field to sort by.
+ * @param {string} [params.sortType=defaults.sortType] - Sort order (`asc` or `desc`).
+ * @param {string} [params.searchTerm=defaults.searchTerm] - Name search keyword.
+ * @param {string} [params.status] - Status filter; all statuses when omitted.
+ * @returns {Promise<Array<Object>>} Plain category objects.
  */
 const findAll = async ({
   page = defaults.page,
@@ -25,6 +24,7 @@ const findAll = async ({
   searchTerm = defaults.searchTerm,
   status,
 }) => {
+  // A leading minus sorts in descending order.
   const sortKey = `${sortType === "desc" ? "-" : ""}${sortBy}`;
   const filter = {
     name: { $regex: escapeRegex(searchTerm), $options: "i" },
@@ -34,6 +34,7 @@ const findAll = async ({
 
   const categories = await Category.find(filter)
     .sort(sortKey)
+    // Skip the items of all previous pages.
     .skip(page * limit - limit)
     .limit(limit);
 
@@ -41,13 +42,12 @@ const findAll = async ({
 };
 
 /**
- * Counts categories based on the public listing filter.
+ * Count categories matching optional name and status filters.
  *
- * @param {Object} params
- * @param {string} params.searchTerm
- * @param {string} [params.status] - Status filter, all statuses when omitted
- *
- * @returns {Promise<number>}
+ * @param {Object} params - Filter options.
+ * @param {string} [params.searchTerm=""] - Name search keyword.
+ * @param {string} [params.status] - Status filter; all statuses when omitted.
+ * @returns {Promise<number>} Matching category count.
  */
 const count = async ({ searchTerm = "", status }) =>
   Category.countDocuments({
@@ -56,13 +56,12 @@ const count = async ({ searchTerm = "", status }) =>
   });
 
 /**
- * Creates a category.
+ * Create a category.
  *
- * @param {Object} params
- * @param {string} params.name
- * @param {string} [params.description]
- *
- * @returns {Promise<Object>}
+ * @param {Object} params - Category fields.
+ * @param {string} params.name - Category name.
+ * @param {string} [params.description] - Category description.
+ * @returns {Promise<Object>} Created category as a plain object.
  */
 const create = async ({ name, description }) => {
   const category = new Category({ name, description });
@@ -71,13 +70,16 @@ const create = async ({ name, description }) => {
 };
 
 /**
- * Retrieves a category by ID.
+ * Fetch a category by ID.
  *
- * @param {Object} params
- * @param {string} params.id
- * @param {boolean} [params.includeUnavailable=false]
+ * Unless `includeUnavailable` is true, only categories with the active status
+ * are returned.
  *
- * @returns {Promise<Object>}
+ * @param {Object} params - Lookup options.
+ * @param {string} params.id - Category ID.
+ * @param {boolean} [params.includeUnavailable=false] - Include unavailable categories when true.
+ * @returns {Promise<Object>} Category as a plain object.
+ * @throws {Error} When the category is missing or unavailable.
  */
 const findSingleItem = async ({ id, includeUnavailable = false }) => {
   const filter = includeUnavailable
@@ -90,20 +92,21 @@ const findSingleItem = async ({ id, includeUnavailable = false }) => {
 };
 
 /**
- * Updates category details.
+ * Update category name and/or description.
  *
- * @param {string} id
- * @param {Object} data
- * @param {string} [data.name]
- * @param {string|null} [data.description]
- *
- * @returns {Promise<Object>}
+ * @param {string} id - Category ID.
+ * @param {Object} data - Fields to patch.
+ * @param {string} [data.name] - New name.
+ * @param {string|null} [data.description] - New description.
+ * @returns {Promise<Object>} Updated category as a plain object.
+ * @throws {Error} When the category does not exist.
  */
 const updateItemPatch = async (id, { name, description }) => {
   const category = await Category.findById(id);
 
   if (!category) throw notFound("Category not found");
 
+  // Unlike `name`, `description` may be set to `null` to clear it.
   if (name !== undefined) category.name = name;
   if (description !== undefined) category.description = description;
   await category.save();
@@ -112,12 +115,12 @@ const updateItemPatch = async (id, { name, description }) => {
 };
 
 /**
- * Updates category availability status.
+ * Update category availability status.
  *
- * @param {string} id
- * @param {string} status
- *
- * @returns {Promise<Object>}
+ * @param {string} id - Category ID.
+ * @param {string} status - New category status.
+ * @returns {Promise<Object>} Updated category as a plain object.
+ * @throws {Error} When the category does not exist.
  */
 const updateStatus = async (id, status) => {
   const category = await Category.findById(id);

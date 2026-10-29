@@ -5,7 +5,7 @@ const { ACCOUNT_STATUS } = require("../config/constants");
 const { unauthorized, forbidden } = require("../utils/error");
 
 /**
- * Authenticates incoming requests using a JWT access token.
+ * Authenticate the request from a Bearer JWT and attach `req.user`.
  *
  * @param {import("express").Request} req - Express request object.
  * @param {Object} req.headers - Incoming request headers.
@@ -37,7 +37,7 @@ const authenticate = async (req, res, next) => {
       return next(unauthorized("Invalid authentication token"));
     }
 
-    // The access token is bound to the device session it was issued for.
+    // Access tokens are bound to the device session they were issued for.
     const hasSession = await sessionServices.hasActiveSession(
       user.id,
       decoded.sid,
@@ -52,6 +52,7 @@ const authenticate = async (req, res, next) => {
       return next(forbidden("Your account is not active"));
     }
 
+    // Expose only the fields that later handlers need.
     req.user = {
       id: user.id,
       email: user.email,
@@ -62,6 +63,7 @@ const authenticate = async (req, res, next) => {
 
     return next();
   } catch (err) {
+    // Forward unexpected and token verification errors to the error handler.
     return next(err);
   }
 };

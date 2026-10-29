@@ -2,13 +2,15 @@ const defaults = require("../config/defaults");
 const generateQueryString = require("./queryString");
 
 /**
- * Generates pagination metadata for list responses.
+ * Build pagination metadata for list responses.
  *
- * @param {number} [page=defaults.page] - Current page number
- * @param {number} [limit=defaults.limit] - Items per page
- * @param {number} [totalItems=defaults.totalItems] - Total number of items
+ * The `next` property is set only when a later page exists, and `prev` only
+ * when the current page is greater than 1.
  *
- * @returns {Object} Pagination metadata object
+ * @param {number} [page=defaults.page] - Current page number.
+ * @param {number} [limit=defaults.limit] - Items per page.
+ * @param {number} [totalItems=defaults.totalItems] - Total item count.
+ * @returns {Object} Page, limit, totals, and optional `next`/`prev` page numbers.
  */
 const getPagination = (
   page = defaults.page,
@@ -40,16 +42,17 @@ const getPagination = (
 };
 
 /**
- * Transforms an array of objects based on selected fields.
+ * Project list items onto selected fields and attach a resource `link`.
  *
- * @param {Object} params
- * @param {Array<Object>} params.items - Data items to transform
- * @param {Array<string>} params.selection - Fields to include in output
- * @param {string} [params.path=""] - Base path for generating item links
+ * When `selection` is empty, each item is returned in full with a `link`.
+ * When `selection` is not empty, a `link` is added only if `path` is set.
  *
- * @returns {Array<Object>} Transformed data array
- *
- * @throws {Error} If items or selection are not valid arrays
+ * @param {Object} params - Transform options.
+ * @param {Array<Object>} [params.items=[]] - Items to transform.
+ * @param {Array<string>} [params.selection=[]] - Field names to keep.
+ * @param {string} [params.path=""] - Base path for item links.
+ * @returns {Array<Object>} Transformed items.
+ * @throws {Error} When `items` or `selection` is not an array.
  */
 const transformData = ({ items = [], selection = [], path = "" }) => {
   // validate input types
@@ -57,7 +60,7 @@ const transformData = ({ items = [], selection = [], path = "" }) => {
     throw new Error("Invalid arguments");
   }
 
-  // if no selection provided, return full object with link
+  // An empty selection keeps every field.
   if (selection.length === 0) {
     return items.map((item) => ({
       ...item,
@@ -84,17 +87,19 @@ const transformData = ({ items = [], selection = [], path = "" }) => {
 };
 
 /**
- * Generates HATEOAS navigation links.
+ * Build HATEOAS `self`, `next`, and `prev` links for a list response.
  *
- * @param {Object} params
- * @param {string} [params.url="/"] - Current request URL
- * @param {string} [params.path=""] - Base API path
- * @param {Object} [params.query={}] - Original query parameters
- * @param {boolean} [params.hasNext=false] - Whether next page exists
- * @param {boolean} [params.hasPrev=false] - Whether previous page exists
- * @param {number} [params.page=defaults.page] - Current page number
+ * The `next` and `prev` links are included only when `hasNext` or `hasPrev`
+ * is true.
  *
- * @returns {Object} HATEOAS links object
+ * @param {Object} params - Link options.
+ * @param {string} [params.url="/"] - Current request URL.
+ * @param {string} [params.path=""] - Base API path.
+ * @param {Object} [params.query={}] - Original query parameters.
+ * @param {boolean} [params.hasNext=false] - Whether a next page exists.
+ * @param {boolean} [params.hasPrev=false] - Whether a previous page exists.
+ * @param {number} [params.page=defaults.page] - Current page number.
+ * @returns {Object} Links object.
  */
 const hateOAS = ({
   url = "/",
@@ -125,13 +130,10 @@ const hateOAS = ({
 };
 
 /**
- * Escapes regular expression special characters in user input.
+ * Escape regex metacharacters in user input used with `$regex`.
  *
- * Prevents regex injection and ReDoS when the value is used in `$regex`.
- *
- * @param {*} value - Raw search value from the request
- *
- * @returns {string} Value safe to use as a literal in a regular expression
+ * @param {*} value - Raw search value from the request.
+ * @returns {string} Literal-safe pattern.
  */
 const escapeRegex = (value) =>
   // prefix every regex metacharacter with a backslash

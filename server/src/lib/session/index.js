@@ -4,18 +4,15 @@ const { hashing } = require("../../utils");
 const { TTL_MS } = require("../../config/constants");
 
 /**
- * Save refresh token as a new session
+ * Persist a refresh token as a new device session.
  *
- * The token is stored as a SHA-256 digest so the session can be found with
- * an indexed lookup (bcrypt would truncate JWTs at 72 bytes).
- *
- * @param {Object} params
- * @param {string} params.id - User ID
- * @param {string|ObjectId} params.sessionId - Pre-generated session ID embedded in the token
- * @param {string} params.refreshToken - Raw refresh token
- * @param {string} [params.deviceInfo] - Client device information
- * @param {ClientSession} [session] - Optional MongoDB session
- * @returns {Promise<void>}
+ * @param {Object} params - Session fields.
+ * @param {string} params.id - User ID.
+ * @param {string|import("mongoose").Types.ObjectId} params.sessionId - Pre-generated session ID embedded in the token.
+ * @param {string} params.refreshToken - Raw refresh token.
+ * @param {string} [params.deviceInfo] - Client device information.
+ * @param {import("mongoose").ClientSession} [session] - Optional MongoDB session.
+ * @returns {Promise<void>} Resolves when the session document is saved.
  */
 const saveRefreshToken = async (
   { id, sessionId, refreshToken, deviceInfo },
@@ -37,17 +34,18 @@ const saveRefreshToken = async (
 };
 
 /**
- * Clear all refresh-token sessions of a user
+ * Clear refresh-token sessions for a user.
  *
- * @param {Object} params
- * @param {string} params.id - User ID
- * @param {string} [params.exceptSessionId] - Session ID to keep (e.g. the current device)
- * @param {ClientSession} [session] - Optional MongoDB session
- * @returns {Promise<void>}
+ * @param {Object} params - Filter fields.
+ * @param {string} params.id - User ID.
+ * @param {string} [params.exceptSessionId] - Session ID to keep (for example the current device).
+ * @param {import("mongoose").ClientSession} [session] - Optional MongoDB session.
+ * @returns {Promise<void>} Resolves when matching sessions are deleted.
  */
 const clearRefreshToken = async ({ id, exceptSessionId }, session) => {
   const filter = { user_id: id };
 
+  // Exclude the kept session from the delete.
   if (exceptSessionId) filter._id = { $ne: exceptSessionId };
 
   await Session.deleteMany(filter, session ? { session } : undefined);
@@ -56,14 +54,15 @@ const clearRefreshToken = async ({ id, exceptSessionId }, session) => {
 /**
  * Find a user's active session by session ID and raw refresh token.
  *
- * @param {Object} params
- * @param {string} params.id - User ID
- * @param {string} params.sessionId - Session ID taken from the verified token
- * @param {string} params.refreshToken - Raw refresh token
- * @param {ClientSession} [session] - Optional MongoDB session
- * @returns {Promise<Object|null>} Matching session or null
+ * @param {Object} params - Lookup fields.
+ * @param {string} params.id - User ID.
+ * @param {string} params.sessionId - Session ID taken from the verified token.
+ * @param {string} params.refreshToken - Raw refresh token.
+ * @param {import("mongoose").ClientSession} [session] - Optional MongoDB session.
+ * @returns {Promise<Object|null>} Matching session, or null when missing or expired.
  */
 const findSessionByToken = async ({ id, sessionId, refreshToken }, session) => {
+  // Skip the query for input that cannot match, and avoid a CastError.
   if (!refreshToken || !mongoose.isValidObjectId(sessionId)) return null;
 
   const query = Session.findOne({
@@ -78,12 +77,12 @@ const findSessionByToken = async ({ id, sessionId, refreshToken }, session) => {
 };
 
 /**
- * Get a user's active sessions
+ * List a user's active sessions.
  *
- * @param {string} id - User ID
- * @param {string} [currentSessionId] - Session ID of the calling device
- * @param {ClientSession} [session] - Optional MongoDB session
- * @returns {Promise<Array<Object>>}
+ * @param {string} id - User ID.
+ * @param {string} [currentSessionId] - Session ID of the calling device.
+ * @param {import("mongoose").ClientSession} [session] - Optional MongoDB session.
+ * @returns {Promise<Array<Object>>} Sessions with `isCurrent` flagged for the caller.
  */
 const getActiveSessions = async (id, currentSessionId, session) => {
   const query = Session.find({
@@ -106,11 +105,11 @@ const getActiveSessions = async (id, currentSessionId, session) => {
 };
 
 /**
- * Check that a session is still active for a user
+ * Return whether a session is still active for a user.
  *
- * @param {string} id - User ID
- * @param {string} sessionId - Session ID taken from the verified access token
- * @returns {Promise<boolean>}
+ * @param {string} id - User ID.
+ * @param {string} sessionId - Session ID taken from the verified access token.
+ * @returns {Promise<boolean>} True when an unexpired matching session exists.
  */
 const hasActiveSession = async (id, sessionId) => {
   if (!mongoose.isValidObjectId(sessionId)) return false;
@@ -125,12 +124,12 @@ const hasActiveSession = async (id, sessionId) => {
 };
 
 /**
- * Delete one session of a user
+ * Delete one session belonging to a user.
  *
- * @param {string} userId - User ID
- * @param {string} sessionId - Session ID
- * @param {ClientSession} [session] - Optional MongoDB session
- * @returns {Promise<boolean>} True when a session was deleted
+ * @param {string} userId - User ID.
+ * @param {string} sessionId - Session ID.
+ * @param {import("mongoose").ClientSession} [session] - Optional MongoDB session.
+ * @returns {Promise<boolean>} True when a session was deleted.
  */
 const deleteSession = async (userId, sessionId, session) => {
   const query = Session.deleteOne({ _id: sessionId, user_id: userId });
@@ -141,12 +140,10 @@ const deleteSession = async (userId, sessionId, session) => {
 };
 
 /**
- * Delete expired sessions of a user
+ * Delete expired sessions for a user.
  *
- * Keeps the sessions collection from growing without a TTL index.
- *
- * @param {string} id - User ID
- * @returns {Promise<void>}
+ * @param {string} id - User ID.
+ * @returns {Promise<void>} Resolves when expired sessions are deleted.
  */
 const deleteExpiredSessions = async (id) => {
   await Session.deleteMany({ user_id: id, expiresAt: { $lte: new Date() } });

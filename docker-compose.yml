@@ -1,3 +1,5 @@
+# Docker Compose stack for the blog management system: API server, MongoDB
+# replica set, Elasticsearch, Kibana, and Redis.
 services:
   server:
     build:
@@ -9,9 +11,11 @@ services:
       - "3000:3000"
     env_file:
       - ./server/.env
+    # Values set here take precedence over the same keys in ./server/.env.
     environment:
       PORT: 3000
       APP_URL: http://localhost:3000
+      # The replicaSet name must match the --replSet value of the mongo services.
       DB_URL: mongodb://mongo1:27017,mongo2:27017,mongo3:27017/Blog_Management_System?replicaSet=rs0
       ELASTIC_URL: http://elasticsearch:9200
       REDIS_URL: redis://redis:6379
@@ -22,13 +26,17 @@ services:
         condition: service_started
       mongo3:
         condition: service_started
+      # Wait for the replica set initialization to finish before starting.
       mongo-init:
         condition: service_completed_successfully
       elasticsearch:
         condition: service_started
+      # Wait for the Redis healthcheck to pass before starting.
       redis:
         condition: service_healthy
     volumes:
+      # Mount the host source into the container. The named volume below keeps
+      # the container's node_modules from being hidden by the host directory.
       - ./server:/app
       - server_node_modules:/app/node_modules
     command: sh -c "yarn install --immutable && yarn dev"
@@ -46,6 +54,7 @@ services:
     image: mongo:7
     container_name: blog-management-mongo2
     command: ["--replSet", "rs0", "--bind_ip_all", "--port", "27017"]
+    # Host port differs from mongo1 to avoid a conflict; the container port is the same.
     ports:
       - "27018:27017"
     volumes:
@@ -55,11 +64,13 @@ services:
     image: mongo:7
     container_name: blog-management-mongo3
     command: ["--replSet", "rs0", "--bind_ip_all", "--port", "27017"]
+    # Host port differs from mongo1 and mongo2 to avoid a conflict.
     ports:
       - "27019:27017"
     volumes:
       - mongo3_data:/data/db
 
+  # One-shot service that runs the replica set initialization script and exits.
   mongo-init:
     image: mongo:7
     container_name: blog-management-mongo-init
@@ -73,6 +84,7 @@ services:
       [
         "bash",
         "-c",
+        # Wait before connecting so the MongoDB nodes can start.
         "sleep 10 && mongosh --host mongo1 /scripts/init-replica.js",
       ]
 
@@ -81,7 +93,9 @@ services:
     container_name: blog-management-es
     environment:
       - discovery.type=single-node
+      # NOTE: Security is disabled, so the cluster requires no authentication.
       - xpack.security.enabled=false
+      # Fix the JVM heap at 512 MB (minimum equals maximum).
       - ES_JAVA_OPTS=-Xms512m -Xmx512m
     ports:
       - "9200:9200"
@@ -107,6 +121,7 @@ services:
       - "6379:6379"
     volumes:
       - redis_data:/data
+    # Used by the server service via the service_healthy condition.
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 10s
