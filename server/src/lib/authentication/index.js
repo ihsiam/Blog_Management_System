@@ -96,11 +96,18 @@ const systemAdmin = async ({ name, email, password }) => {
 
     try {
       await session.withTransaction(async () => {
+        // Ensure the setup document exists.
+        await SystemInfo.updateOne(
+          { id: "system-admin" },
+          { $setOnInsert: { adminSetup: false } },
+          { upsert: true, session },
+        );
+
         // Atomically claim the one-time setup flag.
         const setup = await SystemInfo.findOneAndUpdate(
           { id: "system-admin", adminSetup: false },
           { $set: { adminSetup: true } },
-          { new: true, upsert: true, session },
+          { new: true, session },
         );
 
         if (!setup) {
