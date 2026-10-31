@@ -85,7 +85,16 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/ErrorResponse"
+                allOf:
+                  - $ref: "#/components/schemas/ErrorResponse"
+                  - type: object
+                    properties:
+                      code:
+                        example: 403
+                      error:
+                        example: Forbidden
+                      message:
+                        example: System admin already exists.
         "429":
           $ref: "#/components/responses/TooManyRequests"
         "500":
@@ -1591,25 +1600,24 @@ components:
           example: Data retrieved
       required: [code, message]
 
+    # Base shape for every error response. It has no data field.
     ErrorResponse:
       type: object
       properties:
         code:
           type: integer
           format: int32
-          example: 400
+          example: 500
         error:
           type: string
-          example: Bad request
+          example: Internal server error
         correlationId:
           type: string
           example: 2b6d4a52-6c6e-4ac4-8f3e-2f6f4d6e9a11
         message:
           type: string
-          example: Invalid input.
-        data:
-          description: Extra details about the error. For 400 errors, this is a list of fields with problems.
-      required: [code, error, message]
+          example: Something went wrong. Please try again later.
+      required: [code, error, correlationId, message]
 
     ValidationErrorItem:
       type: object
@@ -1625,6 +1633,25 @@ components:
           enum: [params, query, body, file]
           example: body
       required: [field, message, in]
+
+    # The 400 error response. It is the only error response with a data field.
+    ValidationErrorResponse:
+      allOf:
+        - $ref: "#/components/schemas/ErrorResponse"
+        - type: object
+          properties:
+            code:
+              example: 400
+            error:
+              example: Bad request
+            message:
+              example: Invalid input.
+            data:
+              type: array
+              description: The fields with problems. It is an empty array when there are no field details.
+              items:
+                $ref: "#/components/schemas/ValidationErrorItem"
+          required: [data]
 
     Timestamp:
       type: object
@@ -2441,24 +2468,12 @@ components:
   responses:
     BadRequest:
       description: >
-        The request is not valid. The data field lists the fields with problems. It is null when
-        there are no field details, for example for an invalid or expired OTP.
+        The request is not valid. The data field lists the fields with problems. It is an empty
+        array when there are no field details, for example for an invalid or expired OTP.
       content:
         application/json:
           schema:
-            allOf:
-              - $ref: "#/components/schemas/ErrorResponse"
-              - type: object
-                properties:
-                  code:
-                    example: 400
-                  error:
-                    example: Bad request
-                  data:
-                    type: array
-                    nullable: true
-                    items:
-                      $ref: "#/components/schemas/ValidationErrorItem"
+            $ref: "#/components/schemas/ValidationErrorResponse"
 
     Unauthorized:
       description: The credentials are missing, invalid, or expired, or the session was revoked.
@@ -2531,19 +2546,16 @@ components:
       content:
         application/json:
           schema:
-            type: object
-            properties:
-              code:
-                type: integer
-                format: int32
-                example: 429
-              error:
-                type: string
-                example: Too many requests
-              message:
-                type: string
-                example: Too many attempts. Please try again later.
-            required: [code, error, message]
+            allOf:
+              - $ref: "#/components/schemas/ErrorResponse"
+              - type: object
+                properties:
+                  code:
+                    example: 429
+                  error:
+                    example: Too many requests
+                  message:
+                    example: Too many attempts. Please try again later.
 
     ServerError:
       description: Something went wrong on the server.
