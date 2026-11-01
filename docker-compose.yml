@@ -4,7 +4,6 @@ services:
   server:
     build:
       context: ./server
-      network: host
       dockerfile: dockerfile
     image: mdismilehosensiam/blog_management_system:latest
     container_name: server
