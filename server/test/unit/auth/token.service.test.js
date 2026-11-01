@@ -120,23 +120,4 @@ describe("token service (src/lib/token)", () => {
     });
   });
 
-  describe("decodeToken", () => {
-    it("should decode a token's payload without verifying its signature", () => {
-      const tokenSignedWithAnySecret = jwt.sign(payload, "any-secret-at-all");
-
-      expect(tokenService.decodeToken(tokenSignedWithAnySecret)).toMatchObject(
-        payload,
-      );
-    });
-
-    it("should reject decoding when the token format is invalid", () => {
-      expect(() => tokenService.decodeToken("not-a-jwt-token")).toThrow(
-        expect.objectContaining({
-          statusCode: 400,
-          error: "Bad request",
-          message: "Invalid JWT token format",
-        }),
-      );
-    });
-  });
 });

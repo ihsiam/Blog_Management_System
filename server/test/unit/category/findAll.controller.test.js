@@ -1,5 +1,5 @@
 /**
- * Unit tests for src/api/v1/category/controllers/findAll.js
+ * Unit tests for src/api/v1/categories/controllers/findAll.js
  *
  * Dependencies mocked:
  * - src/lib/categories (findAll, count)
@@ -12,7 +12,7 @@ jest.doMock("../../../src/lib/categories", () => ({
   count: mockCount,
 }));
 
-const findAllController = require("../../../src/api/v1/category/controllers/findAll");
+const findAllController = require("../../../src/api/v1/categories/controllers/findAll");
 const { createMockResponse } = require("../helpers/mockExpress");
 
 describe("category findAll controller", () => {
@@ -46,7 +46,7 @@ describe("category findAll controller", () => {
       await findAllController(buildRequest({ sortBy: "status" }), res, next);
 
       expect(next.mock.calls[0][0].data).toEqual(
-        expect.arrayContaining([expect.objectContaining({ field: "sort_by" })]),
+        expect.arrayContaining([expect.objectContaining({ field: "sortBy" })]),
       );
     });
   });
@@ -74,8 +74,12 @@ describe("category findAll controller", () => {
         sortBy: "name",
         sortType: "asc",
         searchTerm: "tech",
+        status: "active",
       });
-      expect(mockCount).toHaveBeenCalledWith({ searchTerm: "tech" });
+      expect(mockCount).toHaveBeenCalledWith({
+        searchTerm: "tech",
+        status: "active",
+      });
     });
 
     it("should return selected category fields and pagination", async () => {

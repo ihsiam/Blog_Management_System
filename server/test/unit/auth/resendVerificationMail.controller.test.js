@@ -115,6 +115,18 @@ describe("resendVerificationMail controller", () => {
     expect(next).not.toHaveBeenCalled();
   });
 
+  it("should trim whitespace before requesting a verification code", async () => {
+    mockCreateVerificationOtp.mockResolvedValue({ user: null, code: "123456" });
+
+    await resendVerificationMailController(
+      { body: { email: "  missing@test.com  " } },
+      res,
+      next,
+    );
+
+    expect(mockCreateVerificationOtp).toHaveBeenCalledWith("missing@test.com");
+  });
+
   it("should propagate the error when sending the email fails", async () => {
     mockCreateVerificationOtp.mockResolvedValue({
       user: {

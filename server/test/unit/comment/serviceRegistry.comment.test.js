@@ -1,6 +1,6 @@
 /**
  * Unit tests for the Comment-related method of
- * src/lib/service registry/index.js
+ * src/lib/serviceRegistry/index.js
  *
  * This module cross-orchestrates article/comment/user services. Only
  * `getComments` is covered here, since it is the one consumed by the
@@ -25,7 +25,7 @@ jest.doMock("../../../src/lib/comments", () => ({
 
 jest.doMock("../../../src/lib/user", () => ({}));
 
-const serviceRegistry = require("../../../src/lib/service registry");
+const serviceRegistry = require("../../../src/lib/serviceRegistry");
 
 describe("service registry - getComments", () => {
   beforeEach(() => {
@@ -75,11 +75,11 @@ describe("service registry - getComments", () => {
     mockFindArticleById.mockResolvedValue({ id: "article-1", status: "draft" });
     mockGetAllComments.mockResolvedValue([]);
 
-    await serviceRegistry.getComments({ postId: "article-1" });
+    await serviceRegistry.getComments({ articleId: "article-1" });
 
     expect(mockFindArticleById).toHaveBeenCalledWith("article-1");
     expect(mockGetAllComments).toHaveBeenCalledWith(
-      expect.objectContaining({ postId: "article-1" }),
+      expect.objectContaining({ articleId: "article-1" }),
     );
   });
 
@@ -87,7 +87,7 @@ describe("service registry - getComments", () => {
     mockFindArticleById.mockResolvedValue(null);
 
     await expect(
-      serviceRegistry.getComments({ postId: "missing" }),
+      serviceRegistry.getComments({ articleId: "missing" }),
     ).rejects.toMatchObject({ statusCode: 404 });
     expect(mockGetAllComments).not.toHaveBeenCalled();
   });
@@ -96,7 +96,7 @@ describe("service registry - getComments", () => {
     mockFindArticleById.mockRejectedValue(new Error("db down"));
 
     await expect(
-      serviceRegistry.getComments({ postId: "article-1" }),
+      serviceRegistry.getComments({ articleId: "article-1" }),
     ).rejects.toThrow("db down");
     expect(mockGetAllComments).not.toHaveBeenCalled();
   });

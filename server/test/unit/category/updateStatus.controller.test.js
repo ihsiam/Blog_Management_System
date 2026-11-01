@@ -1,5 +1,5 @@
 /**
- * Unit tests for src/api/v1/category/controllers/updateStatus.js
+ * Unit tests for src/api/v1/categories/controllers/updateStatus.js
  *
  * Dependencies mocked:
  * - src/lib/categories (updateStatus)
@@ -10,7 +10,7 @@ jest.doMock("../../../src/lib/categories", () => ({
   updateStatus: mockUpdateStatus,
 }));
 
-const updateStatusController = require("../../../src/api/v1/category/controllers/updateStatus");
+const updateStatusController = require("../../../src/api/v1/categories/controllers/updateStatus");
 const { createMockResponse } = require("../helpers/mockExpress");
 
 describe("category updateStatus controller", () => {

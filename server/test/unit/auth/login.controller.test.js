@@ -92,6 +92,7 @@ describe("login controller", () => {
         httpOnly: true,
         secure: true,
         sameSite: "strict",
+        maxAge: 30 * 24 * 60 * 60 * 1000,
       });
       expect(res.status).toHaveBeenCalledWith(200);
       expect(res.json).toHaveBeenCalledWith({

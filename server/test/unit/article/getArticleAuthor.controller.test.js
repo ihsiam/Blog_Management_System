@@ -1,16 +1,16 @@
 /**
- * Unit tests for src/api/v1/article/controllers/getArticleAuthor.js
+ * Unit tests for src/api/v1/articles/controllers/getArticleAuthor.js
  *
  * Dependencies mocked:
- * - src/lib/service registry (getArticleAuthor orchestration)
+ * - src/lib/serviceRegistry (getArticleAuthor orchestration)
  */
 
 const mockGetArticleAuthor = jest.fn();
-jest.doMock("../../../src/lib/service registry", () => ({
+jest.doMock("../../../src/lib/serviceRegistry", () => ({
   getArticleAuthor: mockGetArticleAuthor,
 }));
 
-const getArticleAuthorController = require("../../../src/api/v1/article/controllers/getArticleAuthor");
+const getArticleAuthorController = require("../../../src/api/v1/articles/controllers/getArticleAuthor");
 const { createMockResponse } = require("../helpers/mockExpress");
 
 describe("article getArticleAuthor controller", () => {

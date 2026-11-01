@@ -4,6 +4,7 @@
  * Dependencies mocked:
  * - src/lib/token (JWT verification)
  * - src/lib/user  (database-backed user lookup)
+ * - src/lib/session (active-session lookup)
  */
 
 const mockVerifyAccessToken = jest.fn();
@@ -16,6 +17,11 @@ jest.doMock("../../../src/lib/user", () => ({
   findAuthUserById: mockFindAuthUserById,
 }));
 
+const mockHasActiveSession = jest.fn();
+jest.doMock("../../../src/lib/session", () => ({
+  hasActiveSession: mockHasActiveSession,
+}));
+
 const authenticate = require("../../../src/middleware/authenticate");
 
 describe("authenticate middleware", () => {
@@ -24,19 +30,20 @@ describe("authenticate middleware", () => {
   beforeEach(() => {
     mockVerifyAccessToken.mockReset();
     mockFindAuthUserById.mockReset();
+    mockHasActiveSession.mockReset();
+    mockHasActiveSession.mockResolvedValue(true);
     next = jest.fn();
   });
 
   const buildRequest = (authorization) => ({ headers: { authorization } });
 
   it("should attach the authenticated user and call next() for a valid token", async () => {
-    mockVerifyAccessToken.mockReturnValue({ id: "1" });
+    mockVerifyAccessToken.mockReturnValue({ id: "1", sid: "session-1" });
     mockFindAuthUserById.mockResolvedValue({
       id: "1",
       email: "jane@test.com",
       role: "user",
       account_status: "active",
-      refreshToken: "some-refresh-token",
       password_hash: "should-not-leak",
     });
 
@@ -44,11 +51,13 @@ describe("authenticate middleware", () => {
     await authenticate(req, {}, next);
 
     expect(mockVerifyAccessToken).toHaveBeenCalledWith("valid-token");
+    expect(mockHasActiveSession).toHaveBeenCalledWith("1", "session-1");
     expect(req.user).toEqual({
       id: "1",
       email: "jane@test.com",
       role: "user",
       status: "active",
+      sessionId: "session-1",
     });
     expect(req.user.password_hash).toBeUndefined();
     expect(next).toHaveBeenCalledWith();
@@ -67,7 +76,7 @@ describe("authenticate middleware", () => {
     expect(mockVerifyAccessToken).not.toHaveBeenCalled();
   });
 
-  it("should reject the request when the Authorization header lacks the Bearer prefix", async () => {
+  it("should reject the request when the Authorization header lacks the Bearer scheme", async () => {
     const req = buildRequest("Token some-token");
     await authenticate(req, {}, next);
 
@@ -86,7 +95,7 @@ describe("authenticate middleware", () => {
       throw verificationError;
     });
 
-    const req = buildRequest("Bearer expired-token");
+    const req = buildRequest("Bearer valid-token");
     await authenticate(req, {}, next);
 
     expect(next).toHaveBeenCalledWith(verificationError);
@@ -94,7 +103,7 @@ describe("authenticate middleware", () => {
   });
 
   it("should reject the request when the user no longer exists", async () => {
-    mockVerifyAccessToken.mockReturnValue({ id: "1" });
+    mockVerifyAccessToken.mockReturnValue({ id: "1", sid: "session-1" });
     mockFindAuthUserById.mockResolvedValue(null);
 
     const req = buildRequest("Bearer valid-token");
@@ -109,11 +118,10 @@ describe("authenticate middleware", () => {
   });
 
   it("should reject the request when the account is not active", async () => {
-    mockVerifyAccessToken.mockReturnValue({ id: "1" });
+    mockVerifyAccessToken.mockReturnValue({ id: "1", sid: "session-1" });
     mockFindAuthUserById.mockResolvedValue({
       id: "1",
       account_status: "pending",
-      refreshToken: "some-refresh-token",
     });
 
     const req = buildRequest("Bearer valid-token");
@@ -128,7 +136,7 @@ describe("authenticate middleware", () => {
   });
 
   it("should propagate the error when the user lookup dependency fails", async () => {
-    mockVerifyAccessToken.mockReturnValue({ id: "1" });
+    mockVerifyAccessToken.mockReturnValue({ id: "1", sid: "session-1" });
     const dbError = new Error("database unavailable");
     mockFindAuthUserById.mockRejectedValue(dbError);
 

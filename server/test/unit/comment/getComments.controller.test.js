@@ -2,12 +2,12 @@
  * Unit tests for src/api/v1/comments/controllers/getComments.js
  *
  * Dependencies mocked:
- * - src/lib/service registry (getComments orchestration)
+ * - src/lib/serviceRegistry (getComments orchestration)
  * - src/lib/comments         (count)
  */
 
 const mockGetComments = jest.fn();
-jest.doMock("../../../src/lib/service registry", () => ({
+jest.doMock("../../../src/lib/serviceRegistry", () => ({
   getComments: mockGetComments,
 }));
 
@@ -67,7 +67,7 @@ describe("comments getComments controller", () => {
       const err = next.mock.calls[0][0];
       expect(err.data).toEqual(
         expect.arrayContaining([
-          expect.objectContaining({ field: "sort_type" }),
+          expect.objectContaining({ field: "sortType" }),
         ]),
       );
     });
@@ -79,7 +79,7 @@ describe("comments getComments controller", () => {
 
       const err = next.mock.calls[0][0];
       expect(err.data).toEqual(
-        expect.arrayContaining([expect.objectContaining({ field: "sort_by" })]),
+        expect.arrayContaining([expect.objectContaining({ field: "sortBy" })]),
       );
     });
 
@@ -109,12 +109,12 @@ describe("comments getComments controller", () => {
         expect.objectContaining({
           page: 1,
           limit: 10,
-          postId: undefined,
+          articleId: undefined,
           status: undefined,
         }),
       );
       expect(mockCount).toHaveBeenCalledWith({
-        article: undefined,
+        articleId: undefined,
         status: undefined,
       });
     });
@@ -128,10 +128,10 @@ describe("comments getComments controller", () => {
       await getCommentsController(req, res, next);
 
       expect(mockGetComments).toHaveBeenCalledWith(
-        expect.objectContaining({ postId: validId, status: "hidden" }),
+        expect.objectContaining({ articleId: validId, status: "hidden" }),
       );
       expect(mockCount).toHaveBeenCalledWith({
-        article: validId,
+        articleId: validId,
         status: "hidden",
       });
     });
@@ -145,7 +145,15 @@ describe("comments getComments controller", () => {
 
       expect(res.status).toHaveBeenCalledWith(200);
       const payload = res.json.mock.calls[0][0];
-      expect(payload.data).toBe(comments);
+      expect(payload.data).toEqual([
+        {
+          id: "c1",
+          body: "hi",
+          article: undefined,
+          author: null,
+          parentCommentId: null,
+        },
+      ]);
       expect(payload.pagination).toMatchObject({
         page: 1,
         limit: 10,

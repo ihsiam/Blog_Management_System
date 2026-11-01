@@ -21,8 +21,7 @@ describe("forgotPassword controller", () => {
   let res;
   let next;
 
-  const GENERIC_MESSAGE =
-    "If an account with that email exists, a password reset code has been sent.";
+  const SUCCESS_MESSAGE = "A password reset code has been sent to your email.";
 
   beforeEach(() => {
     mockCreatePasswordResetOtp.mockReset();
@@ -55,7 +54,7 @@ describe("forgotPassword controller", () => {
     });
   });
 
-  it("should return the generic message without sending an email when the user does not exist", async () => {
+  it("should reject when the user does not exist", async () => {
     mockCreatePasswordResetOtp.mockResolvedValue({
       user: null,
       code: "123456",
@@ -66,14 +65,16 @@ describe("forgotPassword controller", () => {
 
     expect(mockCreatePasswordResetOtp).toHaveBeenCalledWith("missing@test.com");
     expect(mockSendMail).not.toHaveBeenCalled();
-    expect(res.status).toHaveBeenCalledWith(200);
-    expect(res.json).toHaveBeenCalledWith({
-      code: 200,
-      message: GENERIC_MESSAGE,
-    });
+    expect(next).toHaveBeenCalledWith(
+      expect.objectContaining({
+        statusCode: 404,
+        message: "Email is not registered",
+      }),
+    );
+    expect(res.status).not.toHaveBeenCalled();
   });
 
-  it("should return the generic message without sending an email for a blocked account", async () => {
+  it("should return success without sending an email for a blocked account", async () => {
     mockCreatePasswordResetOtp.mockResolvedValue({
       user: { id: "1", email: "jane@test.com", account_status: "blocked" },
       code: "123456",
@@ -86,7 +87,7 @@ describe("forgotPassword controller", () => {
     expect(res.status).toHaveBeenCalledWith(200);
     expect(res.json).toHaveBeenCalledWith({
       code: 200,
-      message: GENERIC_MESSAGE,
+      message: SUCCESS_MESSAGE,
     });
   });
 
@@ -112,7 +113,7 @@ describe("forgotPassword controller", () => {
     expect(res.status).toHaveBeenCalledWith(200);
     expect(res.json).toHaveBeenCalledWith({
       code: 200,
-      message: GENERIC_MESSAGE,
+      message: SUCCESS_MESSAGE,
     });
   });
 

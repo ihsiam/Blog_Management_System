@@ -12,20 +12,24 @@ jest.doMock("../../../src/utils/nodemailer", () => ({
   createTransporter: mockCreateTransport,
 }));
 
+const mockLoggerInfo = jest.fn();
+const mockLoggerError = jest.fn();
+jest.doMock("../../../src/utils/logger", () => ({
+  info: mockLoggerInfo,
+  error: mockLoggerError,
+}));
+
 const { sendMail } = require("../../../src/lib/email");
 
 describe("email service (src/lib/email)", () => {
-  let consoleLogSpy;
-  let consoleErrorSpy;
-
   beforeEach(() => {
     mockSendMail.mockReset();
-    consoleLogSpy = jest.spyOn(console, "log").mockImplementation(() => {});
-    consoleErrorSpy = jest.spyOn(console, "error").mockImplementation(() => {});
+    mockLoggerInfo.mockReset();
+    mockLoggerError.mockReset();
   });
 
   afterEach(() => {
-    jest.restoreAllMocks();
+    jest.clearAllMocks();
   });
 
   describe("input validation", () => {
@@ -67,9 +71,9 @@ describe("email service (src/lib/email)", () => {
         }),
       );
       expect(result).toEqual({ messageId: "abc123" });
-      expect(consoleLogSpy).toHaveBeenCalledWith(
-        "EMAIL SENT:",
-        expect.objectContaining({ to: "jane@test.com" }),
+      expect(mockLoggerInfo).toHaveBeenCalledWith(
+        "Email sent",
+        expect.objectContaining({ messageId: "abc123" }),
       );
     });
   });
@@ -81,7 +85,10 @@ describe("email service (src/lib/email)", () => {
       await expect(
         sendMail({ email: "jane@test.com", subject: "Hi", text: "body" }),
       ).rejects.toThrow("Email sending failed: SMTP connection refused");
-      expect(consoleErrorSpy).toHaveBeenCalled();
+      expect(mockLoggerError).toHaveBeenCalledWith(
+        "Failed to send email",
+        expect.objectContaining({ message: "SMTP connection refused" }),
+      );
     });
   });
 });

@@ -70,8 +70,14 @@ describe("comments updateCommentStatus controller", () => {
       expect(res.status).toHaveBeenCalledWith(200);
       expect(res.json).toHaveBeenCalledWith({
         code: 200,
-        message: "comment status updated",
-        data: updatedComment,
+        message: "Comment status updated",
+        data: {
+          id: validId,
+          status: "hidden",
+          article: undefined,
+          author: null,
+          parentCommentId: null,
+        },
         links: { self: `/api/v1/comments/${validId}` },
       });
       expect(next).not.toHaveBeenCalled();

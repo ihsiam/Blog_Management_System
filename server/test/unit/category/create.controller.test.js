@@ -1,5 +1,5 @@
 /**
- * Unit tests for src/api/v1/category/controllers/create.js
+ * Unit tests for src/api/v1/categories/controllers/create.js
  *
  * Dependencies mocked:
  * - src/lib/categories (create)
@@ -10,7 +10,7 @@ jest.doMock("../../../src/lib/categories", () => ({
   create: mockCreate,
 }));
 
-const createController = require("../../../src/api/v1/category/controllers/create");
+const createController = require("../../../src/api/v1/categories/controllers/create");
 const { createMockResponse } = require("../helpers/mockExpress");
 
 describe("category create controller", () => {

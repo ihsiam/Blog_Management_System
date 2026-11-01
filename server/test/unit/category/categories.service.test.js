@@ -46,7 +46,7 @@ describe("category service (src/lib/categories)", () => {
   });
 
   describe("findAll", () => {
-    it("should filter active categories and apply sorting and pagination", async () => {
+    it("should apply name filtering, sorting, and pagination", async () => {
       const first = createFakeCategoryDoc({ id: "1", name: "Tech" });
       const chain = createQueryChain([first]);
       MockCategoryModel.find.mockReturnValue(chain);
@@ -61,7 +61,6 @@ describe("category service (src/lib/categories)", () => {
 
       expect(MockCategoryModel.find).toHaveBeenCalledWith({
         name: { $regex: "tech", $options: "i" },
-        status: "active",
       });
       expect(chain.sort).toHaveBeenCalledWith("name");
       expect(chain.skip).toHaveBeenCalledWith(5);
@@ -91,7 +90,7 @@ describe("category service (src/lib/categories)", () => {
   });
 
   describe("count", () => {
-    it("should count active categories matching the search term", async () => {
+    it("should count categories matching the search term", async () => {
       MockCategoryModel.countDocuments.mockResolvedValue(3);
 
       await expect(categoryService.count({ searchTerm: "tech" })).resolves.toBe(
@@ -99,7 +98,6 @@ describe("category service (src/lib/categories)", () => {
       );
       expect(MockCategoryModel.countDocuments).toHaveBeenCalledWith({
         name: { $regex: "tech", $options: "i" },
-        status: "active",
       });
     });
   });

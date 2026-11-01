@@ -55,6 +55,21 @@ describe("resetPassword controller", () => {
         },
       ]);
     });
+
+    it("should reject a password longer than 72 bytes", async () => {
+      const req = buildRequest("some-token", "a".repeat(73));
+
+      await resetPasswordController(req, res, next);
+
+      expect(mockResetPassword).not.toHaveBeenCalled();
+      expect(next.mock.calls[0][0].data).toEqual([
+        {
+          field: "password",
+          message: "Password must be at most 72 bytes long",
+          in: "body",
+        },
+      ]);
+    });
   });
 
   it("should reject when the reset token is missing", async () => {

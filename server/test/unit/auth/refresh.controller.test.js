@@ -37,21 +37,16 @@ describe("refresh controller", () => {
     expect(mockRefreshToken).not.toHaveBeenCalled();
   });
 
-  it("should rotate tokens and return the new access token", async () => {
+  it("should return a new access token without rotating the cookie", async () => {
     mockRefreshToken.mockResolvedValue({
-      newAccessToken: "new-access-token",
-      newRefreshToken: "new-refresh-token",
+      accessToken: "new-access-token",
     });
 
     const req = { cookies: { refreshToken: "current-refresh-token" } };
     await refreshController(req, res, next);
 
     expect(mockRefreshToken).toHaveBeenCalledWith("current-refresh-token");
-    expect(res.cookie).toHaveBeenCalledWith(
-      "refreshToken",
-      "new-refresh-token",
-      { httpOnly: true, secure: true, sameSite: "strict" },
-    );
+    expect(res.cookie).not.toHaveBeenCalled();
     expect(res.status).toHaveBeenCalledWith(200);
     expect(res.json).toHaveBeenCalledWith({
       code: 200,

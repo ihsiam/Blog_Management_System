@@ -281,7 +281,9 @@ describe("article service (src/lib/articles)", () => {
         match: { status: "public" },
         populate: { path: "author_id", select: "name" },
       });
-      expect(result.comments).toEqual([{ id: "c1", body: "hi" }]);
+      expect(result.comments).toEqual([
+        { id: "c1", body: "hi", author: undefined },
+      ]);
     });
 
     it("should propagate the error when the lookup fails", async () => {
@@ -406,7 +408,10 @@ describe("article service (src/lib/articles)", () => {
 
   describe("findArticlesByUser", () => {
     it("should return only the ids of a user's articles", async () => {
-      const chain = createQueryChain([{ _id: "a1" }, { _id: "a2" }]);
+      const chain = createQueryChain([
+        { _id: "a1", cover_image_url: "a1.png" },
+        { _id: "a2", cover_image_url: "a2.png" },
+      ]);
       MockArticleModel.find.mockReturnValue(chain);
 
       const result = await articleService.findArticlesByUser("author-1");
@@ -414,8 +419,11 @@ describe("article service (src/lib/articles)", () => {
       expect(MockArticleModel.find).toHaveBeenCalledWith({
         author_id: "author-1",
       });
-      expect(chain.select).toHaveBeenCalledWith("_id");
-      expect(result).toEqual(["a1", "a2"]);
+      expect(chain.select).toHaveBeenCalledWith("_id cover_image_url");
+      expect(result).toEqual([
+        { id: "a1", cover: "a1.png" },
+        { id: "a2", cover: "a2.png" },
+      ]);
     });
   });
 

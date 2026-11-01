@@ -4,16 +4,20 @@
 
 const mockFindArticleById = jest.fn();
 const mockDeleteItem = jest.fn();
+const mockArticleDeleteMany = jest.fn();
 const mockFindSingleItem = jest.fn();
 const mockCommentDeleteMany = jest.fn();
 const mockGetCommentsByArticle = jest.fn();
 const mockCommentCreate = jest.fn();
 const mockFindUserById = jest.fn();
 const mockGetCache = jest.fn();
+const mockSetCache = jest.fn();
+const mockRemoveArticleCover = jest.fn();
 
 jest.doMock("../../../src/lib/articles", () => ({
   findArticleById: mockFindArticleById,
   deleteItem: mockDeleteItem,
+  deleteMany: mockArticleDeleteMany,
   findSingleItem: mockFindSingleItem,
 }));
 
@@ -29,24 +33,31 @@ jest.doMock("../../../src/lib/user", () => ({
 
 jest.doMock("../../../src/utils/cache", () => ({
   getCache: mockGetCache,
-  setCache: jest.fn(),
+  setCache: mockSetCache,
   deleteCache: jest.fn(),
   deleteCachePattern: jest.fn(),
 }));
 
+jest.doMock("../../../src/lib/storage", () => ({
+  removeArticleCover: mockRemoveArticleCover,
+}));
+
 const mongoose = require("mongoose");
-const serviceRegistry = require("../../../src/lib/service registry");
+const serviceRegistry = require("../../../src/lib/serviceRegistry");
 
 describe("service registry - article-related orchestration", () => {
   beforeEach(() => {
     mockFindArticleById.mockReset();
     mockDeleteItem.mockReset();
+    mockArticleDeleteMany.mockReset();
     mockFindSingleItem.mockReset();
     mockCommentDeleteMany.mockReset();
     mockGetCommentsByArticle.mockReset();
     mockCommentCreate.mockReset();
     mockFindUserById.mockReset();
     mockGetCache.mockReset();
+    mockSetCache.mockReset();
+    mockRemoveArticleCover.mockReset();
     mockGetCache.mockResolvedValue(null);
     jest.restoreAllMocks();
   });
@@ -58,7 +69,7 @@ describe("service registry - article-related orchestration", () => {
         endSession: jest.fn().mockResolvedValue(),
       };
       jest.spyOn(mongoose, "startSession").mockResolvedValue(session);
-      mockFindArticleById.mockResolvedValue({ id: "1" });
+      mockFindArticleById.mockResolvedValue({ id: "1", cover_image_url: "cover-1" });
       mockCommentDeleteMany.mockResolvedValue(true);
       mockDeleteItem.mockResolvedValue(true);
 
@@ -66,10 +77,11 @@ describe("service registry - article-related orchestration", () => {
 
       expect(mockFindArticleById).toHaveBeenCalledWith("1", session);
       expect(mockCommentDeleteMany).toHaveBeenCalledWith(
-        { article: "1" },
+        { article_id: "1" },
         session,
       );
       expect(mockDeleteItem).toHaveBeenCalledWith("1", session);
+      expect(mockRemoveArticleCover).toHaveBeenCalledWith("cover-1");
       expect(result).toBe(true);
     });
 
@@ -98,7 +110,7 @@ describe("service registry - article-related orchestration", () => {
       mockGetCommentsByArticle.mockResolvedValue(comments);
 
       const result = await serviceRegistry.getCommentByArticle({
-        articleID: "1",
+        articleId: "1",
         page: 1,
         limit: 10,
         status: "public",
@@ -106,7 +118,7 @@ describe("service registry - article-related orchestration", () => {
 
       expect(mockFindSingleItem).toHaveBeenCalledWith({ id: "1" });
       expect(mockGetCommentsByArticle).toHaveBeenCalledWith({
-        articleID: "1",
+        articleId: "1",
         page: 1,
         limit: 10,
         status: "public",
@@ -120,7 +132,7 @@ describe("service registry - article-related orchestration", () => {
       );
 
       await expect(
-        serviceRegistry.getCommentByArticle({ articleID: "missing" }),
+        serviceRegistry.getCommentByArticle({ articleId: "missing" }),
       ).rejects.toMatchObject({ statusCode: 404 });
       expect(mockGetCommentsByArticle).not.toHaveBeenCalled();
     });
@@ -133,16 +145,17 @@ describe("service registry - article-related orchestration", () => {
       mockCommentCreate.mockResolvedValue(createdComment);
 
       const result = await serviceRegistry.createComment({
-        articleID: "1",
+        articleId: "1",
         body: "hi",
         author: "user-1",
       });
 
       expect(mockCommentCreate).toHaveBeenCalledWith({
-        articleID: "1",
+        articleId: "1",
         body: "hi",
         status: "public",
         author: "user-1",
+        parentCommentId: undefined,
       });
       expect(result).toBe(createdComment);
     });
@@ -154,7 +167,7 @@ describe("service registry - article-related orchestration", () => {
 
       await expect(
         serviceRegistry.createComment({
-          articleID: "missing",
+          articleId: "missing",
           body: "hi",
           author: "user-1",
         }),
@@ -165,7 +178,11 @@ describe("service registry - article-related orchestration", () => {
 
   describe("getArticleAuthor", () => {
     it("should return the article's author", async () => {
-      mockFindArticleById.mockResolvedValue({ id: "1", author_id: "user-1" });
+      mockFindArticleById.mockResolvedValue({
+        id: "1",
+        author_id: "user-1",
+        status: "published",
+      });
       const author = { id: "user-1", name: "Jane" };
       mockFindUserById.mockResolvedValue(author);
 

@@ -63,7 +63,7 @@ describe("user getAllUsers controller", () => {
 
       const err = next.mock.calls[0][0];
       expect(err.data).toEqual(
-        expect.arrayContaining([expect.objectContaining({ field: "sort_by" })]),
+        expect.arrayContaining([expect.objectContaining({ field: "sortBy" })]),
       );
     });
 
@@ -113,7 +113,7 @@ describe("user getAllUsers controller", () => {
           name: "Jane",
           email: "jane@test.com",
           role: "user",
-          status: "active",
+          account_status: "active",
           password: "should-not-leak",
           createdAt: "2024-01-01",
           updatedAt: "2024-01-01",
@@ -131,7 +131,7 @@ describe("user getAllUsers controller", () => {
           name: "Jane",
           email: "jane@test.com",
           role: "user",
-          status: "active",
+          account_status: "active",
           createdAt: "2024-01-01",
           updatedAt: "2024-01-01",
         },

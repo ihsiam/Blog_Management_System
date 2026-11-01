@@ -1,5 +1,5 @@
 /**
- * Unit tests for src/api/v1/article/controllers/findSingleItem.js
+ * Unit tests for src/api/v1/articles/controllers/findSingleItem.js
  *
  * Dependencies mocked:
  * - src/lib/articles (findSingleItem)
@@ -10,7 +10,7 @@ jest.doMock("../../../src/lib/articles", () => ({
   findSingleItem: mockFindSingleItem,
 }));
 
-const findSingleItemController = require("../../../src/api/v1/article/controllers/findSingleItem");
+const findSingleItemController = require("../../../src/api/v1/articles/controllers/findSingleItem");
 const { createMockResponse } = require("../helpers/mockExpress");
 
 describe("article findSingleItem controller", () => {

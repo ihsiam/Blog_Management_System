@@ -82,7 +82,11 @@ describe("user updateUser controller", () => {
       const updatedUser = { id: validId, role: "admin" };
       mockUpdateUser.mockResolvedValue(updatedUser);
 
-      const req = { params: { id: validId }, body: { role: "admin" } };
+      const req = {
+        params: { id: validId },
+        body: { role: "admin" },
+        user: { id: "507f1f77bcf86cd799439012" },
+      };
       await updateUserController(req, res, next);
 
       expect(mockUpdateUser).toHaveBeenCalledWith({
@@ -104,7 +108,11 @@ describe("user updateUser controller", () => {
       const updatedUser = { id: validId, account_status: "blocked" };
       mockUpdateUser.mockResolvedValue(updatedUser);
 
-      const req = { params: { id: validId }, body: { status: "blocked" } };
+      const req = {
+        params: { id: validId },
+        body: { status: "blocked" },
+        user: { id: "507f1f77bcf86cd799439012" },
+      };
       await updateUserController(req, res, next);
 
       expect(mockUpdateUser).toHaveBeenCalledWith({
@@ -126,7 +134,11 @@ describe("user updateUser controller", () => {
       });
       mockUpdateUser.mockRejectedValue(notFoundError);
 
-      const req = { params: { id: validId }, body: { name: "New name" } };
+      const req = {
+        params: { id: validId },
+        body: { name: "New name" },
+        user: { id: "507f1f77bcf86cd799439012" },
+      };
       await updateUserController(req, res, next);
 
       expect(next).toHaveBeenCalledWith(notFoundError);

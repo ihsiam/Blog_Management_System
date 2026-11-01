@@ -51,7 +51,7 @@ describe("ownership middleware - comment resource", () => {
     expect(req.adminOverride).toBeUndefined();
   });
 
-  it("should grant an admin override when a non-owning admin accesses the comment", async () => {
+  it("should reject a non-owning admin when allowAdmin is not enabled", async () => {
     mockCheckOwner.mockResolvedValue(false);
 
     const req = {
@@ -60,8 +60,12 @@ describe("ownership middleware - comment resource", () => {
     };
     await ownership("comment")(req, {}, next);
 
-    expect(req.adminOverride).toBe(true);
-    expect(next).toHaveBeenCalledWith();
+    expect(next).toHaveBeenCalledWith(
+      expect.objectContaining({
+        statusCode: 403,
+        message: "You do not have permission to access this comment",
+      }),
+    );
   });
 
   it("should reject a non-owner, non-admin user", async () => {

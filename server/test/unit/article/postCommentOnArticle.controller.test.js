@@ -1,16 +1,16 @@
 /**
- * Unit tests for src/api/v1/article/controllers/postCommentOnArticle.js
+ * Unit tests for src/api/v1/articles/controllers/postCommentOnArticle.js
  *
  * Dependencies mocked:
- * - src/lib/service registry (createComment orchestration)
+ * - src/lib/serviceRegistry (createComment orchestration)
  */
 
 const mockCreateComment = jest.fn();
-jest.doMock("../../../src/lib/service registry", () => ({
+jest.doMock("../../../src/lib/serviceRegistry", () => ({
   createComment: mockCreateComment,
 }));
 
-const postCommentOnArticleController = require("../../../src/api/v1/article/controllers/postCommentOnArticle");
+const postCommentOnArticleController = require("../../../src/api/v1/articles/controllers/postCommentOnArticle");
 const { createMockResponse } = require("../helpers/mockExpress");
 
 describe("article postCommentOnArticle controller", () => {
@@ -72,7 +72,7 @@ describe("article postCommentOnArticle controller", () => {
 
   describe("successful comment creation", () => {
     it("should create the comment with the authenticated user as author and default status", async () => {
-      const createdComment = { id: "c1", body: "Nice post", author: "user-1" };
+      const createdComment = { id: "c1", body: "Nice post", author: null };
       mockCreateComment.mockResolvedValue(createdComment);
 
       const req = {
@@ -83,7 +83,7 @@ describe("article postCommentOnArticle controller", () => {
       await postCommentOnArticleController(req, res, next);
 
       expect(mockCreateComment).toHaveBeenCalledWith({
-        articleID: validId,
+        articleId: validId,
         body: "Nice post",
         status: "public",
         author: "user-1",
@@ -91,8 +91,13 @@ describe("article postCommentOnArticle controller", () => {
       expect(res.status).toHaveBeenCalledWith(201);
       expect(res.json).toHaveBeenCalledWith({
         code: 201,
-        message: "comment posted",
-        data: createdComment,
+        message: "Comment posted",
+        data: {
+          ...createdComment,
+          article: undefined,
+          author: null,
+          parentCommentId: null,
+        },
         links: {
           self: `/api/v1/articles/${validId}/comments`,
           article: `/api/v1/articles/${validId}`,

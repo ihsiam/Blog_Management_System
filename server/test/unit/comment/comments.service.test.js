@@ -5,6 +5,7 @@
  * Redis access while preserving the service's Mongoose query shape.
  */
 
+const mongoose = require("mongoose");
 const mockGetCache = jest.fn();
 const mockSetCache = jest.fn();
 const mockDeleteCachePattern = jest.fn();
@@ -18,9 +19,11 @@ jest.doMock("../../../src/utils/cache", () => ({
 const createQueryChain = (result) => {
   const chain = {};
   chain.populate = jest.fn().mockReturnValue(chain);
+  chain.select = jest.fn().mockReturnValue(chain);
   chain.sort = jest.fn().mockReturnValue(chain);
   chain.skip = jest.fn().mockReturnValue(chain);
   chain.limit = jest.fn().mockReturnValue(chain);
+  chain.session = jest.fn().mockReturnValue(chain);
   chain.then = (resolve, reject) =>
     Promise.resolve(result).then(resolve, reject);
   chain.catch = (reject) => Promise.resolve(result).catch(reject);
@@ -51,6 +54,12 @@ const commentService = require("../../../src/lib/comments");
 
 describe("comment service (src/lib/comments)", () => {
   beforeEach(() => {
+    const session = {
+      withTransaction: jest.fn(async (callback) => callback()),
+      endSession: jest.fn(),
+    };
+    jest.spyOn(mongoose, "startSession").mockResolvedValue(session);
+
     MockCommentModel.find.mockReset();
     MockCommentModel.findOne.mockReset();
     MockCommentModel.findById.mockReset();
@@ -61,6 +70,10 @@ describe("comment service (src/lib/comments)", () => {
     mockGetCache.mockResolvedValue(null);
     mockSetCache.mockReset();
     mockDeleteCachePattern.mockReset();
+  });
+
+  afterEach(() => {
+    jest.restoreAllMocks();
   });
 
   describe("getCommentsByArticle", () => {
@@ -87,7 +100,7 @@ describe("comment service (src/lib/comments)", () => {
       MockCommentModel.find.mockReturnValue(chain);
 
       const result = await commentService.getCommentsByArticle({
-        articleID: "article-1",
+        articleId: "article-1",
         page: 1,
         limit: 5,
         status: "public",
@@ -129,7 +142,7 @@ describe("comment service (src/lib/comments)", () => {
 
       await expect(
         commentService.getCommentsByArticle({
-          articleID: "article-1",
+          articleId: "article-1",
           status: "public",
         }),
       ).resolves.toBe(cached);
@@ -145,7 +158,7 @@ describe("comment service (src/lib/comments)", () => {
       );
 
       const result = await commentService.getCommentsByArticle({
-        articleID: "article-1",
+        articleId: "article-1",
         page: 2,
         limit: 1,
       });
@@ -161,7 +174,7 @@ describe("comment service (src/lib/comments)", () => {
       MockCommentModel.find.mockReturnValue(chain);
 
       await expect(
-        commentService.getCommentsByArticle({ articleID: "article-1" }),
+        commentService.getCommentsByArticle({ articleId: "article-1" }),
       ).rejects.toThrow("db down");
     });
   });
@@ -172,7 +185,7 @@ describe("comment service (src/lib/comments)", () => {
       MockCommentModel.find.mockReturnValue(chain);
 
       await commentService.getAllComments({
-        postId: "article-1",
+        articleId: "article-1",
         status: "hidden",
         sortKey: "-createdAt",
         page: 2,
@@ -194,7 +207,12 @@ describe("comment service (src/lib/comments)", () => {
       );
 
       await expect(commentService.getAllComments({})).resolves.toEqual([
-        { id: "c1" },
+        {
+          id: "c1",
+          article: undefined,
+          author: null,
+          parentCommentId: null,
+        },
       ]);
     });
   });
@@ -205,7 +223,7 @@ describe("comment service (src/lib/comments)", () => {
 
       await expect(
         commentService.count({
-          article: "article-1",
+          articleId: "article-1",
           status: "public",
           topLevel: true,
         }),
@@ -226,7 +244,7 @@ describe("comment service (src/lib/comments)", () => {
       mockGetCache.mockResolvedValue(3);
 
       await expect(
-        commentService.count({ article: "article-1", status: "public" }),
+        commentService.count({ articleId: "article-1", status: "public" }),
       ).resolves.toBe(3);
       expect(MockCommentModel.countDocuments).not.toHaveBeenCalled();
     });
@@ -235,7 +253,7 @@ describe("comment service (src/lib/comments)", () => {
   describe("create", () => {
     it("should create and persist a new comment with the default status", async () => {
       const result = await commentService.create({
-        articleID: "article-1",
+        articleId: "article-1",
         body: "hi",
         author: "user-1",
       });
@@ -263,7 +281,7 @@ describe("comment service (src/lib/comments)", () => {
 
       await expect(
         commentService.create({
-          articleID: "article-1",
+          articleId: "article-1",
           body: "reply",
           author: "user-1",
           parentCommentId: "parent-1",
@@ -278,7 +296,7 @@ describe("comment service (src/lib/comments)", () => {
       MockCommentModel.mockImplementationOnce(() => failingDoc);
 
       await expect(
-        commentService.create({ articleID: "a1", body: "hi", author: "u1" }),
+        commentService.create({ articleId: "a1", body: "hi", author: "u1" }),
       ).rejects.toThrow("save failed");
     });
   });
@@ -329,7 +347,9 @@ describe("comment service (src/lib/comments)", () => {
   describe("deleteItem", () => {
     it("should delete a comment and all nested replies", async () => {
       const comment = createFakeCommentDoc({ id: "c1", article_id: "a1" });
-      MockCommentModel.findById.mockResolvedValue(comment);
+      MockCommentModel.findById.mockReturnValue({
+        session: jest.fn().mockResolvedValue(comment),
+      });
       MockCommentModel.find
         .mockReturnValueOnce(
           createQueryChain([{ _id: { toString: () => "c2" } }]),
@@ -338,13 +358,16 @@ describe("comment service (src/lib/comments)", () => {
       MockCommentModel.deleteMany.mockResolvedValue({ deletedCount: 2 });
 
       await expect(commentService.deleteItem("c1")).resolves.toBe(true);
-      expect(MockCommentModel.deleteMany).toHaveBeenCalledWith({
-        _id: { $in: ["c1", "c2"] },
-      });
+      expect(MockCommentModel.deleteMany).toHaveBeenCalledWith(
+        { _id: { $in: ["c2"] } },
+        { session: expect.any(Object) },
+      );
     });
 
     it("should reject when the comment does not exist", async () => {
-      MockCommentModel.findById.mockResolvedValue(null);
+      MockCommentModel.findById.mockReturnValue({
+        session: jest.fn().mockResolvedValue(null),
+      });
 
       await expect(commentService.deleteItem("missing")).rejects.toMatchObject({
         statusCode: 404,
@@ -357,7 +380,10 @@ describe("comment service (src/lib/comments)", () => {
       MockCommentModel.deleteMany.mockResolvedValue({ deletedCount: 3 });
 
       await expect(
-        commentService.deleteMany({ article: "a1", author: "u1" }, "session-1"),
+        commentService.deleteMany(
+          { article_id: "a1", author_id: "u1" },
+          "session-1",
+        ),
       ).resolves.toBe(true);
       expect(MockCommentModel.deleteMany).toHaveBeenCalledWith(
         { article_id: "a1", author_id: "u1" },

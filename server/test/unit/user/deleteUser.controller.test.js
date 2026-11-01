@@ -2,11 +2,11 @@
  * Unit tests for src/api/v1/user/controllers/deleteUser.js
  *
  * Dependencies mocked:
- * - src/lib/service registry (deleteUser orchestration)
+ * - src/lib/serviceRegistry (deleteUser orchestration)
  */
 
 const mockDeleteUser = jest.fn();
-jest.doMock("../../../src/lib/service registry", () => ({
+jest.doMock("../../../src/lib/serviceRegistry", () => ({
   deleteUser: mockDeleteUser,
 }));
 
@@ -40,7 +40,10 @@ describe("user deleteUser controller", () => {
   it("should delete the user and respond with 204 No Content", async () => {
     mockDeleteUser.mockResolvedValue(true);
 
-    const req = { params: { id: validId } };
+    const req = {
+      params: { id: validId },
+      user: { id: "507f1f77bcf86cd799439012" },
+    };
     await deleteUserController(req, res, next);
 
     expect(mockDeleteUser).toHaveBeenCalledWith(validId);
@@ -55,7 +58,10 @@ describe("user deleteUser controller", () => {
     });
     mockDeleteUser.mockRejectedValue(notFoundError);
 
-    const req = { params: { id: validId } };
+    const req = {
+      params: { id: validId },
+      user: { id: "507f1f77bcf86cd799439012" },
+    };
     await deleteUserController(req, res, next);
 
     expect(next).toHaveBeenCalledWith(notFoundError);

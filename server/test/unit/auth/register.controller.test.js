@@ -81,6 +81,24 @@ describe("register controller", () => {
         },
       ]);
     });
+
+    it("should reject a password longer than 72 bytes", async () => {
+      const req = {
+        body: { ...validBody, password: "a".repeat(73) },
+      };
+
+      await registerController(req, res, next);
+
+      expect(mockRegister).not.toHaveBeenCalled();
+      const err = next.mock.calls[0][0];
+      expect(err.data).toEqual([
+        {
+          field: "password",
+          message: "Password must be at most 72 bytes long",
+          in: "body",
+        },
+      ]);
+    });
   });
 
   describe("successful registration", () => {
@@ -117,7 +135,7 @@ describe("register controller", () => {
           id: createdUser.id,
           name: createdUser.name,
           email: createdUser.email,
-          status: createdUser.account_status,
+          account_status: createdUser.account_status,
           createdAt: createdUser.createdAt,
           updatedAt: createdUser.updatedAt,
         },

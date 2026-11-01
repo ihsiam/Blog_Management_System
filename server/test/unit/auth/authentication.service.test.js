@@ -5,25 +5,28 @@
  */
 
 const mongoose = require("mongoose");
+const mockUpdateSystemInfo = jest.fn();
 const mockFindOneAndUpdate = jest.fn();
 const mockUserExist = jest.fn();
 const mockCreateUser = jest.fn();
 const mockCreateAdmin = jest.fn();
 const mockFindUserByEmail = jest.fn();
-const mockSaveRefreshToken = jest.fn();
 const mockFindAuthUserById = jest.fn();
+const mockUpdateUser = jest.fn();
+const mockUpdatePassword = jest.fn();
+const mockDeleteExpiredSessions = jest.fn();
+const mockSaveRefreshToken = jest.fn();
 const mockFindSessionByToken = jest.fn();
 const mockClearRefreshToken = jest.fn();
 const mockCreateOtp = jest.fn();
-const mockFindValidOtp = jest.fn();
+const mockClaimOtpAttempt = jest.fn();
 const mockMarkOtpUsed = jest.fn();
-const mockUpdateUser = jest.fn();
 const mockSavePasswordResetToken = jest.fn();
 const mockFindPasswordResetToken = jest.fn();
 const mockMarkPasswordResetTokenUsed = jest.fn();
-const mockUpdatePassword = jest.fn();
 
 jest.doMock("../../../src/model/SystemInfo", () => ({
+  updateOne: mockUpdateSystemInfo,
   findOneAndUpdate: mockFindOneAndUpdate,
 }));
 
@@ -32,25 +35,40 @@ jest.doMock("../../../src/lib/user", () => ({
   createUser: mockCreateUser,
   createAdmin: mockCreateAdmin,
   findUserByEmail: mockFindUserByEmail,
-  saveRefreshToken: mockSaveRefreshToken,
   findAuthUserById: mockFindAuthUserById,
+  updateUser: mockUpdateUser,
+  updatePassword: mockUpdatePassword,
+}));
+
+jest.doMock("../../../src/lib/session", () => ({
+  deleteExpiredSessions: mockDeleteExpiredSessions,
+  saveRefreshToken: mockSaveRefreshToken,
   findSessionByToken: mockFindSessionByToken,
   clearRefreshToken: mockClearRefreshToken,
+}));
+
+jest.doMock("../../../src/lib/otp", () => ({
   createOtp: mockCreateOtp,
-  findValidOtp: mockFindValidOtp,
+  claimOtpAttempt: mockClaimOtpAttempt,
   markOtpUsed: mockMarkOtpUsed,
-  updateUser: mockUpdateUser,
+}));
+
+jest.doMock("../../../src/lib/passwordReset", () => ({
   savePasswordResetToken: mockSavePasswordResetToken,
   findPasswordResetToken: mockFindPasswordResetToken,
   markPasswordResetTokenUsed: mockMarkPasswordResetTokenUsed,
-  updatePassword: mockUpdatePassword,
 }));
 
 const mockGenerateHash = jest.fn();
 const mockCompareHash = jest.fn();
+const mockGenerateDigest = jest.fn();
 
 jest.doMock("../../../src/utils", () => ({
-  hashing: { generateHash: mockGenerateHash, compareHash: mockCompareHash },
+  hashing: {
+    generateHash: mockGenerateHash,
+    compareHash: mockCompareHash,
+    generateDigest: mockGenerateDigest,
+  },
 }));
 
 const mockGenerateAccessToken = jest.fn();
@@ -75,25 +93,28 @@ describe("authentication service (src/lib/authentication)", () => {
     };
     jest.spyOn(mongoose, "startSession").mockResolvedValue(session);
 
+    mockUpdateSystemInfo.mockReset();
     mockFindOneAndUpdate.mockReset();
     mockUserExist.mockReset();
     mockCreateUser.mockReset();
     mockCreateAdmin.mockReset();
     mockFindUserByEmail.mockReset();
-    mockSaveRefreshToken.mockReset();
     mockFindAuthUserById.mockReset();
+    mockUpdateUser.mockReset();
+    mockUpdatePassword.mockReset();
+    mockDeleteExpiredSessions.mockReset();
+    mockSaveRefreshToken.mockReset();
     mockFindSessionByToken.mockReset();
     mockClearRefreshToken.mockReset();
     mockCreateOtp.mockReset();
-    mockFindValidOtp.mockReset();
+    mockClaimOtpAttempt.mockReset();
     mockMarkOtpUsed.mockReset();
-    mockUpdateUser.mockReset();
     mockSavePasswordResetToken.mockReset();
     mockFindPasswordResetToken.mockReset();
     mockMarkPasswordResetTokenUsed.mockReset();
-    mockUpdatePassword.mockReset();
     mockGenerateHash.mockReset();
     mockCompareHash.mockReset();
+    mockGenerateDigest.mockReset();
     mockGenerateAccessToken.mockReset();
     mockGenerateRefreshToken.mockReset();
     mockVerifyRefreshToken.mockReset();
@@ -163,6 +184,7 @@ describe("authentication service (src/lib/authentication)", () => {
 
   describe("systemAdmin", () => {
     it("should create the system administrator successfully", async () => {
+      mockUpdateSystemInfo.mockResolvedValue({});
       mockFindOneAndUpdate.mockResolvedValue({ adminSetup: true });
       mockUserExist.mockResolvedValue(false);
       mockGenerateHash.mockResolvedValue("hashed-password");
@@ -180,10 +202,15 @@ describe("authentication service (src/lib/authentication)", () => {
         password: "plain-password",
       });
 
+      expect(mockUpdateSystemInfo).toHaveBeenCalledWith(
+        { id: "system-admin" },
+        { $setOnInsert: { adminSetup: false } },
+        { upsert: true, session },
+      );
       expect(mockFindOneAndUpdate).toHaveBeenCalledWith(
         { id: "system-admin", adminSetup: false },
         { $set: { adminSetup: true } },
-        { new: true, upsert: true, session },
+        { new: true, session },
       );
       expect(mockCreateAdmin).toHaveBeenCalledWith(
         { name: "Admin", email: "admin@test.com", password: "hashed-password" },
@@ -193,6 +220,7 @@ describe("authentication service (src/lib/authentication)", () => {
     });
 
     it("should reject when a system administrator already exists", async () => {
+      mockUpdateSystemInfo.mockResolvedValue({});
       mockFindOneAndUpdate.mockResolvedValue(null);
 
       await expect(
@@ -221,6 +249,7 @@ describe("authentication service (src/lib/authentication)", () => {
     it("should authenticate valid credentials and issue a token pair", async () => {
       mockFindUserByEmail.mockResolvedValue(approvedUser);
       mockCompareHash.mockResolvedValue(true);
+      mockDeleteExpiredSessions.mockResolvedValue(undefined);
       mockGenerateAccessToken.mockReturnValue("access-token");
       mockGenerateRefreshToken.mockReturnValue("refresh-token");
       mockSaveRefreshToken.mockResolvedValue(undefined);
@@ -235,20 +264,29 @@ describe("authentication service (src/lib/authentication)", () => {
         "plain-password",
         approvedUser.password_hash,
       );
-      expect(mockGenerateAccessToken).toHaveBeenCalledWith({
+      expect(mockGenerateAccessToken).toHaveBeenCalledWith(
+        expect.objectContaining({
         id: approvedUser.id,
         role: approvedUser.role,
         email: approvedUser.email,
-      });
-      expect(mockGenerateRefreshToken).toHaveBeenCalledWith({
+        sid: expect.any(String),
+        }),
+      );
+      expect(mockGenerateRefreshToken).toHaveBeenCalledWith(
+        expect.objectContaining({
         id: approvedUser.id,
         role: approvedUser.role,
         email: approvedUser.email,
-      });
+        sid: expect.any(String),
+        }),
+      );
       expect(mockSaveRefreshToken).toHaveBeenCalledWith(
-        approvedUser.id,
-        "refresh-token",
-        "browser",
+        expect.objectContaining({
+          id: approvedUser.id,
+          refreshToken: "refresh-token",
+          deviceInfo: "browser",
+          sessionId: expect.any(mongoose.Types.ObjectId),
+        }),
       );
       expect(result).toEqual({
         accessToken: "access-token",
@@ -291,7 +329,12 @@ describe("authentication service (src/lib/authentication)", () => {
   });
 
   describe("refreshToken", () => {
-    const decodedPayload = { id: "1", role: "user", email: "jane@test.com" };
+    const decodedPayload = {
+      id: "1",
+      role: "user",
+      email: "jane@test.com",
+      sid: "session-1",
+    };
     const sessionUser = {
       id: "1",
       role: "user",
@@ -302,32 +345,20 @@ describe("authentication service (src/lib/authentication)", () => {
     it("should rotate tokens for a valid refresh token", async () => {
       mockVerifyRefreshToken.mockReturnValue(decodedPayload);
       mockFindAuthUserById.mockResolvedValue(sessionUser);
-      mockFindSessionByToken.mockResolvedValue({ device_info: "browser" });
+      mockFindSessionByToken.mockResolvedValue({ id: "session-1" });
       mockGenerateAccessToken.mockReturnValue("new-access-token");
-      mockGenerateRefreshToken.mockReturnValue("new-refresh-token");
-      mockClearRefreshToken.mockResolvedValue(undefined);
-      mockSaveRefreshToken.mockResolvedValue(undefined);
 
       const result = await authService.refreshToken("current-refresh-token");
 
       expect(mockFindSessionByToken).toHaveBeenCalledWith(
-        sessionUser.id,
-        "current-refresh-token",
-      );
-      expect(mockClearRefreshToken).toHaveBeenCalledWith(
-        sessionUser.id,
-        "current-refresh-token",
-        session,
-      );
-      expect(mockSaveRefreshToken).toHaveBeenCalledWith(
-        sessionUser.id,
-        "new-refresh-token",
-        "browser",
-        session,
+        {
+          id: sessionUser.id,
+          sessionId: "session-1",
+          refreshToken: "current-refresh-token",
+        },
       );
       expect(result).toEqual({
-        newAccessToken: "new-access-token",
-        newRefreshToken: "new-refresh-token",
+        accessToken: "new-access-token",
       });
     });
 
@@ -353,7 +384,7 @@ describe("authentication service (src/lib/authentication)", () => {
         email: "jane@test.com",
         account_status: "pending",
       });
-      mockFindValidOtp.mockResolvedValue({
+      mockClaimOtpAttempt.mockResolvedValue({
         id: "otp-1",
         code_hash: "hashed-code",
       });
@@ -383,7 +414,7 @@ describe("authentication service (src/lib/authentication)", () => {
         email: "jane@test.com",
         account_status: "pending",
       });
-      mockFindValidOtp.mockResolvedValue({
+      mockClaimOtpAttempt.mockResolvedValue({
         id: "otp-1",
         code_hash: "hashed-code",
       });
@@ -451,12 +482,12 @@ describe("authentication service (src/lib/authentication)", () => {
         id: "1",
         email: "jane@test.com",
       });
-      mockFindValidOtp.mockResolvedValue({
+      mockClaimOtpAttempt.mockResolvedValue({
         id: "otp-1",
         code_hash: "hashed-code",
       });
       mockCompareHash.mockResolvedValue(true);
-      mockGenerateHash.mockResolvedValue("reset-token-hash");
+      mockGenerateDigest.mockReturnValue("reset-token-hash");
       mockMarkOtpUsed.mockResolvedValue(true);
       mockSavePasswordResetToken.mockResolvedValue(undefined);
 
@@ -470,7 +501,7 @@ describe("authentication service (src/lib/authentication)", () => {
       expect(mockMarkOtpUsed).toHaveBeenCalledWith("otp-1", session);
       expect(mockSavePasswordResetToken).toHaveBeenCalledWith(
         "1",
-        expect.any(String),
+        "reset-token-hash",
         session,
       );
     });
@@ -500,8 +531,7 @@ describe("authentication service (src/lib/authentication)", () => {
         session,
       );
       expect(mockClearRefreshToken).toHaveBeenCalledWith(
-        "1",
-        undefined,
+        { id: "1" },
         session,
       );
     });

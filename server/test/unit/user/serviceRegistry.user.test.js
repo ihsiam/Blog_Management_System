@@ -1,6 +1,6 @@
 /**
  * Unit tests for the User-related method of
- * src/lib/service registry/index.js
+ * src/lib/serviceRegistry/index.js
  *
  * This module cross-orchestrates article/comment/user services. Only
  * `deleteUser` is covered here, since it is the one consumed by the
@@ -12,10 +12,21 @@
  * here.
  */
 
+const mockStartSession = jest.fn();
+const transactionSession = {
+  withTransaction: jest.fn(async (callback) => callback()),
+  endSession: jest.fn(),
+};
+jest.doMock("mongoose", () => ({
+  startSession: mockStartSession,
+}));
+
 const mockFindUserById = jest.fn();
+const mockEnsureAnotherActiveAdmin = jest.fn();
 const mockDeleteItem = jest.fn();
 jest.doMock("../../../src/lib/user", () => ({
   findUserById: mockFindUserById,
+  ensureAnotherActiveAdmin: mockEnsureAnotherActiveAdmin,
   deleteItem: mockDeleteItem,
 }));
 
@@ -26,38 +37,80 @@ jest.doMock("../../../src/lib/articles", () => ({
   deleteMany: mockArticleDeleteMany,
 }));
 
-const mockCommentDeleteMany = jest.fn();
+const mockCommentDeleteWithReplies = jest.fn();
 jest.doMock("../../../src/lib/comments", () => ({
-  deleteMany: mockCommentDeleteMany,
+  deleteWithReplies: mockCommentDeleteWithReplies,
 }));
 
-const serviceRegistry = require("../../../src/lib/service registry");
+const mockRemoveArticleCover = jest.fn();
+jest.doMock("../../../src/lib/storage", () => ({
+  removeArticleCover: mockRemoveArticleCover,
+}));
+
+jest.doMock("../../../src/utils/cache", () => ({
+  deleteCachePattern: jest.fn(),
+}));
+
+const serviceRegistry = require("../../../src/lib/serviceRegistry");
 
 describe("service registry - deleteUser", () => {
   beforeEach(() => {
+    mockStartSession.mockReset();
+    mockStartSession.mockResolvedValue(transactionSession);
+    transactionSession.withTransaction.mockClear();
+    transactionSession.endSession.mockClear();
     mockFindUserById.mockReset();
+    mockEnsureAnotherActiveAdmin.mockReset();
     mockDeleteItem.mockReset();
     mockFindArticlesByUser.mockReset();
     mockArticleDeleteMany.mockReset();
-    mockCommentDeleteMany.mockReset();
+    mockCommentDeleteWithReplies.mockReset();
+    mockRemoveArticleCover.mockReset();
   });
 
   it("should cascade-delete the user's comments, their articles' comments, their articles, and finally the user", async () => {
     mockFindUserById.mockResolvedValue({ id: "user-1" });
-    mockFindArticlesByUser.mockResolvedValue(["article-1", "article-2"]);
-    mockCommentDeleteMany.mockResolvedValue(true);
+    mockFindArticlesByUser.mockResolvedValue([
+      { id: "article-1", cover: "cover-1" },
+      { id: "article-2", cover: "cover-2" },
+    ]);
+    mockEnsureAnotherActiveAdmin.mockResolvedValue(true);
+    mockCommentDeleteWithReplies.mockResolvedValue(true);
     mockArticleDeleteMany.mockResolvedValue(true);
     mockDeleteItem.mockResolvedValue(true);
 
     const result = await serviceRegistry.deleteUser("user-1");
 
-    expect(mockFindArticlesByUser).toHaveBeenCalledWith("user-1");
-    expect(mockCommentDeleteMany).toHaveBeenCalledWith({
-      article_id: { $in: ["article-1", "article-2"] },
-    });
-    expect(mockCommentDeleteMany).toHaveBeenCalledWith({ author_id: "user-1" });
-    expect(mockArticleDeleteMany).toHaveBeenCalledWith({ author_id: "user-1" });
-    expect(mockDeleteItem).toHaveBeenCalledWith("user-1");
+    expect(mockFindUserById).toHaveBeenCalledWith("user-1", transactionSession);
+    expect(mockEnsureAnotherActiveAdmin).toHaveBeenCalledWith(
+      "user-1",
+      transactionSession,
+    );
+    expect(mockFindArticlesByUser).toHaveBeenCalledWith(
+      "user-1",
+      transactionSession,
+    );
+    expect(mockCommentDeleteWithReplies).toHaveBeenCalledWith(
+      {
+        article_id: { $in: ["article-1", "article-2"] },
+      },
+      transactionSession,
+    );
+    expect(mockCommentDeleteWithReplies).toHaveBeenCalledWith(
+      { author_id: "user-1" },
+      transactionSession,
+    );
+    expect(mockArticleDeleteMany).toHaveBeenCalledWith(
+      { author_id: "user-1" },
+      transactionSession,
+    );
+    expect(mockDeleteItem).toHaveBeenCalledWith(
+      "user-1",
+      transactionSession,
+    );
+    expect(mockRemoveArticleCover).toHaveBeenCalledWith("cover-1");
+    expect(mockRemoveArticleCover).toHaveBeenCalledWith("cover-2");
+    expect(transactionSession.endSession).toHaveBeenCalledTimes(1);
     expect(result).toBe(true);
   });
 
@@ -74,7 +127,8 @@ describe("service registry - deleteUser", () => {
   it("should not delete the user when cleaning up their articles' comments fails", async () => {
     mockFindUserById.mockResolvedValue({ id: "user-1" });
     mockFindArticlesByUser.mockResolvedValue([]);
-    mockCommentDeleteMany.mockRejectedValue(new Error("db down"));
+    mockEnsureAnotherActiveAdmin.mockResolvedValue(true);
+    mockCommentDeleteWithReplies.mockRejectedValue(new Error("db down"));
 
     await expect(serviceRegistry.deleteUser("user-1")).rejects.toThrow(
       "db down",
@@ -86,7 +140,8 @@ describe("service registry - deleteUser", () => {
   it("should propagate the error when deleting the user's own articles fails", async () => {
     mockFindUserById.mockResolvedValue({ id: "user-1" });
     mockFindArticlesByUser.mockResolvedValue([]);
-    mockCommentDeleteMany.mockResolvedValue(true);
+    mockEnsureAnotherActiveAdmin.mockResolvedValue(true);
+    mockCommentDeleteWithReplies.mockResolvedValue(true);
     mockArticleDeleteMany.mockRejectedValue(new Error("db down"));
 
     await expect(serviceRegistry.deleteUser("user-1")).rejects.toThrow(
@@ -98,7 +153,8 @@ describe("service registry - deleteUser", () => {
   it("should propagate the error when deleting the user record itself fails", async () => {
     mockFindUserById.mockResolvedValue({ id: "user-1" });
     mockFindArticlesByUser.mockResolvedValue([]);
-    mockCommentDeleteMany.mockResolvedValue(true);
+    mockEnsureAnotherActiveAdmin.mockResolvedValue(true);
+    mockCommentDeleteWithReplies.mockResolvedValue(true);
     mockArticleDeleteMany.mockResolvedValue(true);
     mockDeleteItem.mockRejectedValue(new Error("db down"));
 

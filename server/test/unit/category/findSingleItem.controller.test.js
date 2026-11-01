@@ -1,5 +1,5 @@
 /**
- * Unit tests for src/api/v1/category/controllers/findSingleItem.js
+ * Unit tests for src/api/v1/categories/controllers/findSingleItem.js
  *
  * Dependencies mocked:
  * - src/lib/categories (findSingleItem)
@@ -10,7 +10,7 @@ jest.doMock("../../../src/lib/categories", () => ({
   findSingleItem: mockFindSingleItem,
 }));
 
-const findSingleItemController = require("../../../src/api/v1/category/controllers/findSingleItem");
+const findSingleItemController = require("../../../src/api/v1/categories/controllers/findSingleItem");
 const { createMockResponse } = require("../helpers/mockExpress");
 
 describe("category findSingleItem controller", () => {
@@ -38,7 +38,10 @@ describe("category findSingleItem controller", () => {
 
     await findSingleItemController({ params: { id: category.id } }, res, next);
 
-    expect(mockFindSingleItem).toHaveBeenCalledWith({ id: category.id });
+    expect(mockFindSingleItem).toHaveBeenCalledWith({
+      id: category.id,
+      includeUnavailable: false,
+    });
     expect(res.status).toHaveBeenCalledWith(200);
     expect(res.json).toHaveBeenCalledWith({
       code: 200,

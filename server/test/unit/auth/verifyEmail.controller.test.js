@@ -82,4 +82,19 @@ describe("verifyEmail controller", () => {
     });
     expect(next).not.toHaveBeenCalled();
   });
+
+  it("should normalize email and OTP before verification", async () => {
+    mockVerifyEmailOtp.mockResolvedValue(undefined);
+
+    await verifyEmailController(
+      buildRequest("  JANE@TEST.COM  ", " 123456 "),
+      res,
+      next,
+    );
+
+    expect(mockVerifyEmailOtp).toHaveBeenCalledWith({
+      email: "jane@test.com",
+      code: "123456",
+    });
+  });
 });

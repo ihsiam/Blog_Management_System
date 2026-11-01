@@ -3,7 +3,8 @@
  *
  * Dependencies mocked:
  * - src/lib/user (findAuthUserById, updatePassword)
- * - src/utils (hashing.compareHash)
+ * - src/lib/session (clearRefreshToken)
+ * - src/utils (hashing.compareHash, validation.isPasswordTooLong)
  */
 
 const mockFindAuthUserById = jest.fn();
@@ -13,9 +14,16 @@ jest.doMock("../../../src/lib/user", () => ({
   updatePassword: mockUpdatePassword,
 }));
 
+const mockClearRefreshToken = jest.fn();
+jest.doMock("../../../src/lib/session", () => ({
+  clearRefreshToken: mockClearRefreshToken,
+}));
+
 const mockCompareHash = jest.fn();
+const mockIsPasswordTooLong = jest.fn();
 jest.doMock("../../../src/utils", () => ({
   hashing: { compareHash: mockCompareHash },
+  validation: { isPasswordTooLong: mockIsPasswordTooLong },
 }));
 
 const changePasswordController = require("../../../src/api/v1/user/controllers/changePassword");
@@ -30,7 +38,9 @@ describe("user changePassword controller", () => {
   beforeEach(() => {
     mockFindAuthUserById.mockReset();
     mockUpdatePassword.mockReset();
+    mockClearRefreshToken.mockReset();
     mockCompareHash.mockReset();
+    mockIsPasswordTooLong.mockReturnValue(false);
     res = createMockResponse();
     next = jest.fn();
   });
@@ -118,10 +128,16 @@ describe("user changePassword controller", () => {
       expect(mockCompareHash).toHaveBeenCalledWith("wrong-old-pass", "hashed");
       expect(next).toHaveBeenCalledWith(
         expect.objectContaining({
-          statusCode: 401,
-          message: "Old password is incorrect",
+          statusCode: 400,
         }),
       );
+      expect(next.mock.calls[0][0].data).toEqual([
+        {
+          field: "oldPassword",
+          message: "Old password is incorrect",
+          in: "body",
+        },
+      ]);
       expect(mockUpdatePassword).not.toHaveBeenCalled();
     });
 
@@ -137,11 +153,16 @@ describe("user changePassword controller", () => {
         oldPassword: "correct-old-pass",
         newPassword: "new-password",
       });
+      req.user = { sessionId: "session-1" };
       await changePasswordController(req, res, next);
 
       expect(mockUpdatePassword).toHaveBeenCalledWith({
         id: validId,
         password: "new-password",
+      });
+      expect(mockClearRefreshToken).toHaveBeenCalledWith({
+        id: validId,
+        exceptSessionId: "session-1",
       });
       expect(res.status).toHaveBeenCalledWith(200);
       expect(res.json).toHaveBeenCalledWith({
@@ -166,6 +187,7 @@ describe("user changePassword controller", () => {
         oldPassword: "correct-old-pass",
         newPassword: "new-password",
       });
+      req.user = { sessionId: "session-1" };
       await changePasswordController(req, res, next);
 
       expect(next).toHaveBeenCalledWith(dbError);

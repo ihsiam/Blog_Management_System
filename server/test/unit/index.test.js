@@ -31,14 +31,18 @@ jest.doMock("../../src/app", () => mockApp);
 
 jest.doMock("dotenv", () => ({ config: jest.fn() }));
 
+const mockLogger = {
+  info: jest.fn(),
+  error: jest.fn(),
+};
+jest.doMock("../../src/utils/logger", () => mockLogger);
+
 const createServerMock = jest.fn();
 jest.doMock("http", () => ({ createServer: createServerMock }));
 
 describe("Application bootstrap (src/index.js)", () => {
   let mockServer;
   let exitSpy;
-  let logSpy;
-  let errorSpy;
 
   // process.on("unhandledRejection"/"uncaughtException", ...) are registered
   // on the real global `process` object as a side effect of requiring
@@ -84,8 +88,8 @@ describe("Application bootstrap (src/index.js)", () => {
     createServerMock.mockReset().mockReturnValue(mockServer);
 
     exitSpy = jest.spyOn(process, "exit").mockImplementation(() => {});
-    logSpy = jest.spyOn(console, "log").mockImplementation(() => {});
-    errorSpy = jest.spyOn(console, "error").mockImplementation(() => {});
+    mockLogger.info.mockReset();
+    mockLogger.error.mockReset();
   });
 
   afterEach(() => {
@@ -158,8 +162,10 @@ describe("Application bootstrap (src/index.js)", () => {
       loadIndex();
       await flushPromises();
 
-      expect(logSpy).toHaveBeenCalledWith("Server is running");
-      expect(logSpy).toHaveBeenCalledWith(
+      expect(mockLogger.info).toHaveBeenCalledWith("Server is running", {
+        port: 3000,
+      });
+      expect(mockLogger.info).toHaveBeenCalledWith(
         "API documentation: http://localhost:3000/docs",
       );
     });
@@ -184,9 +190,9 @@ describe("Application bootstrap (src/index.js)", () => {
 
       errorHandler(serverError);
 
-      expect(errorSpy).toHaveBeenCalledWith(
-        "Server failed to start:",
-        serverError,
+      expect(mockLogger.error).toHaveBeenCalledWith(
+        "Server failed to start",
+        { message: serverError.message },
       );
       expect(exitSpy).toHaveBeenCalledWith(1);
     });
@@ -209,8 +215,9 @@ describe("Application bootstrap (src/index.js)", () => {
       loadIndex();
       await flushPromises();
 
-      expect(logSpy).toHaveBeenCalledWith("DB Connection failed");
-      expect(logSpy).toHaveBeenCalledWith(dbError.message);
+      expect(mockLogger.error).toHaveBeenCalledWith("Startup failed", {
+        message: dbError.message,
+      });
       expect(exitSpy).toHaveBeenCalledWith(1);
     });
   });
@@ -224,8 +231,9 @@ describe("Application bootstrap (src/index.js)", () => {
       await flushPromises();
 
       expect(mockServer.listen).not.toHaveBeenCalled();
-      expect(logSpy).toHaveBeenCalledWith("DB Connection failed");
-      expect(logSpy).toHaveBeenCalledWith(redisError.message);
+      expect(mockLogger.error).toHaveBeenCalledWith("Startup failed", {
+        message: redisError.message,
+      });
       expect(exitSpy).toHaveBeenCalledWith(1);
     });
   });
@@ -239,7 +247,10 @@ describe("Application bootstrap (src/index.js)", () => {
       const error = new Error("unhandled rejection boom");
       trackedRejectionHandlers[0](error);
 
-      expect(logSpy).toHaveBeenCalledWith("Unhandled rejection:", error);
+      expect(mockLogger.error).toHaveBeenCalledWith("Unhandled rejection", {
+        message: error.message,
+        stack: error.stack,
+      });
       expect(exitSpy).toHaveBeenCalledWith(1);
     });
 
@@ -251,7 +262,10 @@ describe("Application bootstrap (src/index.js)", () => {
       const error = new Error("uncaught exception boom");
       trackedExceptionHandlers[0](error);
 
-      expect(logSpy).toHaveBeenCalledWith("Uncaught exception:", error);
+      expect(mockLogger.error).toHaveBeenCalledWith("Uncaught exception", {
+        message: error.message,
+        stack: error.stack,
+      });
       expect(exitSpy).toHaveBeenCalledWith(1);
     });
   });

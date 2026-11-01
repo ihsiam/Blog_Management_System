@@ -10,6 +10,7 @@
  */
 
 const mockConnect = jest.fn();
+const mockMongooseSet = jest.fn();
 
 // Capture which events were registered at module-load time using a plain
 // array. clearMocks:true resets jest.fn() call history between tests but
@@ -21,20 +22,28 @@ const mockConnectionOn = jest.fn().mockImplementation((event) => {
 
 jest.doMock("mongoose", () => ({
   connect: mockConnect,
+  set: mockMongooseSet,
   connection: { on: mockConnectionOn },
+}));
+
+const mockLoggerInfo = jest.fn();
+const mockLoggerWarn = jest.fn();
+jest.doMock("../../src/utils/logger", () => ({
+  info: mockLoggerInfo,
+  warn: mockLoggerWarn,
+  error: jest.fn(),
 }));
 
 const connectDB = require("../../src/db/connection");
 
 describe("connectDB (src/db/connection)", () => {
-  let consoleLogSpy;
   const originalDbUrl = process.env.DB_URL;
 
   beforeEach(() => {
     mockConnect.mockReset();
     mockConnectionOn.mockReset();
-    consoleLogSpy = jest.spyOn(console, "log").mockImplementation(() => {});
-    jest.spyOn(console, "error").mockImplementation(() => {});
+    mockLoggerInfo.mockReset();
+    mockLoggerWarn.mockReset();
   });
 
   afterEach(() => {
@@ -65,9 +74,7 @@ describe("connectDB (src/db/connection)", () => {
     expect(mockConnect).toHaveBeenCalledWith("mongodb://localhost:27017/test", {
       serverSelectionTimeoutMS: 5000,
     });
-    expect(consoleLogSpy).toHaveBeenCalledWith(
-      "Database connected successfully",
-    );
+    expect(mockLoggerInfo).toHaveBeenCalledWith("Database connected successfully");
   });
 
   it("should propagate the error when all retry attempts fail", async () => {
@@ -85,10 +92,10 @@ describe("connectDB (src/db/connection)", () => {
 
     await expect(connectDB(2, 0)).rejects.toThrow();
 
-    expect(consoleLogSpy).toHaveBeenCalledWith(
+    expect(mockLoggerWarn).toHaveBeenCalledWith(
       expect.stringContaining("DB connection attempt 1/2 failed"),
     );
-    expect(consoleLogSpy).toHaveBeenCalledWith(
+    expect(mockLoggerWarn).toHaveBeenCalledWith(
       expect.stringContaining("DB connection attempt 2/2 failed"),
     );
   });

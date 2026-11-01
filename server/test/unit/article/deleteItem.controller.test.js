@@ -1,16 +1,16 @@
 /**
- * Unit tests for src/api/v1/article/controllers/deleteItem.js
+ * Unit tests for src/api/v1/articles/controllers/deleteItem.js
  *
  * Dependencies mocked:
- * - src/lib/service registry (deleteArticle orchestration)
+ * - src/lib/serviceRegistry (deleteArticle orchestration)
  */
 
 const mockDeleteArticle = jest.fn();
-jest.doMock("../../../src/lib/service registry", () => ({
+jest.doMock("../../../src/lib/serviceRegistry", () => ({
   deleteArticle: mockDeleteArticle,
 }));
 
-const deleteItemController = require("../../../src/api/v1/article/controllers/deleteItem");
+const deleteItemController = require("../../../src/api/v1/articles/controllers/deleteItem");
 const { createMockResponse } = require("../helpers/mockExpress");
 
 describe("article deleteItem controller", () => {

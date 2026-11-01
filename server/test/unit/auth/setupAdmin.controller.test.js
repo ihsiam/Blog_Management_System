@@ -8,20 +8,10 @@
  */
 
 const mockSystemAdmin = jest.fn();
+const mockCreateSession = jest.fn();
 jest.doMock("../../../src/lib/authentication", () => ({
   systemAdmin: mockSystemAdmin,
-}));
-
-const mockGenerateAccessToken = jest.fn();
-const mockGenerateRefreshToken = jest.fn();
-jest.doMock("../../../src/lib/token", () => ({
-  generateAccessToken: mockGenerateAccessToken,
-  generateRefreshToken: mockGenerateRefreshToken,
-}));
-
-const mockSaveRefreshToken = jest.fn();
-jest.doMock("../../../src/lib/user", () => ({
-  saveRefreshToken: mockSaveRefreshToken,
+  createSession: mockCreateSession,
 }));
 
 const setupAdminController = require("../../../src/api/v1/authentication/controllers/setupAdmin");
@@ -39,9 +29,7 @@ describe("setupAdmin controller", () => {
 
   beforeEach(() => {
     mockSystemAdmin.mockReset();
-    mockGenerateAccessToken.mockReset();
-    mockGenerateRefreshToken.mockReset();
-    mockSaveRefreshToken.mockReset();
+    mockCreateSession.mockReset();
     res = createMockResponse();
     next = jest.fn();
   });
@@ -90,9 +78,10 @@ describe("setupAdmin controller", () => {
         role: "admin",
       };
       mockSystemAdmin.mockResolvedValue(createdAdmin);
-      mockGenerateAccessToken.mockReturnValue("access-token");
-      mockGenerateRefreshToken.mockReturnValue("refresh-token");
-      mockSaveRefreshToken.mockResolvedValue(undefined);
+      mockCreateSession.mockResolvedValue({
+        accessToken: "access-token",
+        refreshToken: "refresh-token",
+      });
 
       const req = {
         body: validBody,
@@ -101,22 +90,15 @@ describe("setupAdmin controller", () => {
       await setupAdminController(req, res, next);
 
       expect(mockSystemAdmin).toHaveBeenCalledWith(validBody);
-      const expectedPayload = {
-        id: createdAdmin.id,
-        role: createdAdmin.role,
-        email: createdAdmin.email,
-      };
-      expect(mockGenerateAccessToken).toHaveBeenCalledWith(expectedPayload);
-      expect(mockGenerateRefreshToken).toHaveBeenCalledWith(expectedPayload);
-      expect(mockSaveRefreshToken).toHaveBeenCalledWith(
-        createdAdmin.id,
-        "refresh-token",
-        "Mozilla/5.0",
-      );
+      expect(mockCreateSession).toHaveBeenCalledWith({
+        user: createdAdmin,
+        deviceInfo: "Mozilla/5.0",
+      });
       expect(res.cookie).toHaveBeenCalledWith("refreshToken", "refresh-token", {
         httpOnly: true,
         secure: true,
         sameSite: "strict",
+        maxAge: 30 * 24 * 60 * 60 * 1000,
       });
       expect(res.status).toHaveBeenCalledWith(201);
       expect(res.json).toHaveBeenCalledWith({
@@ -141,7 +123,7 @@ describe("setupAdmin controller", () => {
       await setupAdminController(req, res, next);
 
       expect(next).toHaveBeenCalledWith(conflictError);
-      expect(mockGenerateAccessToken).not.toHaveBeenCalled();
+      expect(mockCreateSession).not.toHaveBeenCalled();
       expect(res.status).not.toHaveBeenCalled();
     });
   });
