@@ -2546,16 +2546,19 @@ components:
       content:
         application/json:
           schema:
-            allOf:
-              - $ref: "#/components/schemas/ErrorResponse"
-              - type: object
-                properties:
-                  code:
-                    example: 429
-                  error:
-                    example: Too many requests
-                  message:
-                    example: Too many attempts. Please try again later.
+            type: object
+            properties:
+              code:
+                type: integer
+                format: int32
+                example: 429
+              error:
+                type: string
+                example: Too many requests
+              message:
+                type: string
+                example: Too many attempts. Please try again later.
+            required: [code, error, message]
 
     ServerError:
       description: Something went wrong on the server.
