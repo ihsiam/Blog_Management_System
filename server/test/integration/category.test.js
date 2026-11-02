@@ -77,8 +77,8 @@ describe("GET /api/v1/categories", () => {
       expect.arrayContaining([
         expect.objectContaining({ field: "page", in: "query" }),
         expect.objectContaining({ field: "limit", in: "query" }),
-        expect.objectContaining({ field: "sort_type", in: "query" }),
-        expect.objectContaining({ field: "sort_by", in: "query" }),
+        expect.objectContaining({ field: "sortType", in: "query" }),
+        expect.objectContaining({ field: "sortBy", in: "query" }),
       ]),
     );
   });

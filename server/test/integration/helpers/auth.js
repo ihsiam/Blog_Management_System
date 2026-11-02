@@ -42,7 +42,7 @@ const seedUser = async ({
   if (refreshToken) {
     await Session.create({
       user_id: user.id,
-      refresh_token_hash: await hashing.generateHash(refreshToken),
+      refresh_token_hash: hashing.generateDigest(refreshToken),
       device_info: "integration-test",
       expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
     });
@@ -58,18 +58,21 @@ const seedUser = async ({
  * @returns {Promise<{accessToken: string, refreshToken: string}>}
  */
 const issueSession = async (user) => {
+  const sessionId = new Session().id;
   const payload = {
     id: user.id,
     role: user.role,
     email: user.email,
+    sid: sessionId,
   };
 
   const accessToken = tokenServices.generateAccessToken(payload);
   const refreshToken = tokenServices.generateRefreshToken(payload);
 
   await Session.create({
+    _id: sessionId,
     user_id: user.id,
-    refresh_token_hash: await hashing.generateHash(refreshToken),
+    refresh_token_hash: hashing.generateDigest(refreshToken),
     device_info: "integration-test",
     expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
   });

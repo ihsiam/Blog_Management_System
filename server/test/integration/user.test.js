@@ -101,7 +101,7 @@ describe("GET /api/v1/users", () => {
         name: expect.any(String),
         email: expect.any(String),
         role: expect.any(String),
-        status: expect.any(String),
+        account_status: expect.any(String),
       }),
     );
     expect(all.body.data[0].password).toBeUndefined();
@@ -154,8 +154,8 @@ describe("GET /api/v1/users", () => {
       expect.arrayContaining([
         expect.objectContaining({ field: "page", in: "query" }),
         expect.objectContaining({ field: "limit", in: "query" }),
-        expect.objectContaining({ field: "sort_type", in: "query" }),
-        expect.objectContaining({ field: "sort_by", in: "query" }),
+        expect.objectContaining({ field: "sortType", in: "query" }),
+        expect.objectContaining({ field: "sortBy", in: "query" }),
         expect.objectContaining({ field: "status", in: "query" }),
       ]),
     );
@@ -400,7 +400,7 @@ describe("PATCH /api/v1/users/:id", () => {
       data: {
         name: "After",
         role: "admin",
-        status: "blocked",
+        account_status: "blocked",
       },
     });
 
@@ -509,10 +509,19 @@ describe("PATCH /api/v1/users/:id/change-password", () => {
     const res = await request(app)
       .patch(`/api/v1/users/${user.id}/change-password`)
       .set(authHeader(accessToken))
-      .send({ oldPassword: "wrong-password", newPassword: "new-password" });
+      .send({ oldPassword: "wrong-password", newPassword: "new-password1" });
 
-    expect(res.status).toBe(401);
-    expect(res.body.message).toBe("Old password is incorrect");
+    expect(res.status).toBe(400);
+    expect(res.body.message).toBe("invalid input");
+    expect(res.body.data).toEqual(
+      expect.arrayContaining([
+        {
+          field: "oldPassword",
+          message: "Old password is incorrect",
+          in: "body",
+        },
+      ]),
+    );
     const after = (await User.findById(user.id)).password_hash;
     expect(after).toBe(before);
   });

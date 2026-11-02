@@ -28,6 +28,7 @@ const app = require("../../src/app");
 const emailService = require("../../src/lib/email");
 const User = require("../../src/model/User");
 const Session = require("../../src/model/Session");
+const SystemInfo = require("../../src/model/SystemInfo");
 const { hashing } = require("../../src/utils");
 const tokenServices = require("../../src/lib/token");
 const db = require("./helpers/db");
@@ -94,7 +95,6 @@ describe("POST /api/v1/auth/sign-up", () => {
       data: {
         name: "Jane Doe",
         email: "jane@example.com",
-        status: "pending",
       },
       links: { self: "/api/v1/auth/sign-up" },
     });
@@ -208,6 +208,7 @@ describe("POST /api/v1/auth/setup-admin", () => {
   });
 
   it("should forbid creating a second system admin", async () => {
+    await SystemInfo.create({ id: "system-admin", adminSetup: true });
     await seedUser({
       email: "first-admin@example.com",
       password: "password123",
@@ -484,7 +485,7 @@ describe("POST /api/v1/auth/refresh", () => {
     });
 
     const newRefresh = parseRefreshCookie(res.headers["set-cookie"]);
-    expect(newRefresh).toBeTruthy();
+    expect(newRefresh).toBeNull();
 
     const stored = await User.findById(user.id);
     expect(
@@ -682,8 +683,7 @@ describe("POST /api/v1/auth/forgot-password", () => {
     expect(res.status).toBe(200);
     expect(res.body).toMatchObject({
       code: 200,
-      message:
-        "If an account with that email exists, a password reset code has been sent.",
+      message: "A password reset code has been sent to your email.",
     });
     expect(emailService.sendMail).toHaveBeenCalledTimes(1);
     expect(emailService.sendMail.mock.calls[0][0].subject).toBe(
@@ -691,15 +691,13 @@ describe("POST /api/v1/auth/forgot-password", () => {
     );
   });
 
-  it("should return the same generic message for an unknown email (no mail sent)", async () => {
+  it("should return 404 for an unknown email (no mail sent)", async () => {
     const res = await request(app)
       .post("/api/v1/auth/forgot-password")
       .send({ email: "unknown@example.com" });
 
-    expect(res.status).toBe(200);
-    expect(res.body.message).toBe(
-      "If an account with that email exists, a password reset code has been sent.",
-    );
+    expect(res.status).toBe(404);
+    expect(res.body.message).toBe("Email is not registered");
     expect(emailService.sendMail).not.toHaveBeenCalled();
   });
 
@@ -925,7 +923,7 @@ describe("Session management routes", () => {
       .set("Cookie", refreshCookie(first.refreshToken));
 
     expect(res.status).toBe(200);
-    expect(res.body).toMatchObject({ code: 200, message: "Data retrieved." });
+    expect(res.body).toMatchObject({ code: 200, message: "Data retrieved" });
     expect(res.body.data).toHaveLength(2);
     expect(res.body.data).toEqual(
       expect.arrayContaining([

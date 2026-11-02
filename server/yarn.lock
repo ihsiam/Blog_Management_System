@@ -2192,6 +2192,7 @@ __metadata:
     helmet: "npm:^8.3.0"
     jest: "npm:^30.5.1"
     jsonwebtoken: "npm:^9.0.2"
+    mongodb: "npm:7.5.0"
     mongodb-memory-server: "npm:^11.2.0"
     mongoose: "npm:^8.3.3"
     multer: "npm:^2.0.2"
@@ -5972,9 +5973,9 @@ __metadata:
   languageName: node
   linkType: hard
 
-"mongodb@npm:^7.2.0":
-  version: 7.6.0
-  resolution: "mongodb@npm:7.6.0"
+"mongodb@npm:7.5.0":
+  version: 7.5.0
+  resolution: "mongodb@npm:7.5.0"
   dependencies:
     "@mongodb-js/saslprep": "npm:^1.4.11"
     bson: "npm:^7.2.0"
@@ -6002,7 +6003,7 @@ __metadata:
       optional: true
     socks:
       optional: true
-  checksum: 10c0/91f45d49aaa17af40b1dbd4f5eff85fd11f12c7df993cadbe51e96c31f40c74596b2d979f7eeebb376889a1397deb9081db10cbb0e8904853c80b1f2fcddf7d0
+  checksum: 10c0/468db2b24fa3e497d6212bc3073c008b46ebffdace1197be5982c976d61e962e85727ac4443c6c8b59a9baed10d14ed589b6ea9234e87727469d7a19e82f9cd0
   languageName: node
   linkType: hard
 

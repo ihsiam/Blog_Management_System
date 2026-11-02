@@ -20,6 +20,7 @@
 
 const request = require("supertest");
 const mongoose = require("mongoose");
+const logger = require("../../src/utils/logger");
 
 // Load the real Express application (no mocks).
 const app = require("../../src/app");
@@ -285,11 +286,12 @@ describe("Database bootstrap — connectDB", () => {
     });
     process.env.DB_URL = mongodRef.getUri();
 
+    const infoSpy = jest.spyOn(logger, "info");
     // console.log is mocked in beforeEach; clearMocks:true ensures only
     // calls made inside this test are recorded.
     await connectDB(1, 0);
 
-    expect(console.log).toHaveBeenCalledWith("Database connected successfully");
+    expect(infoSpy).toHaveBeenCalledWith("Database connected successfully");
   });
 
   it("should reject with a descriptive error when DB_URL is not set", async () => {

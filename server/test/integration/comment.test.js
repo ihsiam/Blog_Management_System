@@ -75,7 +75,7 @@ describe("POST /api/v1/articles/:id/comments", () => {
     expect(res.status).toBe(201);
     expect(res.body).toMatchObject({
       code: 201,
-      message: "comment posted",
+      message: "Comment posted",
       data: {
         body: "Great article!",
         status: "public",
@@ -359,8 +359,8 @@ describe("GET /api/v1/comments (admin)", () => {
       expect.arrayContaining([
         expect.objectContaining({ field: "page", in: "query" }),
         expect.objectContaining({ field: "limit", in: "query" }),
-        expect.objectContaining({ field: "sort_type", in: "query" }),
-        expect.objectContaining({ field: "sort_by", in: "query" }),
+        expect.objectContaining({ field: "sortType", in: "query" }),
+        expect.objectContaining({ field: "sortBy", in: "query" }),
         expect.objectContaining({ field: "articleId", in: "query" }),
       ]),
     );
@@ -397,7 +397,7 @@ describe("PATCH /api/v1/comments/:id", () => {
     expect(res.status).toBe(200);
     expect(res.body).toMatchObject({
       code: 200,
-      message: "comment updated",
+      message: "Comment updated",
       data: { body: "After" },
     });
 
@@ -497,7 +497,7 @@ describe("PATCH /api/v1/comments/:id/status", () => {
     expect(hidden.status).toBe(200);
     expect(hidden.body).toMatchObject({
       code: 200,
-      message: "comment status updated",
+      message: "Comment status updated",
       data: { status: "hidden" },
       links: { self: `/api/v1/comments/${comment.id}` },
     });

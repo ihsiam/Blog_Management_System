@@ -276,8 +276,8 @@ describe("GET /api/v1/articles", () => {
       expect.arrayContaining([
         expect.objectContaining({ field: "page", in: "query" }),
         expect.objectContaining({ field: "limit", in: "query" }),
-        expect.objectContaining({ field: "sort_type", in: "query" }),
-        expect.objectContaining({ field: "sort_by", in: "query" }),
+        expect.objectContaining({ field: "sortType", in: "query" }),
+        expect.objectContaining({ field: "sortBy", in: "query" }),
       ]),
     );
   });
@@ -706,7 +706,7 @@ describe("POST /api/v1/articles/:articleId/comments/:commentId/replies", () => {
     expect(res.status).toBe(201);
     expect(res.body).toMatchObject({
       code: 201,
-      message: "reply posted",
+      message: "Reply posted",
       data: { body: "A reply", parentCommentId: String(parent.id) },
       links: {
         self: `/api/v1/articles/${article.id}/comments/${parent.id}/replies`,
