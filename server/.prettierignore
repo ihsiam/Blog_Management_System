@@ -3,3 +3,6 @@ coverage
 dist
 build
 .git
+.yarn
+.pnp.*
+yarn.lock

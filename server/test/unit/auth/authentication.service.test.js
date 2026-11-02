@@ -5,6 +5,7 @@
  */
 
 const mongoose = require("mongoose");
+
 const mockUpdateSystemInfo = jest.fn();
 const mockFindOneAndUpdate = jest.fn();
 const mockUserExist = jest.fn();

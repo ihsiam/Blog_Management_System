@@ -35,10 +35,8 @@ const db = require("./helpers/db");
 const {
   seedUser,
   issueSession,
-  extractTokenFromMail,
   refreshCookie,
   parseRefreshCookie,
-  expiredActiveResetToken,
   expiredAccessToken,
   expiredRefreshToken,
 } = require("./helpers/auth");

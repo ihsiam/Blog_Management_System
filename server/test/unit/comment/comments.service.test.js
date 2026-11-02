@@ -6,6 +6,7 @@
  */
 
 const mongoose = require("mongoose");
+
 const mockGetCache = jest.fn();
 const mockSetCache = jest.fn();
 const mockDeleteCachePattern = jest.fn();

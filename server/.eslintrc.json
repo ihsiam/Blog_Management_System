@@ -15,7 +15,14 @@
        ===================== */
 
     "no-console": "off",
-    "no-unused-vars": ["error", { "argsIgnorePattern": "^_" }],
+    "no-unused-vars": [
+      "error",
+      {
+        "argsIgnorePattern": "^_",
+        "varsIgnorePattern": "^_",
+        "ignoreRestSiblings": true
+      }
+    ],
     "no-underscore-dangle": "off",
     "no-return-await": "off",
 
@@ -29,5 +36,32 @@
     "object-curly-newline": "off",
     "implicit-arrow-linebreak": "off",
     "linebreak-style": "off"
-  }
+  },
+  "overrides": [
+    {
+      /* =====================
+         Test files
+         ===================== */
+      "files": [
+        "test/**/*.js",
+        "**/*.test.js",
+        "**/*.spec.js",
+        "jest.integration.config.js"
+      ],
+      "env": {
+        "jest": true
+      },
+      "rules": {
+        "import/no-extraneous-dependencies": [
+          "error",
+          { "devDependencies": true }
+        ],
+        "global-require": "off",
+        "import/no-dynamic-require": "off",
+        "no-await-in-loop": "off",
+        "no-promise-executor-return": "off",
+        "func-names": "off"
+      }
+    }
+  ]
 }

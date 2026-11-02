@@ -36,6 +36,7 @@ process.env.MONGOOSE_BUFFER_TIMEOUT_MS =
   process.env.MONGOOSE_BUFFER_TIMEOUT_MS || "500";
 
 const mongoose = require("mongoose");
+
 mongoose.set("bufferTimeoutMS", Number(process.env.MONGOOSE_BUFFER_TIMEOUT_MS));
 
 const logger = require("../../src/utils/logger");

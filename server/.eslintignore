@@ -1,2 +1,5 @@
-test/
-jest.integration.config.js
+node_modules
+coverage
+dist
+build
+.yarn
