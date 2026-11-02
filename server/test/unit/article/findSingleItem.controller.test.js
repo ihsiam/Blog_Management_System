@@ -1,5 +1,5 @@
 /**
- * Unit tests for src/api/v1/article/controllers/findSingleItem.js
+ * Unit tests for src/api/v1/articles/controllers/findSingleItem.js
  *
  * Dependencies mocked:
  * - src/lib/articles (findSingleItem)
@@ -10,7 +10,7 @@ jest.doMock("../../../src/lib/articles", () => ({
   findSingleItem: mockFindSingleItem,
 }));
 
-const findSingleItemController = require("../../../src/api/v1/article/controllers/findSingleItem");
+const findSingleItemController = require("../../../src/api/v1/articles/controllers/findSingleItem");
 const { createMockResponse } = require("../helpers/mockExpress");
 
 describe("article findSingleItem controller", () => {
@@ -36,6 +36,21 @@ describe("article findSingleItem controller", () => {
         expect.objectContaining({ statusCode: 400 }),
       );
     });
+
+    it("should reject unsupported expand values", async () => {
+      const req = {
+        params: { id: validId },
+        query: { expand: "author" },
+        user: { id: "user-1" },
+      };
+
+      await findSingleItemController(req, res, next);
+
+      expect(mockFindSingleItem).not.toHaveBeenCalled();
+      expect(next).toHaveBeenCalledWith(
+        expect.objectContaining({ statusCode: 400 }),
+      );
+    });
   });
 
   describe("successful retrieval", () => {
@@ -43,12 +58,18 @@ describe("article findSingleItem controller", () => {
       const article = { id: validId, title: "Hello" };
       mockFindSingleItem.mockResolvedValue(article);
 
-      const req = { params: { id: validId }, query: {} };
+      const req = {
+        params: { id: validId },
+        query: {},
+        user: { id: "user-1" },
+      };
+
       await findSingleItemController(req, res, next);
 
       expect(mockFindSingleItem).toHaveBeenCalledWith({
         id: validId,
         expand: "",
+        user: req.user,
       });
       expect(res.status).toHaveBeenCalledWith(200);
       expect(res.json).toHaveBeenCalledWith({
@@ -69,13 +90,15 @@ describe("article findSingleItem controller", () => {
 
       const req = {
         params: { id: validId },
-        query: { expand: "author,comments" },
+        query: { expand: "comments" },
+        user: { id: "user-1" },
       };
       await findSingleItemController(req, res, next);
 
       expect(mockFindSingleItem).toHaveBeenCalledWith({
         id: validId,
-        expand: "author,comments",
+        expand: "comments",
+        user: req.user,
       });
     });
   });
@@ -87,7 +110,11 @@ describe("article findSingleItem controller", () => {
       });
       mockFindSingleItem.mockRejectedValue(notFoundError);
 
-      const req = { params: { id: validId }, query: {} };
+      const req = {
+        params: { id: validId },
+        query: {},
+        user: { id: "user-1" },
+      };
       await findSingleItemController(req, res, next);
 
       expect(next).toHaveBeenCalledWith(notFoundError);

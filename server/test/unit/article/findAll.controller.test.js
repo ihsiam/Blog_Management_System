@@ -1,5 +1,5 @@
 /**
- * Unit tests for src/api/v1/article/controllers/findAll.js
+ * Unit tests for src/api/v1/articles/controllers/findAll.js
  *
  * Dependencies mocked:
  * - src/lib/articles (findAll, count)
@@ -16,7 +16,7 @@ jest.doMock("../../../src/lib/articles", () => ({
   count: mockCount,
 }));
 
-const findAllController = require("../../../src/api/v1/article/controllers/findAll");
+const findAllController = require("../../../src/api/v1/articles/controllers/findAll");
 const { createMockResponse } = require("../helpers/mockExpress");
 
 describe("article findAll controller", () => {
@@ -70,7 +70,7 @@ describe("article findAll controller", () => {
       const err = next.mock.calls[0][0];
       expect(err.data).toEqual(
         expect.arrayContaining([
-          expect.objectContaining({ field: "sort_type" }),
+          expect.objectContaining({ field: "sortType" }),
         ]),
       );
     });
@@ -83,7 +83,7 @@ describe("article findAll controller", () => {
       expect(mockFindAll).not.toHaveBeenCalled();
       const err = next.mock.calls[0][0];
       expect(err.data).toEqual(
-        expect.arrayContaining([expect.objectContaining({ field: "sort_by" })]),
+        expect.arrayContaining([expect.objectContaining({ field: "sortBy" })]),
       );
     });
   });

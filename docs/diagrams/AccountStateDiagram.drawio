@@ -1,0 +1,63 @@
+<mxfile host="app.diagrams.net">
+  <diagram name="Page-1" id="3QjViY75wPly6un8kc3d">
+    <mxGraphModel dx="1058" dy="527" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="827" pageHeight="1169" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="sCO3YAxf5bRu05mPxpug-4" edge="1" parent="1" source="sCO3YAxf5bRu05mPxpug-1" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" target="sCO3YAxf5bRu05mPxpug-3">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="sCO3YAxf5bRu05mPxpug-7" connectable="0" parent="sCO3YAxf5bRu05mPxpug-4" style="edgeLabel;html=1;align=center;verticalAlign=middle;resizable=0;points=[];" value="Email verification&lt;div&gt;(successful)&lt;/div&gt;" vertex="1">
+          <mxGeometry relative="1" x="0.3765" y="-2" as="geometry">
+            <mxPoint as="offset" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="2O8XKsy_5qB3qZkUQXh9-2" edge="1" parent="1" source="sCO3YAxf5bRu05mPxpug-1" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=oval;endFill=1;startArrow=classic;startFill=1;">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="414" y="220" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="adminEntry-1" edge="1" parent="1" source="sCO3YAxf5bRu05mPxpug-3" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=oval;endFill=1;startArrow=classic;startFill=1;entryX=0;entryY=0.5;entryDx=0;entryDy=0;">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="150" y="400" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="adminEntry-2" connectable="0" parent="adminEntry-1" style="edgeLabel;html=1;align=center;verticalAlign=middle;resizable=0;points=[];" value="Admin creates account&lt;div&gt;(account_status = active)&lt;/div&gt;" vertex="1">
+          <mxGeometry relative="1" y="-2" as="geometry">
+            <mxPoint x="-110" y="2" as="offset" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="sCO3YAxf5bRu05mPxpug-1" parent="1" style="rounded=1;whiteSpace=wrap;html=1;" value="pending&lt;div&gt;(email not verified)&lt;/div&gt;" vertex="1">
+          <mxGeometry height="60" width="120" x="354" y="250" as="geometry" />
+        </mxCell>
+        <mxCell id="sCO3YAxf5bRu05mPxpug-6" edge="1" parent="1" source="sCO3YAxf5bRu05mPxpug-2" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;entryX=0.5;entryY=1;entryDx=0;entryDy=0;" target="sCO3YAxf5bRu05mPxpug-3">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="580" y="450" />
+              <mxPoint x="270" y="450" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="sCO3YAxf5bRu05mPxpug-9" connectable="0" parent="sCO3YAxf5bRu05mPxpug-6" style="edgeLabel;html=1;align=center;verticalAlign=middle;resizable=0;points=[];" value="&amp;nbsp;Admin unblocks&amp;nbsp;&lt;div&gt;(manual action)&lt;/div&gt;" vertex="1">
+          <mxGeometry relative="1" x="0.0971" y="-1" as="geometry">
+            <mxPoint as="offset" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="sCO3YAxf5bRu05mPxpug-2" parent="1" style="rounded=1;whiteSpace=wrap;html=1;" value="blocked&lt;br&gt;&lt;div&gt;(admin action)&lt;/div&gt;" vertex="1">
+          <mxGeometry height="60" width="120" x="520" y="370" as="geometry" />
+        </mxCell>
+        <mxCell id="sCO3YAxf5bRu05mPxpug-5" edge="1" parent="1" source="sCO3YAxf5bRu05mPxpug-3" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" target="sCO3YAxf5bRu05mPxpug-2">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="sCO3YAxf5bRu05mPxpug-8" connectable="0" parent="sCO3YAxf5bRu05mPxpug-5" style="edgeLabel;html=1;align=center;verticalAlign=middle;resizable=0;points=[];" value="Admin blocks&lt;div&gt;&amp;nbsp;(manual action)&amp;nbsp;&lt;/div&gt;" vertex="1">
+          <mxGeometry relative="1" x="-0.1158" y="2" as="geometry">
+            <mxPoint as="offset" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="sCO3YAxf5bRu05mPxpug-3" parent="1" style="rounded=1;whiteSpace=wrap;html=1;" value="active&lt;div&gt;(email verified)&lt;/div&gt;" vertex="1">
+          <mxGeometry height="60" width="120" x="210" y="370" as="geometry" />
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

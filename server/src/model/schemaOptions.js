@@ -21,7 +21,13 @@ const schemaOptions = {
     // include virtual fields in JSON output
     virtuals: true,
 
-    // customize serialized response shape
+    /**
+     * Replace `_id` with `id` and drop Mongoose's virtual `id`.
+     *
+     * @param {import("mongoose").Document} _doc - Source document
+     * @param {Object} ret - Plain object about to be serialized
+     * @returns {Object} Payload with `id` instead of `_id`
+     */
     transform: (_doc, ret) => {
       // extract _id and remove mongoose virtual id
       const { _id, id, ...rest } = ret;
@@ -36,7 +42,13 @@ const schemaOptions = {
     // include virtual fields in object output
     virtuals: true,
 
-    // customize object response shape
+    /**
+     * Replace `_id` with `id` and drop Mongoose's virtual `id`.
+     *
+     * @param {import("mongoose").Document} _doc - Source document
+     * @param {Object} ret - Plain object about to be converted
+     * @returns {Object} Payload with `id` instead of `_id`
+     */
     transform: (_doc, ret) => {
       // extract _id and remove mongoose virtual id
       const { _id, id, ...rest } = ret;

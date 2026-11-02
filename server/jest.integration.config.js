@@ -1,9 +1,14 @@
-/** @type {import("jest").Config} */
+/**
+ * Jest config for integration tests only (unit tests use package.json `jest`).
+ *
+ * @type {import("jest").Config}
+ */
 module.exports = {
   testEnvironment: "node",
 
-  // Pick up only integration test files — unit tests are unaffected.
+  // Unit tests are configured separately in package.json.
   testMatch: ["**/test/integration/**/*.test.js"],
+  maxWorkers: 1,
 
   verbose: true,
   clearMocks: true,
@@ -14,14 +19,7 @@ module.exports = {
   // via JEST_WORKER_ID in src/utils/logger.js).
   setupFiles: ["./test/integration/setup.js"],
 
-  // Integration tests talk to real async infrastructure (MongoMemoryServer,
-  // real Express app). The ElasticsearchTransport keeps undici connection-pool
-  // handles alive after the tests complete; forceExit is the pragmatic,
-  // commonly accepted solution for integration suites that include third-party
-  // logging infrastructure not under test control.
-  forceExit: true,
-
   // MongoMemoryServer needs time on first run (binary download + mongod
-  // startup). 30 s is generous but ensures reliability across environments.
+  // startup). 30 seconds is generous but ensures reliability across environments.
   testTimeout: 30000,
 };

@@ -1,49 +1,78 @@
 const { Schema, model } = require("mongoose");
+
 const schemaOptions = require("./schemaOptions");
+const { ROLES, ACCOUNT_STATUS } = require("../config/constants");
 
 const UserSchema = new Schema(
   {
-    name: { type: String, required: true },
+    name: {
+      type: String,
+      required: true,
+    },
+
     email: {
       type: String,
       unique: true,
       required: true,
     },
-    password: {
+
+    password_hash: {
       type: String,
       required: true,
     },
+
     role: {
       type: String,
-      enum: ["user", "admin"],
-      default: "user",
+      enum: Object.values(ROLES),
+      default: ROLES.USER,
     },
-    status: {
+
+    account_status: {
       type: String,
-      enum: ["pending", "approved", "blocked", "declined"],
-      default: "pending",
-    },
-    refreshToken: {
-      type: String,
-      default: null,
+      enum: Object.values(ACCOUNT_STATUS),
+      default: ACCOUNT_STATUS.PENDING,
     },
   },
   schemaOptions,
 );
 
-// Virtual populate
-UserSchema.virtual("articles", {
-  ref: "Article",
+// Indexes
+UserSchema.index({ role: 1 });
+UserSchema.index({ account_status: 1 });
+
+// Virtual relationships
+UserSchema.virtual("sessions", {
+  ref: "Session",
   localField: "_id",
-  foreignField: "author",
+  foreignField: "user_id",
   justOne: false,
 });
 
-// Virtual populate
+UserSchema.virtual("otp", {
+  ref: "OTP",
+  localField: "_id",
+  foreignField: "user_id",
+  justOne: false,
+});
+
+UserSchema.virtual("PasswordResetToken", {
+  ref: "PasswordResetToken",
+  localField: "_id",
+  foreignField: "user_id",
+  justOne: false,
+});
+
+UserSchema.virtual("articles", {
+  ref: "Article",
+  localField: "_id",
+  foreignField: "author_id",
+  justOne: false,
+});
+
 UserSchema.virtual("comments", {
   ref: "Comment",
   localField: "_id",
-  foreignField: "author",
+  foreignField: "author_id",
   justOne: false,
 });
 

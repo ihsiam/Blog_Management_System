@@ -1,9 +1,11 @@
 /**
- * Generates a URL query string from an object.
+ * Build a URL query string from an object, omitting null and undefined values.
  *
- * @param {Object} query - Key-value pairs representing query parameters
+ * Keys and values are URI-encoded. Array and object values are converted with
+ * `String()` before encoding, so they are not expanded into repeated keys.
  *
- * @returns {string} Encoded query string (e.g. "page=1&limit=10")
+ * @param {Object} query - Key-value pairs.
+ * @returns {string} Encoded query string (for example `page=1&limit=10`).
  */
 const generateQueryString = (query) =>
   // remove null/undefined values, encode safely, and join as query string

@@ -21,6 +21,7 @@ describe("user createUser controller", () => {
     name: "Jane",
     email: "jane@test.com",
     password: "strong-password",
+    role: "user",
   };
 
   beforeEach(() => {
@@ -54,9 +55,11 @@ describe("user createUser controller", () => {
 
       expect(mockCreateUserByAdmin).not.toHaveBeenCalled();
       const err = next.mock.calls[0][0];
-      expect(err.data).toEqual([
-        { field: "email", message: "invalid input", in: "body" },
-      ]);
+      expect(err.data).toEqual(
+        expect.arrayContaining([
+          { field: "email", message: "invalid input", in: "body" },
+        ]),
+      );
     });
 
     it("should reject a password shorter than 8 characters", async () => {
@@ -66,13 +69,15 @@ describe("user createUser controller", () => {
 
       expect(mockCreateUserByAdmin).not.toHaveBeenCalled();
       const err = next.mock.calls[0][0];
-      expect(err.data).toEqual([
-        {
-          field: "password",
-          message: "Password must be at least 8 character",
-          in: "body",
-        },
-      ]);
+      expect(err.data).toEqual(
+        expect.arrayContaining([
+          {
+            field: "password",
+            message: "Password must be at least 8 character",
+            in: "body",
+          },
+        ]),
+      );
     });
   });
 

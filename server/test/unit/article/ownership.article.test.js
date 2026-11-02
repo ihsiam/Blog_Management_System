@@ -1,21 +1,9 @@
 /**
- * Unit tests for the "article" branch of src/middleware/ownership.js
- *
- * `ownership.js` is shared across article/comment/user resources. This
- * phase covers the request-level guard checks (auth required, resource
- * id required/valid) and the "article" branch specifically. The
- * "comment" and "user" branches belong to their own module phases.
- *
- * Dependencies mocked:
- * - src/lib/articles (ownership lookup)
- *
- * `src/lib/comments` and `src/lib/user` are provided as empty mocks
- * since `ownership.js` requires them at import time, but they are never
- * invoked by any test in this file (only the "article" model branch is
- * exercised).
+ * Unit tests for the article branch of src/middleware/ownership.js
  */
 
 const mockCheckOwner = jest.fn();
+
 jest.doMock("../../../src/lib/articles", () => ({
   checkOwner: mockCheckOwner,
 }));
@@ -83,63 +71,31 @@ describe("ownership middleware - article resource", () => {
         user: { id: "user-1", role: "user" },
         params: { id: validArticleId },
       };
+
       await ownership("article")(req, {}, next);
 
       expect(mockCheckOwner).toHaveBeenCalledWith({
         resourceId: validArticleId,
         userId: "user-1",
-        allowMissing: undefined,
-      });
-      expect(next).toHaveBeenCalledWith();
-      expect(req.adminOverride).toBeUndefined();
-    });
-
-    it("should allow the request when the article is missing and allowMissing is enabled", async () => {
-      mockCheckOwner.mockResolvedValue(null);
-
-      const req = {
-        user: { id: "user-1", role: "user" },
-        params: { id: validArticleId },
-      };
-      await ownership("article", { allowMissing: true })(req, {}, next);
-
-      expect(mockCheckOwner).toHaveBeenCalledWith({
-        resourceId: validArticleId,
-        userId: "user-1",
-        allowMissing: true,
       });
       expect(next).toHaveBeenCalledWith();
     });
 
-    it("should grant an admin override when the admin does not own the article and allowMissing is not set", async () => {
+    it("should allow the request when the admin does not own the article and admin access is enabled", async () => {
       mockCheckOwner.mockResolvedValue(false);
 
       const req = {
         user: { id: "admin-1", role: "admin" },
         params: { id: validArticleId },
       };
-      await ownership("article")(req, {}, next);
 
-      expect(req.adminOverride).toBe(true);
+      await ownership("article", { allowAdmin: true })(req, {}, next);
+
+      expect(mockCheckOwner).toHaveBeenCalledWith({
+        resourceId: validArticleId,
+        userId: "admin-1",
+      });
       expect(next).toHaveBeenCalledWith();
-    });
-
-    it("should NOT grant an admin override when allowMissing is enabled", async () => {
-      mockCheckOwner.mockResolvedValue(false);
-
-      const req = {
-        user: { id: "admin-1", role: "admin" },
-        params: { id: validArticleId },
-      };
-      await ownership("article", { allowMissing: true })(req, {}, next);
-
-      expect(req.adminOverride).toBeUndefined();
-      expect(next).toHaveBeenCalledWith(
-        expect.objectContaining({
-          statusCode: 403,
-          message: "You do not have permission to access this article",
-        }),
-      );
     });
 
     it("should reject a non-owner, non-admin user", async () => {
@@ -149,6 +105,7 @@ describe("ownership middleware - article resource", () => {
         user: { id: "user-2", role: "user" },
         params: { id: validArticleId },
       };
+
       await ownership("article")(req, {}, next);
 
       expect(next).toHaveBeenCalledWith(
@@ -167,6 +124,7 @@ describe("ownership middleware - article resource", () => {
         user: { id: "user-1", role: "user" },
         params: { id: validArticleId },
       };
+
       await ownership("article")(req, {}, next);
 
       expect(next).toHaveBeenCalledWith(dbError);

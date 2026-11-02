@@ -1,28 +1,24 @@
-const { badRequest } = require("../../../../utils/error");
-const userServices = require("../../../../lib/user");
-const tokenServices = require("../../../../lib/token");
+const { badRequest, notFound } = require("../../../../utils/error");
+const { ACCOUNT_STATUS } = require("../../../../config/constants");
+const authServices = require("../../../../lib/authentication");
 const emailService = require("../../../../lib/email");
+const { validation } = require("../../../../utils");
 
 /**
- * Sends a password reset email to a registered user.
+ * Request a password reset email for a registered user.
  *
- * @param {import("express").Request} req - Express request object
- * @param {Object} req.body - Request payload
- * @param {string} req.body.email - User email address
- *
- * @param {import("express").Response} res - Express response object
- * @param {Function} next - Express error handler middleware
- *
- * @returns {Promise<void>} Sends confirmation response
+ * @param {import("express").Request} req - Express request object.
+ * @param {Object} req.body - Request payload.
+ * @param {string} req.body.email - User email address.
+ * @param {import("express").Response} res - Express response object.
+ * @param {import("express").NextFunction} next - Next middleware function.
+ * @returns {Promise<import("express").Response|void>} The Express response after sending the 200 reply, or undefined when an error is forwarded to `next`.
  */
 const forgotPassword = async (req, res, next) => {
   try {
     const { email } = req.body;
 
-    /**
-     * Validate email presence and format
-     */
-    if (!email) {
+    if (!email || typeof email !== "string") {
       throw badRequest([
         {
           field: "email",
@@ -32,9 +28,7 @@ const forgotPassword = async (req, res, next) => {
       ]);
     }
 
-    const isValidEmail = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim());
-
-    if (!isValidEmail) {
+    if (!validation.isValidEmail(email)) {
       throw badRequest([
         {
           field: "email",
@@ -44,62 +38,26 @@ const forgotPassword = async (req, res, next) => {
       ]);
     }
 
-    /**
-     * Fetch user by email
-     */
-    const user = await userServices.findUserByEmail(email);
+    const { user, code } = await authServices.createPasswordResetOtp(
+      email.trim(),
+    );
 
-    /**
-     * Always return a generic response to prevent user enumeration
-     */
-    const responseMessage =
-      "If this email is registered, you will receive a password reset link.";
+    // The email must belong to a registered account.
+    if (!user) {
+      throw notFound("Email is not registered");
+    }
 
-    if (user) {
-      /**
-       * Restrict password reset for declined accounts
-       */
-      if (user.status === "declined") {
-        return res.status(200).json({
-          code: 200,
-          message: responseMessage,
-        });
-      }
-
-      /**
-       * Build JWT payload for reset token
-       */
-      const payload = {
-        id: user.id,
-        role: user.role,
-        email: user.email,
-      };
-
-      /**
-       * Generate password reset token
-       */
-      const resetToken = tokenServices.generateActiveResetToken(payload);
-
-      /**
-       * Construct password reset URL
-       */
-      const resetUrl = `${process.env.APP_URL}/api/v1/auth/reset-password/${resetToken}`;
-
-      /**
-       * Send password reset email
-       */
+    if (user.account_status !== ACCOUNT_STATUS.BLOCKED) {
       await emailService.sendMail({
         email: user.email,
         subject: "Reset your password",
-        text: `Hello ${user.name},\n\nPlease reset your password using the link below:\n${resetUrl}`,
+        text: `Hello ${user.name},\n\nYour password reset code is: ${code}`,
       });
     }
 
-    /**
-     * Response     */
     return res.status(200).json({
       code: 200,
-      message: responseMessage,
+      message: "A password reset code has been sent to your email.",
     });
   } catch (err) {
     return next(err);

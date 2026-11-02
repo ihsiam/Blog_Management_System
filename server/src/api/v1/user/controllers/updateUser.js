@@ -1,83 +1,99 @@
 const mongoose = require("mongoose");
-const { badRequest } = require("../../../../utils/error");
+const { badRequest, conflict } = require("../../../../utils/error");
 const userServices = require("../../../../lib/user");
+const {
+  ROLES,
+  ACCOUNT_STATUS,
+  STATUS_TRANSITION,
+} = require("../../../../config/constants");
+const { mapUser } = require("../../../../utils/mappers");
 
 /**
- * Updates user profile or account details.
+ * Update a user profile or account details.
  *
- * @param {import("express").Request} req - Express request object
- *
- * @param {Object} req.params - Route parameters
- * @param {string} req.params.id - User ID to update
- *
- * @param {Object} req.body - Request payload
- * @param {string} [req.body.name] - User full name
- * @param {string} [req.body.role] - User role (user | admin)
- * @param {string} [req.body.status] - User status (pending | approved | block | declined)
- *
- * @param {import("express").Response} res - Express response object
- * @param {Function} next - Express error handler middleware
- *
- * @returns {Promise<void>} Sends updated user data response
+ * @param {import("express").Request} req - Express request.
+ * @param {Object} req.params - Route parameters.
+ * @param {string} req.params.id - User ID to update.
+ * @param {Object} req.body - Request payload.
+ * @param {string} [req.body.name] - User full name.
+ * @param {string} [req.body.role] - User role (`user` or `admin`).
+ * @param {string} [req.body.status] - Account status (`pending`, `active`, or `blocked`).
+ * @param {Object} req.user - Authenticated user, set by an earlier middleware.
+ * @param {string} req.user.id - Authenticated user ID.
+ * @param {import("express").Response} res - Express response.
+ * @param {import("express").NextFunction} next - Next middleware.
+ * @returns {Promise<void>} Resolves after the response is sent or `next` has been called.
+ * @throws {Error} When the input is invalid.
+ * @throws {Error} When the authenticated user would block or demote their own account.
  */
 const updateUser = async (req, res, next) => {
   try {
-    // extract data
     const { id } = req.params;
     const { name, role, status } = req.body;
 
-    // 400 error data
+    // Collect every validation error so the client can fix them in one request.
     const errors = [];
 
-    // id validation
+    // Reject malformed IDs before they reach the database query.
     if (!id || !mongoose.Types.ObjectId.isValid(id)) {
       errors.push({ field: "id", message: "invalid input", in: "params" });
     }
 
-    // name validation
     if (name !== undefined && (typeof name !== "string" || !name.trim())) {
       errors.push({ field: "name", message: "invalid input", in: "body" });
     }
 
-    // role validation
     if (role !== undefined) {
       if (
         typeof role !== "string" ||
         !role.trim() ||
-        !["user", "admin"].includes(role)
+        !Object.values(ROLES).includes(role)
       ) {
         errors.push({ field: "role", message: "invalid input", in: "body" });
       }
     }
 
-    // status validation
     if (status !== undefined) {
-      const allowedStatus = ["pending", "approved", "blocked", "declined"];
-
       if (
         typeof status !== "string" ||
         !status.trim() ||
-        !allowedStatus.includes(status)
+        !Object.values(ACCOUNT_STATUS).includes(status)
       ) {
         errors.push({ field: "status", message: "invalid input", in: "body" });
       }
     }
 
-    // throw error if any
     if (errors.length) {
       throw badRequest(errors, "invalid input");
     }
 
-    // update user
-    const data = await userServices.updateUser({ id, name, role, status });
+    // An admin cannot block or demote their own account.
+    if (
+      new mongoose.Types.ObjectId(id).toString() === req.user.id &&
+      ((role !== undefined && role !== ROLES.ADMIN) ||
+        status === ACCOUNT_STATUS.BLOCKED)
+    ) {
+      throw conflict("You cannot block or demote your own account");
+    }
 
-    // response
+    // Record the status change as an admin action only when a status is sent.
+    const data = await userServices.updateUser({
+      id,
+      name,
+      role,
+      status,
+      ...(status !== undefined && {
+        statusTransition: STATUS_TRANSITION.ADMIN,
+      }),
+    });
+
     return res.status(200).json({
       code: 200,
       message: "Account updated",
-      data,
+      data: mapUser(data),
     });
   } catch (e) {
+    // Forward validation and service errors to the error handler.
     return next(e);
   }
 };

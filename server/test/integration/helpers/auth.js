@@ -8,6 +8,7 @@
 
 const jwt = require("jsonwebtoken");
 const User = require("../../../src/model/User");
+const Session = require("../../../src/model/Session");
 const { hashing } = require("../../../src/utils");
 const tokenServices = require("../../../src/lib/token");
 
@@ -33,11 +34,19 @@ const seedUser = async ({
   const user = await User.create({
     name,
     email,
-    password: hashPassword,
+    password_hash: hashPassword,
     role,
-    status,
-    refreshToken,
+    account_status: status === "approved" ? "active" : status,
   });
+
+  if (refreshToken) {
+    await Session.create({
+      user_id: user.id,
+      refresh_token_hash: hashing.generateDigest(refreshToken),
+      device_info: "integration-test",
+      expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
+    });
+  }
 
   return user.toObject();
 };
@@ -49,16 +58,24 @@ const seedUser = async ({
  * @returns {Promise<{accessToken: string, refreshToken: string}>}
  */
 const issueSession = async (user) => {
+  const sessionId = new Session().id;
   const payload = {
     id: user.id,
     role: user.role,
     email: user.email,
+    sid: sessionId,
   };
 
   const accessToken = tokenServices.generateAccessToken(payload);
   const refreshToken = tokenServices.generateRefreshToken(payload);
 
-  await User.findByIdAndUpdate(user.id, { $set: { refreshToken } });
+  await Session.create({
+    _id: sessionId,
+    user_id: user.id,
+    refresh_token_hash: hashing.generateDigest(refreshToken),
+    device_info: "integration-test",
+    expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
+  });
 
   return { accessToken, refreshToken };
 };

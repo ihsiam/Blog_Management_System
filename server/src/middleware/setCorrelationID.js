@@ -1,14 +1,18 @@
 /**
- * Middleware to set or propagate correlation ID for request tracing.
+ * Reuse `x-correlation-id` from the client, or assign a new UUID, on req and res.
  *
- * - If client sends `x-correlation-id`, it is reused
- * - Otherwise a new ID is generated using randomUUID
- * - ID is attached to request headers and response headers
+ * The ID is written to the request headers and to the response headers, so
+ * later handlers and the client can both use it to trace the request.
+ *
+ * @param {import("express").Request} req - Express request.
+ * @param {import("express").Response} res - Express response.
+ * @param {import("express").NextFunction} next - Next middleware.
+ * @returns {void}
  */
 const setCorrelationID = (req, res, next) => {
   const HEADER_KEY = "x-correlation-id";
 
-  // use existing correlation ID or generate a new one
+  // Keep the client's ID so one request can be traced across services.
   const correlationID = req.headers[HEADER_KEY] || crypto.randomUUID();
 
   // attach to request for downstream services/logging

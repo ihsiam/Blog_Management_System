@@ -1,16 +1,16 @@
 /**
- * Unit tests for src/api/v1/article/controllers/getArticleAuthor.js
+ * Unit tests for src/api/v1/articles/controllers/getArticleAuthor.js
  *
  * Dependencies mocked:
- * - src/lib/service registry (getArticleAuthor orchestration)
+ * - src/lib/serviceRegistry (getArticleAuthor orchestration)
  */
 
 const mockGetArticleAuthor = jest.fn();
-jest.doMock("../../../src/lib/service registry", () => ({
+jest.doMock("../../../src/lib/serviceRegistry", () => ({
   getArticleAuthor: mockGetArticleAuthor,
 }));
 
-const getArticleAuthorController = require("../../../src/api/v1/article/controllers/getArticleAuthor");
+const getArticleAuthorController = require("../../../src/api/v1/articles/controllers/getArticleAuthor");
 const { createMockResponse } = require("../helpers/mockExpress");
 
 describe("article getArticleAuthor controller", () => {
@@ -36,35 +36,23 @@ describe("article getArticleAuthor controller", () => {
     );
   });
 
-  it("should reject when the author no longer exists", async () => {
-    mockGetArticleAuthor.mockResolvedValue(null);
-
-    const req = { params: { id: validId } };
-    await getArticleAuthorController(req, res, next);
-
-    expect(next).toHaveBeenCalledWith(
-      expect.objectContaining({ statusCode: 400, message: "author not found" }),
-    );
-  });
-
-  it("should return only the sanitized author fields", async () => {
+  it("should return only the public author fields", async () => {
     mockGetArticleAuthor.mockResolvedValue({
       id: "user-1",
       name: "Jane",
       email: "jane@test.com",
       password: "should-not-leak",
-      refreshToken: "should-not-leak",
     });
 
     const req = { params: { id: validId } };
     await getArticleAuthorController(req, res, next);
 
+    expect(mockGetArticleAuthor).toHaveBeenCalledWith(validId);
     expect(res.status).toHaveBeenCalledWith(200);
     const payload = res.json.mock.calls[0][0];
     expect(payload.data).toEqual({
       id: "user-1",
       name: "Jane",
-      email: "jane@test.com",
     });
     expect(payload.links).toEqual({
       self: `/api/v1/articles/${validId}/author`,

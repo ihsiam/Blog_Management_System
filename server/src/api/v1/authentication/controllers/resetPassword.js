@@ -1,32 +1,25 @@
-const tokenServices = require("../../../../lib/token");
-const userServices = require("../../../../lib/user");
-const { badRequest } = require("../../../../utils/error");
+const authServices = require("../../../../lib/authentication");
+const { badRequest, unauthorized } = require("../../../../utils/error");
+const { validation } = require("../../../../utils");
+const { clearResetTokenCookie } = require("../../../../utils/cookie");
 
 /**
- * Resets a user's password using a valid password reset token.
+ * Reset a user's password using a valid reset token.
  *
- * @param {import("express").Request} req - Express request object
- * @param {Object} req.params - Route parameters
- * @param {string} req.params.token - Password reset JWT token
- *
- * @param {Object} req.body - Request payload
- * @param {string} req.body.password - New user password
- *
- * @param {import("express").Response} res - Express response object
- * @param {Function} next - Express error-handling middleware
- *
- * @returns {Promise<void>} Sends password reset confirmation response
- *
- * @throws {Error} BadRequest if password validation fails
+ * @param {import("express").Request} req - Express request object.
+ * @param {Object} req.body - Request payload.
+ * @param {string} req.body.password - New password.
+ * @param {Object} [req.cookies] - Request cookies.
+ * @param {string} [req.cookies.resetToken] - Reset token cookie.
+ * @param {import("express").Response} res - Express response object.
+ * @param {import("express").NextFunction} next - Next middleware function.
+ * @returns {Promise<import("express").Response|void>} The Express response after sending the 200 reply, or undefined when an error is forwarded to `next`.
  */
 const resetPassword = async (req, res, next) => {
   try {
-    const { token } = req.params;
     const { password } = req.body;
+    const token = req.cookies?.resetToken;
 
-    /**
-     * Validate password presence and type
-     */
     if (!password || typeof password !== "string") {
       throw badRequest([
         {
@@ -37,9 +30,6 @@ const resetPassword = async (req, res, next) => {
       ]);
     }
 
-    /**
-     * Validate password strength
-     */
     if (password.length < 8) {
       throw badRequest([
         {
@@ -50,23 +40,20 @@ const resetPassword = async (req, res, next) => {
       ]);
     }
 
-    /**
-     * Verify reset token and extract user payload
-     */
-    const user = tokenServices.verifyActiveResetToken(token);
+    if (validation.isPasswordTooLong(password)) {
+      throw badRequest([
+        {
+          field: "password",
+          message: "Password must be at most 72 bytes long",
+          in: "body",
+        },
+      ]);
+    }
 
-    /**
-     * Update user password
-     */
-    await userServices.updatePassword({
-      id: user.id,
-      password,
-    });
+    if (!token) throw unauthorized("Reset token is missing");
 
-    /**
-     * Invalidate all active sessions after password change
-     */
-    await userServices.clearRefreshToken(user.id);
+    await authServices.resetPassword({ token, password });
+    clearResetTokenCookie(res);
 
     return res.status(200).json({
       code: 200,

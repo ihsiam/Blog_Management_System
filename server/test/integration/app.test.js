@@ -20,6 +20,7 @@
 
 const request = require("supertest");
 const mongoose = require("mongoose");
+const logger = require("../../src/utils/logger");
 
 // Load the real Express application (no mocks).
 const app = require("../../src/app");
@@ -31,6 +32,12 @@ beforeEach(() => {
   jest.spyOn(console, "log").mockImplementation(() => {});
   jest.spyOn(console, "error").mockImplementation(() => {});
   jest.spyOn(console, "warn").mockImplementation(() => {});
+});
+
+afterAll(async () => {
+  if (mongoose.connection.readyState !== 0) {
+    await mongoose.disconnect();
+  }
 });
 
 // ─── Health check endpoint ───────────────────────────────────────────────────
@@ -242,20 +249,27 @@ describe("Database bootstrap — connectDB", () => {
   let mongodRef = null; // tracks the MongoMemoryServer instance per test
 
   afterEach(async () => {
-    // Always disconnect Mongoose first, then stop the in-memory server.
-    if (mongoose.connection.readyState !== 0) {
-      await mongoose.disconnect();
+    try {
+      // Always disconnect Mongoose first, then stop the in-memory server.
+      if (mongoose.connection.readyState !== 0) {
+        await mongoose.disconnect();
+      }
+    } finally {
+      if (mongodRef) {
+        await mongodRef.stop();
+        mongodRef = null;
+      }
+      delete process.env.DB_URL;
     }
-    if (mongodRef) {
-      await mongodRef.stop();
-      mongodRef = null;
-    }
-    delete process.env.DB_URL;
   });
 
   it("should connect successfully to an in-memory MongoDB", async () => {
     const { MongoMemoryServer } = require("mongodb-memory-server");
-    mongodRef = await MongoMemoryServer.create();
+    mongodRef = await MongoMemoryServer.create({
+      instance: {
+        args: ["--wiredTigerCacheSizeGB", "0.25", "--nounixsocket"],
+      },
+    });
     process.env.DB_URL = mongodRef.getUri();
 
     await connectDB(1, 0);
@@ -265,14 +279,19 @@ describe("Database bootstrap — connectDB", () => {
 
   it("should log 'Database connected successfully' after a successful connection", async () => {
     const { MongoMemoryServer } = require("mongodb-memory-server");
-    mongodRef = await MongoMemoryServer.create();
+    mongodRef = await MongoMemoryServer.create({
+      instance: {
+        args: ["--wiredTigerCacheSizeGB", "0.25", "--nounixsocket"],
+      },
+    });
     process.env.DB_URL = mongodRef.getUri();
 
+    const infoSpy = jest.spyOn(logger, "info");
     // console.log is mocked in beforeEach; clearMocks:true ensures only
     // calls made inside this test are recorded.
     await connectDB(1, 0);
 
-    expect(console.log).toHaveBeenCalledWith("Database connected successfully");
+    expect(infoSpy).toHaveBeenCalledWith("Database connected successfully");
   });
 
   it("should reject with a descriptive error when DB_URL is not set", async () => {

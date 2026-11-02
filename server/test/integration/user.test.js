@@ -101,7 +101,7 @@ describe("GET /api/v1/users", () => {
         name: expect.any(String),
         email: expect.any(String),
         role: expect.any(String),
-        status: expect.any(String),
+        account_status: expect.any(String),
       }),
     );
     expect(all.body.data[0].password).toBeUndefined();
@@ -112,7 +112,9 @@ describe("GET /api/v1/users", () => {
       .query({ status: "pending" })
       .set(authHeader(adminToken));
     expect(pending.status).toBe(200);
-    expect(pending.body.data.every((u) => u.status === "pending")).toBe(true);
+    expect(pending.body.data.every((u) => u.account_status === "pending")).toBe(
+      true,
+    );
 
     const byName = await request(app)
       .get("/api/v1/users")
@@ -152,8 +154,8 @@ describe("GET /api/v1/users", () => {
       expect.arrayContaining([
         expect.objectContaining({ field: "page", in: "query" }),
         expect.objectContaining({ field: "limit", in: "query" }),
-        expect.objectContaining({ field: "sort_type", in: "query" }),
-        expect.objectContaining({ field: "sort_by", in: "query" }),
+        expect.objectContaining({ field: "sortType", in: "query" }),
+        expect.objectContaining({ field: "sortBy", in: "query" }),
         expect.objectContaining({ field: "status", in: "query" }),
       ]),
     );
@@ -172,6 +174,7 @@ describe("POST /api/v1/users", () => {
         name: "New User",
         email: "newuser@example.com",
         password: "password123",
+        role: "user",
       });
 
     expect(res.status).toBe(201);
@@ -181,7 +184,6 @@ describe("POST /api/v1/users", () => {
       data: {
         name: "New User",
         email: "newuser@example.com",
-        status: "approved",
         role: "user",
       },
     });
@@ -190,9 +192,9 @@ describe("POST /api/v1/users", () => {
 
     const stored = await User.findOne({ email: "newuser@example.com" });
     expect(stored).not.toBeNull();
-    expect(stored.status).toBe("approved");
-    expect(stored.password).not.toBe("password123");
-    expect(await hashing.compareHash("password123", stored.password)).toBe(
+    expect(stored.account_status).toBe("active");
+    expect(stored.password_hash).not.toBe("password123");
+    expect(await hashing.compareHash("password123", stored.password_hash)).toBe(
       true,
     );
   });
@@ -211,6 +213,7 @@ describe("POST /api/v1/users", () => {
         name: "Dup",
         email: "dup@example.com",
         password: "password123",
+        role: "user",
       });
     expect(dup.status).toBe(400);
     expect(dup.body.data).toEqual([
@@ -275,7 +278,6 @@ describe("GET /api/v1/users/:id", () => {
         name: "Self",
         email: "self@example.com",
         role: "user",
-        status: "approved",
       },
     });
     expect(res.body.data.password).toBeUndefined();
@@ -398,14 +400,14 @@ describe("PATCH /api/v1/users/:id", () => {
       data: {
         name: "After",
         role: "admin",
-        status: "blocked",
+        account_status: "blocked",
       },
     });
 
     const stored = await User.findById(target.id);
     expect(stored.name).toBe("After");
     expect(stored.role).toBe("admin");
-    expect(stored.status).toBe("blocked");
+    expect(stored.account_status).toBe("blocked");
   });
 
   it("should forbid regular users from updating accounts", async () => {
@@ -480,12 +482,12 @@ describe("PATCH /api/v1/users/:id/change-password", () => {
     });
 
     const stored = await User.findById(user.id);
-    expect(await hashing.compareHash("new-password", stored.password)).toBe(
-      true,
-    );
-    expect(await hashing.compareHash("old-password", stored.password)).toBe(
-      false,
-    );
+    expect(
+      await hashing.compareHash("new-password", stored.password_hash),
+    ).toBe(true);
+    expect(
+      await hashing.compareHash("old-password", stored.password_hash),
+    ).toBe(false);
 
     const oldLogin = await request(app)
       .post("/api/v1/auth/sign-in")
@@ -502,16 +504,25 @@ describe("PATCH /api/v1/users/:id/change-password", () => {
     const { user, accessToken } = await createAuthedUser({
       password: "correct-password",
     });
-    const before = (await User.findById(user.id)).password;
+    const before = (await User.findById(user.id)).password_hash;
 
     const res = await request(app)
       .patch(`/api/v1/users/${user.id}/change-password`)
       .set(authHeader(accessToken))
-      .send({ oldPassword: "wrong-password", newPassword: "new-password" });
+      .send({ oldPassword: "wrong-password", newPassword: "new-password1" });
 
-    expect(res.status).toBe(401);
-    expect(res.body.message).toBe("Old password is incorrect");
-    const after = (await User.findById(user.id)).password;
+    expect(res.status).toBe(400);
+    expect(res.body.message).toBe("invalid input");
+    expect(res.body.data).toEqual(
+      expect.arrayContaining([
+        {
+          field: "oldPassword",
+          message: "Old password is incorrect",
+          in: "body",
+        },
+      ]),
+    );
+    const after = (await User.findById(user.id)).password_hash;
     expect(after).toBe(before);
   });
 
@@ -543,7 +554,7 @@ describe("PATCH /api/v1/users/:id/change-password", () => {
     );
 
     const stored = await User.findById(target.id);
-    expect(await hashing.compareHash("password123", stored.password)).toBe(
+    expect(await hashing.compareHash("password123", stored.password_hash)).toBe(
       true,
     );
   });
@@ -634,12 +645,12 @@ describe("DELETE /api/v1/users/:id", () => {
     expect(await User.findById(target.id)).toBeNull();
     expect(await Article.findById(article.id)).toBeNull();
     expect(await Article.findById(otherArticle.id)).not.toBeNull();
-    expect(await Comment.countDocuments({ article: article.id })).toBe(0);
-    expect(await Comment.countDocuments({ author: target.id })).toBe(0);
+    expect(await Comment.countDocuments({ article_id: article.id })).toBe(0);
+    expect(await Comment.countDocuments({ author_id: target.id })).toBe(0);
     expect(
       await Comment.countDocuments({
-        article: otherArticle.id,
-        author: other.id,
+        article_id: otherArticle.id,
+        author_id: other.id,
       }),
     ).toBe(1);
     expect(await User.findById(other.id)).not.toBeNull();

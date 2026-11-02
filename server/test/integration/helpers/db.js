@@ -16,7 +16,7 @@
  */
 
 const mongoose = require("mongoose");
-const { MongoMemoryServer } = require("mongodb-memory-server");
+const { MongoMemoryReplSet } = require("mongodb-memory-server");
 
 let mongod = null;
 
@@ -26,7 +26,14 @@ let mongod = null;
  * correct URI automatically.
  */
 const connect = async () => {
-  mongod = await MongoMemoryServer.create();
+  mongod = await MongoMemoryReplSet.create({
+    replSet: { count: 1 },
+    instanceOpts: [
+      {
+        args: ["--wiredTigerCacheSizeGB", "0.25", "--nounixsocket"],
+      },
+    ],
+  });
   const uri = mongod.getUri();
 
   // Make the URI available to application code that reads this env var.
@@ -39,12 +46,15 @@ const connect = async () => {
  * Disconnect Mongoose and stop the in-memory MongoDB instance.
  */
 const disconnect = async () => {
-  if (mongoose.connection.readyState !== 0) {
-    await mongoose.disconnect();
-  }
-  if (mongod) {
-    await mongod.stop();
-    mongod = null;
+  try {
+    if (mongoose.connection.readyState !== 0) {
+      await mongoose.disconnect();
+    }
+  } finally {
+    if (mongod) {
+      await mongod.stop();
+      mongod = null;
+    }
   }
 };
 

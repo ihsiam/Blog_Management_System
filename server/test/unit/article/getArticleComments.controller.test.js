@@ -1,20 +1,20 @@
 /**
- * Unit tests for src/api/v1/article/controllers/getArticleComments.js
+ * Unit tests for src/api/v1/articles/controllers/getArticleComments.js
  *
  * Dependencies mocked:
- * - src/lib/service registry (getCommentByArticle orchestration)
- * - src/lib/comments        (count)
+ * - src/lib/serviceRegistry (getCommentByArticle orchestration)
+ * - src/lib/comments (count)
  */
 
 const mockGetCommentByArticle = jest.fn();
-jest.doMock("../../../src/lib/service registry", () => ({
+jest.doMock("../../../src/lib/serviceRegistry", () => ({
   getCommentByArticle: mockGetCommentByArticle,
 }));
 
 const mockCommentCount = jest.fn();
 jest.doMock("../../../src/lib/comments", () => ({ count: mockCommentCount }));
 
-const getArticleCommentsController = require("../../../src/api/v1/article/controllers/getArticleComments");
+const getArticleCommentsController = require("../../../src/api/v1/articles/controllers/getArticleComments");
 const { createMockResponse } = require("../helpers/mockExpress");
 
 describe("article getArticleComments controller", () => {
@@ -82,11 +82,12 @@ describe("article getArticleComments controller", () => {
       await getArticleCommentsController(buildRequest(), res, next);
 
       expect(mockGetCommentByArticle).toHaveBeenCalledWith(
-        expect.objectContaining({ articleID: validId, status: "public" }),
+        expect.objectContaining({ articleId: validId, status: "public" }),
       );
       expect(mockCommentCount).toHaveBeenCalledWith({
-        article: validId,
+        articleId: validId,
         status: "public",
+        topLevel: true,
       });
     });
 
@@ -113,7 +114,9 @@ describe("article getArticleComments controller", () => {
           body: "Nice post",
           author: "user-1",
           createdAt: "2024-01-01",
+          status: "public",
           updatedAt: "2024-01-01",
+          replies: [],
         },
       ]);
       expect(payload.links.article).toBe(`/api/v1/articles/${validId}`);

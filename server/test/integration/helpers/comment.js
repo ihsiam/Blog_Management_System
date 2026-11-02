@@ -31,8 +31,8 @@ const seedComment = async ({
   const comment = await Comment.create({
     body,
     status,
-    article,
-    author,
+    article_id: article,
+    author_id: author,
   });
 
   return comment.toObject();

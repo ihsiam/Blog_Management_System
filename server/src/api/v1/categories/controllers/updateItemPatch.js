@@ -1,0 +1,70 @@
+const mongoose = require("mongoose");
+const categoryServices = require("../../../../lib/categories");
+const { badRequest, conflict } = require("../../../../utils/error");
+
+/**
+ * Update category details via partial payload.
+ *
+ * @param {import("express").Request} req - Express request object.
+ * @param {Object} req.params - Route parameters.
+ * @param {string} req.params.id - Category ID.
+ * @param {Object} req.body - Fields to update.
+ * @param {string} [req.body.name] - Updated category name.
+ * @param {string|null} [req.body.description] - Updated category description.
+ * @param {import("express").Response} res - Express response object.
+ * @param {import("express").NextFunction} next - Next middleware function.
+ * @returns {Promise<import("express").Response|void>} The Express response after sending the 200 reply, or undefined when an error is forwarded to `next`.
+ */
+const updateItemPatch = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const { name, description } = req.body;
+    const errors = [];
+
+    if (!id || !mongoose.Types.ObjectId.isValid(id)) {
+      errors.push({ field: "id", message: "invalid input", in: "params" });
+    }
+    // Reject no-op PATCH requests that would not change stored data.
+    if (name === undefined && description === undefined) {
+      errors.push({ field: "body", message: "invalid input", in: "body" });
+    }
+    if (name !== undefined && (typeof name !== "string" || !name.trim())) {
+      errors.push({ field: "name", message: "invalid input", in: "body" });
+    }
+    if (
+      description !== undefined &&
+      description !== null &&
+      typeof description !== "string"
+    ) {
+      errors.push({
+        field: "description",
+        message: "invalid input",
+        in: "body",
+      });
+    }
+    if (errors.length) throw badRequest(errors, "invalid input");
+
+    try {
+      const category = await categoryServices.updateItemPatch(id, {
+        name: name?.trim(),
+        description,
+      });
+      return res.status(200).json({
+        code: 200,
+        message: "Successfully updated category",
+        data: category,
+        links: { self: `/api/v1/categories/${category.id}` },
+      });
+    } catch (err) {
+      // Map unique-index violation to a client-friendly conflict response.
+      if (err.code === 11000) {
+        throw conflict("A category with this name already exists.");
+      }
+      throw err;
+    }
+  } catch (err) {
+    return next(err);
+  }
+};
+
+module.exports = updateItemPatch;
