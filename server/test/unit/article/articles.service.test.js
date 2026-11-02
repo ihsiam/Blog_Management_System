@@ -7,6 +7,7 @@
 
 const mockFindSingleItemCategory = jest.fn();
 const mockUploadArticleCover = jest.fn();
+const mockRemoveArticleCover = jest.fn();
 const mockGetCache = jest.fn();
 const mockSetCache = jest.fn();
 const mockDeleteCache = jest.fn();
@@ -18,6 +19,7 @@ jest.doMock("../../../src/lib/categories", () => ({
 
 jest.doMock("../../../src/lib/storage", () => ({
   uploadArticleCover: mockUploadArticleCover,
+  removeArticleCover: mockRemoveArticleCover,
 }));
 
 jest.doMock("../../../src/utils/cache", () => ({
@@ -66,6 +68,7 @@ describe("article service (src/lib/articles)", () => {
   beforeEach(() => {
     mockFindSingleItemCategory.mockReset();
     mockUploadArticleCover.mockReset();
+    mockRemoveArticleCover.mockReset();
     mockGetCache.mockReset();
     mockSetCache.mockReset();
     mockDeleteCache.mockReset();

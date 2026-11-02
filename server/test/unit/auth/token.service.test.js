@@ -119,5 +119,4 @@ describe("token service (src/lib/token)", () => {
       );
     });
   });
-
 });

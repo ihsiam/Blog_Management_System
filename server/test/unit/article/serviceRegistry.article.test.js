@@ -69,7 +69,10 @@ describe("service registry - article-related orchestration", () => {
         endSession: jest.fn().mockResolvedValue(),
       };
       jest.spyOn(mongoose, "startSession").mockResolvedValue(session);
-      mockFindArticleById.mockResolvedValue({ id: "1", cover_image_url: "cover-1" });
+      mockFindArticleById.mockResolvedValue({
+        id: "1",
+        cover_image_url: "cover-1",
+      });
       mockCommentDeleteMany.mockResolvedValue(true);
       mockDeleteItem.mockResolvedValue(true);
 

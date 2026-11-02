@@ -14,6 +14,18 @@
 const request = require("supertest");
 const mongoose = require("mongoose");
 
+const mockUploadArticleCover = jest
+  .fn()
+  .mockResolvedValue(
+    "https://res.cloudinary.com/test/image/upload/v1/blog-management/articles/cover.jpg",
+  );
+const mockRemoveArticleCover = jest.fn();
+
+jest.doMock("../../src/lib/storage", () => ({
+  uploadArticleCover: mockUploadArticleCover,
+  removeArticleCover: mockRemoveArticleCover,
+}));
+
 const app = require("../../src/app");
 const Article = require("../../src/model/Article");
 const Category = require("../../src/model/Category");

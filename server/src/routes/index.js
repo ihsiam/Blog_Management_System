@@ -11,7 +11,6 @@ const authenticate = require("../middleware/authenticate");
 const authenticateOptional = require("../middleware/authenticateOptional");
 const authorize = require("../middleware/authorize");
 const ownership = require("../middleware/ownership");
-const uploadCleanup = require("../middleware/uploadCleanup");
 const upload = require("../utils/multer");
 const { ROLES } = require("../config/constants");
 
@@ -93,7 +92,6 @@ router
     authorize([ROLES.USER, ROLES.ADMIN]),
     upload.single("cover"),
     articleController.create,
-    uploadCleanup,
   );
 
 // Admin article listing.
@@ -112,7 +110,6 @@ router
     ownership("article"),
     upload.single("cover"),
     articleController.updateItemPatch,
-    uploadCleanup,
   )
   .delete(
     authenticate,

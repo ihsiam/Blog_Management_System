@@ -2066,8 +2066,8 @@ components:
             cover:
               type: string
               format: uri-reference
-              description: Relative URL of the cover image.
-              example: /uploads/articles/1767225600000-cover.jpg
+              description: Cloudinary secure URL of the cover image.
+              example: https://res.cloudinary.com/example/image/upload/v1767225600/blog-management/articles/cover.jpg
             status:
               type: string
               enum: [draft, published]
@@ -2092,7 +2092,7 @@ components:
             cover:
               type: string
               format: uri-reference
-              example: /uploads/articles/1767225600000-cover.jpg
+              example: https://res.cloudinary.com/example/image/upload/v1767225600/blog-management/articles/cover.jpg
             author:
               $ref: "#/components/schemas/AuthorDetails"
             link:
@@ -2144,7 +2144,7 @@ components:
             cover:
               type: string
               format: uri-reference
-              example: /uploads/articles/1767225600000-cover.jpg
+              example: https://res.cloudinary.com/example/image/upload/v1767225600/blog-management/articles/cover.jpg
             author:
               $ref: "#/components/schemas/AuthorDetails"
             category:

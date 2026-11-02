@@ -266,18 +266,18 @@ describe("authentication service (src/lib/authentication)", () => {
       );
       expect(mockGenerateAccessToken).toHaveBeenCalledWith(
         expect.objectContaining({
-        id: approvedUser.id,
-        role: approvedUser.role,
-        email: approvedUser.email,
-        sid: expect.any(String),
+          id: approvedUser.id,
+          role: approvedUser.role,
+          email: approvedUser.email,
+          sid: expect.any(String),
         }),
       );
       expect(mockGenerateRefreshToken).toHaveBeenCalledWith(
         expect.objectContaining({
-        id: approvedUser.id,
-        role: approvedUser.role,
-        email: approvedUser.email,
-        sid: expect.any(String),
+          id: approvedUser.id,
+          role: approvedUser.role,
+          email: approvedUser.email,
+          sid: expect.any(String),
         }),
       );
       expect(mockSaveRefreshToken).toHaveBeenCalledWith(
@@ -350,13 +350,11 @@ describe("authentication service (src/lib/authentication)", () => {
 
       const result = await authService.refreshToken("current-refresh-token");
 
-      expect(mockFindSessionByToken).toHaveBeenCalledWith(
-        {
-          id: sessionUser.id,
-          sessionId: "session-1",
-          refreshToken: "current-refresh-token",
-        },
-      );
+      expect(mockFindSessionByToken).toHaveBeenCalledWith({
+        id: sessionUser.id,
+        sessionId: "session-1",
+        refreshToken: "current-refresh-token",
+      });
       expect(result).toEqual({
         accessToken: "new-access-token",
       });
@@ -530,10 +528,7 @@ describe("authentication service (src/lib/authentication)", () => {
         "reset-1",
         session,
       );
-      expect(mockClearRefreshToken).toHaveBeenCalledWith(
-        { id: "1" },
-        session,
-      );
+      expect(mockClearRefreshToken).toHaveBeenCalledWith({ id: "1" }, session);
     });
 
     it("should reject an invalid or expired reset token", async () => {

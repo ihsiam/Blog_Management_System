@@ -104,10 +104,7 @@ describe("service registry - deleteUser", () => {
       { author_id: "user-1" },
       transactionSession,
     );
-    expect(mockDeleteItem).toHaveBeenCalledWith(
-      "user-1",
-      transactionSession,
-    );
+    expect(mockDeleteItem).toHaveBeenCalledWith("user-1", transactionSession);
     expect(mockRemoveArticleCover).toHaveBeenCalledWith("cover-1");
     expect(mockRemoveArticleCover).toHaveBeenCalledWith("cover-2");
     expect(transactionSession.endSession).toHaveBeenCalledTimes(1);

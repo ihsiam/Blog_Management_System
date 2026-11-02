@@ -79,7 +79,9 @@ describe("user service (src/lib/user)", () => {
     mockDeleteOtpsByUser.mockReset();
     mockDeletePasswordResetTokenByUser.mockReset();
     mockGenerateHash.mockReset();
-    mockNormalizeEmail.mockImplementation((email) => email.trim().toLowerCase());
+    mockNormalizeEmail.mockImplementation((email) =>
+      email.trim().toLowerCase(),
+    );
   });
 
   describe("findUserByEmail", () => {
@@ -691,7 +693,10 @@ describe("user service (src/lib/user)", () => {
 
       const result = await userService.deleteItem("1");
 
-      expect(mockClearRefreshToken).toHaveBeenCalledWith({ id: "1" }, undefined);
+      expect(mockClearRefreshToken).toHaveBeenCalledWith(
+        { id: "1" },
+        undefined,
+      );
       expect(mockDeleteOtpsByUser).toHaveBeenCalledWith("1", undefined);
       expect(mockDeletePasswordResetTokenByUser).toHaveBeenCalledWith(
         "1",

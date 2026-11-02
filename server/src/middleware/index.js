@@ -5,10 +5,8 @@ const cookieParser = require("cookie-parser");
 const swaggerUI = require("swagger-ui-express");
 const YAML = require("yamljs");
 
-const path = require("path");
-
 // Load the API documentation once at startup
-const swaggerDocs = YAML.load(path.join(__dirname, "../../swagger.yaml"));
+const swaggerDocs = YAML.load(`${__dirname}/../../swagger.yaml`);
 
 /**
  * Applies global Express middlewares to the application.
@@ -19,7 +17,6 @@ const swaggerDocs = YAML.load(path.join(__dirname, "../../swagger.yaml"));
  * - CORS configuration (supports credentials)
  * - Cookie parsing support
 
- * - Static upload serving during development
  * - Swagger API documentation setup
  *
  * @param {import("express").Application} app - Express application instance
@@ -32,9 +29,6 @@ const applyMiddleware = (app) => {
 
   // Parse incoming JSON requests.
   app.use(express.json());
-
-  // Cover images are stored on disk and served from /uploads in development
-  app.use("/uploads", express.static(path.join(__dirname, "../../uploads")));
 
   // Enable CORS with credentials support (cookies, auth headers).
   app.use(

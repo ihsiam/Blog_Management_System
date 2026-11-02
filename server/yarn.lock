@@ -2178,6 +2178,7 @@ __metadata:
   resolution: "blog-management-system@workspace:."
   dependencies:
     bcryptjs: "npm:^3.0.3"
+    cloudinary: "npm:^2.11.0"
     cookie-parser: "npm:^1.4.7"
     cors: "npm:^2.8.5"
     dotenv: "npm:^16.4.5"
@@ -2520,6 +2521,15 @@ __metadata:
     strip-ansi: "npm:^6.0.1"
     wrap-ansi: "npm:^7.0.0"
   checksum: 10c0/4bda0f09c340cbb6dfdc1ed508b3ca080f12992c18d68c6be4d9cf51756033d5266e61ec57529e610dacbf4da1c634423b0c1b11037709cc6b09045cbd815df5
+  languageName: node
+  linkType: hard
+
+"cloudinary@npm:^2.11.0":
+  version: 2.11.0
+  resolution: "cloudinary@npm:2.11.0"
+  dependencies:
+    lodash: "npm:^4.17.23"
+  checksum: 10c0/54163496d1b03bac0a97d9abf5f3e4569b7161d49140f78e9302baff1bdda1cfee2745ca922b3012748fcb6eeb2c44016b3cee2c0504ad9d609af0cf6488013f
   languageName: node
   linkType: hard
 
@@ -5553,7 +5563,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"lodash@npm:^4.17.21":
+"lodash@npm:^4.17.21, lodash@npm:^4.17.23":
   version: 4.18.1
   resolution: "lodash@npm:4.18.1"
   checksum: 10c0/757228fc68805c59789e82185135cf85f05d0b2d3d54631d680ca79ec21944ec8314d4533639a14b8bcfbd97a517e78960933041a5af17ecb693ec6eecb99a27

@@ -190,10 +190,9 @@ describe("Application bootstrap (src/index.js)", () => {
 
       errorHandler(serverError);
 
-      expect(mockLogger.error).toHaveBeenCalledWith(
-        "Server failed to start",
-        { message: serverError.message },
-      );
+      expect(mockLogger.error).toHaveBeenCalledWith("Server failed to start", {
+        message: serverError.message,
+      });
       expect(exitSpy).toHaveBeenCalledWith(1);
     });
   });

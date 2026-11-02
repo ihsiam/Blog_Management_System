@@ -33,7 +33,7 @@ Blog Management System/
 │   │   │   ├── categories/
 │   │   │   ├── comments/
 │   │   │   └── user/
-│   │   ├── config/           # Defaults, Redis, and shared role/status constants
+│   │   ├── config/           # Defaults, Cloudinary, Redis, and shared constants
 │   │   ├── db/               # MongoDB connection logic
 │   │   ├── lib/              # Business logic (services)
 │   │   │   ├── articles/
@@ -45,10 +45,10 @@ Blog Management System/
 │   │   │   ├── passwordReset/
 │   │   │   ├── serviceRegistry/    # Cross-module operations (cascading deletes, comment lookups)
 │   │   │   ├── session/
-│   │   │   ├── storage/            # Cover image storage (local disk in development)
+│   │   │   ├── storage/            # Cloudinary cover image storage
 │   │   │   ├── token/
 │   │   │   └── user/
-│   │   ├── middleware/       # Auth, authorization, ownership, upload checks, logging
+│   │   ├── middleware/       # Security, auth, authorization, ownership, and logging
 │   │   ├── model/            # Mongoose schemas and model definitions
 │   │   ├── routes/           # API route registration
 │   │   ├── utils/            # Shared helpers: logger, cache, hashing, validation, mappers, cookies, errors
@@ -65,7 +65,7 @@ Blog Management System/
 └── README.md                 # Project documentation
 ```
 
-Runtime folders created by the app (and ignored by git): `server/logs/` for Winston log files and `server/uploads/` for cover images.
+Runtime folders created by the app (and ignored by git): `server/logs/` for Winston log files.
 
 ## Tech Stack
 
@@ -77,7 +77,7 @@ Runtime folders created by the app (and ignored by git): `server/logs/` for Wins
 | Cache                | Redis                                    |
 | Auth                 | JWT, bcryptjs, HttpOnly cookies          |
 | Email                | Nodemailer (SMTP)                        |
-| File upload          | Multer (local disk in development)       |
+| File upload          | Multer memory storage + Cloudinary   |
 | Validation & Routing | Express middleware and controller checks |
 | Logging              | Winston, express-winston, Elasticsearch  |
 | Docs                 | Swagger UI (`server/swagger.yaml`)       |
@@ -127,6 +127,7 @@ Runtime folders created by the app (and ignored by git): `server/logs/` for Wins
 ### Infrastructure
 
 - Centralized error handling with a correlation id on every response
+- Helmet security headers and credential-aware CORS
 - Daily rotating log files and Elasticsearch log shipping (authorization and cookie headers are never logged)
 - Redis caching for article lists, article details, authors, and comment trees
 - Containerized MongoDB replica set
@@ -140,6 +141,7 @@ Runtime folders created by the app (and ignored by git): `server/logs/` for Wins
 - MongoDB running as a **replica set** (the API uses transactions); Docker Compose provides one
 - Redis (required, the server exits if it cannot connect)
 - SMTP credentials for OTP emails
+- A Cloudinary account and API credentials for article cover uploads
 
 ## Getting Started
 
@@ -158,7 +160,10 @@ cd Blog_Management_System
 cp server/default.env server/.env
 ```
 
-3. Fill in the required values in `server/.env`
+3. Fill in the required values in `server/.env`.
+
+For article cover uploads, configure `CLOUDINARY_CLOUD_NAME`, `CLOUDINARY_API_KEY`,
+and `CLOUDINARY_API_SECRET` in `server/.env`.
 
 4. Start the full stack
 
@@ -187,7 +192,7 @@ yarn install
 
 2. Create a local `.env` file based on `default.env`
 
-3. Start MongoDB as a replica set (for example `mongod --replSet rs0` followed by `rs.initiate()`), and start Redis. Point `DB_URL` at the replica set, for example `mongodb://localhost:27017/Blog_Management_System?replicaSet=rs0`.
+3. Start MongoDB as a replica set (for example `mongod --replSet rs0` followed by `rs.initiate()`), start Redis, and configure Cloudinary credentials. Point `DB_URL` at the replica set, for example `mongodb://localhost:27017/Blog_Management_System?replicaSet=rs0`.
 
 4. Run the app in development mode
 
@@ -223,6 +228,10 @@ JWT_REFRESH_EXPIRES=
 EMAIL_SERVICE=
 EMAIL_USER=
 EMAIL_PASSWORD=
+
+CLOUDINARY_CLOUD_NAME=
+CLOUDINARY_API_KEY=
+CLOUDINARY_API_SECRET=
 ```
 
 | Variable                                        | Required | Default                 | Notes                                    |
@@ -236,14 +245,15 @@ EMAIL_PASSWORD=
 | `JWT_ACCESS_SECRET`, `JWT_REFRESH_SECRET`       | Yes      | -                       | Use long random values                   |
 | `JWT_ACCESS_EXPIRES`, `JWT_REFRESH_EXPIRES`     | No       | `15m`, `30d`            | Token lifetimes                          |
 | `EMAIL_SERVICE`, `EMAIL_USER`, `EMAIL_PASSWORD` | Yes      | -                       | SMTP settings for OTP emails             |
+| `CLOUDINARY_CLOUD_NAME`, `CLOUDINARY_API_KEY`, `CLOUDINARY_API_SECRET` | Yes for article uploads | - | Cloudinary image storage credentials |
 | `MONGOOSE_SERVER_SELECTION_TIMEOUT_MS`          | No       | `5000`                  | Optional tuning                          |
 | `MONGOOSE_BUFFER_TIMEOUT_MS`                    | No       | `10000`                 | Optional tuning                          |
 
-Docker Compose overrides `PORT`, `APP_URL`, `DB_URL`, `ELASTIC_URL`, and `REDIS_URL` for the server container.
+Docker Compose overrides `PORT`, `APP_URL`, `DB_URL`, `ELASTIC_URL`, and `REDIS_URL` for the server container. Cloudinary credentials remain in `server/.env` and are passed through by `env_file`.
 
 ## API Overview
 
-The API is grouped under `/api/v1` and uses JSON responses (cover uploads use `multipart/form-data`). Full request and response schemas are in Swagger at `/docs`.
+The API is grouped under `/api/v1` and uses JSON responses. Article create and update requests use `multipart/form-data` for cover uploads; Multer keeps the image in memory and Cloudinary stores it. The response `cover` field contains the Cloudinary secure URL. Full request and response schemas are in Swagger at `/docs`.
 
 Success responses use `{ code, message, data, links }`; list responses add `pagination`. Errors use `{ code, error, correlationId, message, data }`. Lists accept `page` and `limit` (1 to 100), and sorting and search parameters per resource.
 
@@ -379,16 +389,15 @@ yarn test:integration
 - The root project orchestrates the full stack through Docker Compose, which also overrides the container command to `yarn dev` with the source folder mounted.
 - The backend server itself lives under the `server/` folder.
 - MongoDB must run as a replica set because registration, token, delete, and password flows use transactions.
-- Cover images are stored on local disk under `server/uploads/articles` during development and served from `/uploads/articles/`.
+- New cover images are uploaded to Cloudinary and their secure URLs are stored in the existing `cover_image_url` database field.
 - Elasticsearch and Kibana are included for centralized log monitoring.
+- Helmet is enabled globally. CORS currently reflects the request origin and allows credentials; restrict the allowed origin before exposing the API publicly.
 
 ## Roadmap
 
-The following features are **planned** and will be implemented incrementally:
+The following features remain planned:
 
 - [ ] Load balancing
-- [ ] Security hardening (`helmet`, stricter CORS)
-- [ ] Cloud object storage for cover images
 
 ## Author
 

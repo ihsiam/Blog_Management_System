@@ -74,7 +74,9 @@ describe("connectDB (src/db/connection)", () => {
     expect(mockConnect).toHaveBeenCalledWith("mongodb://localhost:27017/test", {
       serverSelectionTimeoutMS: 5000,
     });
-    expect(mockLoggerInfo).toHaveBeenCalledWith("Database connected successfully");
+    expect(mockLoggerInfo).toHaveBeenCalledWith(
+      "Database connected successfully",
+    );
   });
 
   it("should propagate the error when all retry attempts fail", async () => {

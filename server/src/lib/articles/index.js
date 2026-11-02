@@ -214,7 +214,12 @@ const create = async ({
     category_id: category,
   });
 
-  await article.save();
+  try {
+    await article.save();
+  } catch (err) {
+    await storageService.removeArticleCover(cover);
+    throw err;
+  }
 
   await invalidatePublishedArticleLists();
 
@@ -343,7 +348,12 @@ const updateItemPatch = async (id, { title, body, category, file }) => {
     article[key] = payload[key] ?? article[key];
   });
 
-  await article.save();
+  try {
+    await article.save();
+  } catch (err) {
+    if (cover) await storageService.removeArticleCover(cover);
+    throw err;
+  }
 
   // The replaced cover is no longer referenced.
   if (cover) await storageService.removeArticleCover(previousCover);
