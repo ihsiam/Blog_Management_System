@@ -1,6 +1,6 @@
 {
   "name": "blog-management-system",
-  "version": "1.0.0",
+  "version": "2.0.0",
   "packageManager": "yarn@4.12.0",
   "resolutions": {
     "mongodb-memory-server-core/mongodb": "7.5.0"
