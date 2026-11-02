@@ -5,7 +5,6 @@ services:
     build:
       context: ./server
       dockerfile: dockerfile
-    image: mdismilehosensiam/blog_management_system:latest
     container_name: server
     ports:
       - "3000:3000"

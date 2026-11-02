@@ -3,15 +3,55 @@ name: CI/CD
 on:
   push:
     branches:
+      - dev
       - main
   pull_request:
+    branches:
+      - dev
+      - main
+
+permissions:
+  contents: read
+  pull-requests: write
 
 env:
   IMAGE_NAME: mdismilehosensiam/blog_management_system
 
 jobs:
+  quality:
+    name: Format and lint
+    runs-on: ubuntu-latest
+
+    defaults:
+      run:
+        working-directory: server
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v5
+
+      - name: Enable Corepack
+        run: corepack enable
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: yarn
+          cache-dependency-path: server/yarn.lock
+
+      - name: Install dependencies
+        run: yarn install --immutable
+
+      - name: Check formatting
+        run: yarn format:check
+
+      - name: Run lint
+        run: yarn lint
+
   test:
     name: Test
+    needs: quality
     runs-on: ubuntu-latest
 
     defaults:
@@ -40,6 +80,33 @@ jobs:
 
       - name: Run integration tests
         run: yarn test:integration --runInBand
+
+  promote-dev:
+    name: Open dev to main pull request
+    needs: [quality, test]
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push' && github.ref == 'refs/heads/dev'
+
+    steps:
+      - name: Open pull request
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          open_promotions="$(gh pr list \
+            --repo "${GITHUB_REPOSITORY}" \
+            --head dev \
+            --base main \
+            --state open \
+            --json number \
+            --jq 'length')"
+          if [ "${open_promotions}" -eq 0 ]; then
+            gh pr create \
+              --repo "${GITHUB_REPOSITORY}" \
+              --base main \
+              --head dev \
+              --title "chore: promote dev to main" \
+              --body "Automated promotion after CI passed on \`dev\`."
+          fi
 
   build-and-publish:
     name: Build and publish image
