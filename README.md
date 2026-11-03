@@ -264,6 +264,11 @@ Success responses use `{ code, message, data, links }`; list responses add `pagi
 | GET    | `/health` | Server health check      |
 | GET    | `/docs`   | Swagger UI documentation |
 
+The hosted production API is available at
+`https://blog-management-system-lq0r.onrender.com`, with the health check at
+`https://blog-management-system-lq0r.onrender.com/health` and Swagger UI at
+`https://blog-management-system-lq0r.onrender.com/docs`.
+
 ### Authentication
 
 | Method | Endpoint                               | Description                                     | Access         |
