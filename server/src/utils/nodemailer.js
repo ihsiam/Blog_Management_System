@@ -19,6 +19,7 @@ const createTransporter = () => {
 
   return nodemailer.createTransport({
     service: EMAIL_SERVICE,
+    family: 4,
     auth: {
       user: EMAIL_USER,
       pass: EMAIL_PASSWORD,
